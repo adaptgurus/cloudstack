@@ -39,6 +39,7 @@ public class EventDaoImpl extends GenericDaoBase<EventVO, Long> implements Event
     protected final SearchBuilder<EventVO> ToArchiveOrDeleteEventSearch;
     protected final SearchBuilder<EventVO> ArchiveByIdsSearch;
     protected final SearchBuilder<EventVO> LatestEventsByResourceSearch;
+    protected final SearchBuilder<EventVO> LastStartEventSearch;
 
     public EventDaoImpl() {
         CompletedEventSearch = createSearchBuilder();
@@ -66,6 +67,14 @@ public class EventDaoImpl extends GenericDaoBase<EventVO, Long> implements Event
         ArchiveByIdsSearch = createSearchBuilder();
         ArchiveByIdsSearch.and("id", ArchiveByIdsSearch.entity().getId(), Op.IN);
         ArchiveByIdsSearch.done();
+
+        LastStartEventSearch = createSearchBuilder();
+        LastStartEventSearch.and("type", LastStartEventSearch.entity().getType(), Op.EQ);
+        LastStartEventSearch.and("state", LastStartEventSearch.entity().getState(), Op.EQ);
+        LastStartEventSearch.and("resourceId", LastStartEventSearch.entity().getResourceId(), Op.EQ);
+        LastStartEventSearch.and("resourceType", LastStartEventSearch.entity().getResourceType(), Op.EQ);
+        LastStartEventSearch.and("archived", LastStartEventSearch.entity().getArchived(), Op.EQ);
+        LastStartEventSearch.done();
     }
 
     @Override
@@ -90,6 +99,17 @@ public class EventDaoImpl extends GenericDaoBase<EventVO, Long> implements Event
         sc.setParameters("startId", startId);
         sc.setParameters("archived", false);
         return findOneIncludingRemovedBy(sc);
+    }
+
+    @Override
+    public EventVO findLastEvent(String type, State state, Long resourceId, String resourceType) {
+        SearchCriteria<EventVO> sc = LastStartEventSearch.create();
+        sc.setParameters("type", type);
+        sc.setParameters("state", state);
+        sc.setParameters("resourceId", resourceId);
+        sc.setParameters("resourceType", resourceType);
+        sc.setParameters("archived", false);
+        return findLastOneBy(sc);
     }
 
     @Override
