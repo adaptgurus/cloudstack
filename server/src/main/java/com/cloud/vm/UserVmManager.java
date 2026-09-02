@@ -134,6 +134,10 @@ public interface UserVmManager extends UserVmService {
     ConfigKey<Integer> CapacitySkipcountingHours = new ConfigKey<>("Advanced", Integer.class, "capacity.skipcounting.hours", "3600",
             "Time (in seconds) to wait before release VM's cpu and memory when VM in stopped state", true);
 
+  ConfigKey<Boolean> ResetPasswordOnRestoreFromBackup = new ConfigKey<Boolean>("Advanced", Boolean.class, "restore.vm.from.backup.reset.password", "true",
+            "For a password enabled template, whether to generate a new password and expose it in the API response when creating/restoring an Instance from a backup. " +
+                    "Can be overridden per call with the createVMFromBackup API's resetpassword parameter.", true, ConfigKey.Scope.Zone);
+
     static final int MAX_USER_DATA_LENGTH_BYTES = 2048;
 
     public  static  final String CKS_NODE = "cksnode";
