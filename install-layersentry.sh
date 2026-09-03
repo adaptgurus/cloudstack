@@ -10,12 +10,13 @@ readonly PRODUCT_NAME="Layersentry"
 readonly CLOUDSTACK_VERSION="4.22.1.1"
 readonly CLOUDSTACK_CHANNEL="4.22"
 # Immutable repository commit that contains the reviewed Layersentry UI assets/styles.
-readonly ASSET_COMMIT="7a9fdcafd77192a15129c02fcf9aef9076b7d31a"
+readonly ASSET_COMMIT="76256a9f9fd9576248f2d1bae640c42b43fe1462"
 readonly ASSET_BASE_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${ASSET_COMMIT}/ui/public"
 readonly SOURCE_BASE_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${ASSET_COMMIT}/ui"
 readonly LOGO_SHA256="8d5100f54a5590c7d27245ea491c2592da8c6982b1a582cafd785840891da3f1"
 readonly ICON_SHA256="235782b2a7dab1d91ed5d3c99411abd75042bcf2f5f3b784a753123bf5e579da"
 readonly STYLE_SHA256="5a531679566bd3a8b88f061f682ce940fb8adeb7cbc1f71b9700441866a5cdca"
+readonly NAV_STYLE_SHA256="7f8e2d8deafcf7aa6cc9b969faf281972801b1d4041163409de486a250213a34"
 readonly MIN_RAM_MB=4096
 readonly MIN_DISK_GB=250
 
@@ -641,8 +642,11 @@ apply_branding() {
 
   download_verified "$ASSET_BASE_URL/assets/layersentry-logo.svg" "$LOGO_SHA256" "$TMP_DIR/layersentry-logo.svg"
   download_verified "$ASSET_BASE_URL/assets/layersentry-icon.svg" "$ICON_SHA256" "$TMP_DIR/layersentry-icon.svg"
-  # layersentry.less intentionally contains standards-compliant CSS only; install it as a static CSS overlay.
+  # Layersentry style files intentionally contain standards-compliant CSS only; install them as one static overlay.
   download_verified "$SOURCE_BASE_URL/src/style/layersentry.less" "$STYLE_SHA256" "$TMP_DIR/layersentry.css"
+  download_verified "$SOURCE_BASE_URL/src/style/layersentry-navigation.less" "$NAV_STYLE_SHA256" "$TMP_DIR/layersentry-navigation.css"
+  printf '\n' >> "$TMP_DIR/layersentry.css"
+  cat "$TMP_DIR/layersentry-navigation.css" >> "$TMP_DIR/layersentry.css"
 
   install -m 0644 "$TMP_DIR/layersentry-logo.svg" "$ASSETS_DIR/layersentry-logo.svg"
   install -m 0644 "$TMP_DIR/layersentry-icon.svg" "$ASSETS_DIR/layersentry-icon.svg"
