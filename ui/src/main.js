@@ -27,6 +27,7 @@ import extensions from './core/ext'
 import './permission' // permission control
 import './utils/filter' // global filter
 import './style/layersentry.less'
+import './style/layersentry-navigation.less'
 import {
   pollJobPlugin,
   notifierPlugin,
