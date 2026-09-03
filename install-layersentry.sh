@@ -9,6 +9,7 @@ umask 022
 readonly PRODUCT_NAME="Layersentry"
 readonly CLOUDSTACK_VERSION="4.22.1.1"
 readonly CLOUDSTACK_CHANNEL="4.22"
+# Immutable repository commit that contains the reviewed Layersentry UI assets/styles.
 readonly ASSET_COMMIT="7a9fdcafd77192a15129c02fcf9aef9076b7d31a"
 readonly ASSET_BASE_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${ASSET_COMMIT}/ui/public"
 readonly SOURCE_BASE_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${ASSET_COMMIT}/ui"
@@ -42,36 +43,36 @@ usage() {
   cat <<USAGE
 Usage: sudo ./install-layersentry.sh [options]
 
-Installs Apache CloudStack ${CLOUDSTACK_VERSION} LTS where supported, then applies
-Layersentry presentation branding without renaming CloudStack internals.
+Installs Apache CloudStack ${CLOUDSTACK_VERSION} LTS from the configured CloudStack
+community package channel where the exact release is available, then applies the
+Layersentry presentation overlay without renaming CloudStack internals.
 
 Options:
   --branding-only              Apply/refresh Layersentry branding on an existing
                                CloudStack ${CLOUDSTACK_VERSION} installation.
   --with-kvm                   Also install the matching CloudStack KVM agent after
                                verifying hardware/nested virtualization. This script
-                               does not guess or rewrite host bridge networking.
+                               never guesses or rewrites host bridge/VLAN networking.
   --db-host HOST               Database host for a fresh install (default: localhost).
   --db-deploy-user USER        Database administrative user (default: root).
-  --set-selinux-permissive     On EL hosts only, explicitly allow this script to set
-                               SELinux permissive as documented for basic CloudStack
-                               setup. Without this flag, enforcing SELinux is a stop.
+  --set-selinux-permissive     EL only: explicitly permit changing SELinux from
+                               Enforcing to Permissive. Without this flag, Enforcing
+                               SELinux is a hard stop rather than an implicit downgrade.
   -h, --help                   Show this help.
 
-Fresh-install database secrets are never logged. Supply optional environment variables:
+Fresh-install database secrets are never printed. Optional environment variables:
   LAYERSENTRY_CLOUD_DB_PASSWORD   Password for the CloudStack database user.
   LAYERSENTRY_DB_DEPLOY_PASSWORD  Administrative DB password when socket/no-password
-                                  authentication is not available.
+                                  authentication is unavailable.
 
-Supported deterministic automation targets:
+Deterministic automation targets:
   - Ubuntu 22.04 (jammy), 24.04 (noble)
   - Debian 12 (bookworm)
-  - EL-compatible 8/9/10 x86_64 when the exact ${CLOUDSTACK_VERSION} community package
-    is present in the current CloudStack EL repository
-  - SLES/openSUSE 15.6+ x86_64 when the exact package is present in the current repo
+  - EL-compatible 8/9/10 x86_64 when the exact ${CLOUDSTACK_VERSION} package exists
+  - SLES/openSUSE 15.6+ x86_64 when the exact ${CLOUDSTACK_VERSION} package exists
 
-The script rejects missing exact-version packages rather than installing a different,
-snapshot, RC, beta or arbitrary version.
+The installer rejects a missing exact release instead of silently taking another
+version, RC, snapshot, beta, upgrade, or downgrade.
 USAGE
 }
 
@@ -99,8 +100,10 @@ on_error() {
   local line=${BASH_LINENO[0]:-unknown}
   set +e
   printf 'ERROR: Layersentry installer failed at [%s%%] %s (line %s, exit %s).\n' \
-    "$CURRENT_PROGRESS" "$CURRENT_STAGE" "$line" "$rc" | tee -a "$LOG_FILE" >&2
-  printf 'ERROR: Review %s. No 100%% completion marker was emitted.\n' "$LOG_FILE" | tee -a "$LOG_FILE" >&2
+    "$CURRENT_PROGRESS" "$CURRENT_STAGE" "$line" "$rc" | tee -a "${LOG_FILE:-/dev/stderr}" >&2
+  if [[ -n "${LOG_FILE:-}" ]]; then
+    printf 'ERROR: Review %s. No 100%% completion marker was emitted.\n' "$LOG_FILE" | tee -a "$LOG_FILE" >&2
+  fi
   exit "$rc"
 }
 
@@ -112,6 +115,8 @@ cleanup() {
 
 trap on_error ERR
 trap cleanup EXIT
+
+command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 parse_args() {
   while (($#)); do
@@ -145,7 +150,59 @@ init_logging() {
   TMP_DIR="$(mktemp -d /tmp/layersentry-install.XXXXXX)"
 }
 
-command_exists() { command -v "$1" >/dev/null 2>&1; }
+suse_version_supported() {
+  local major minor rest
+  major="${OS_VERSION%%.*}"
+  rest="${OS_VERSION#*.}"
+  if [[ "$rest" == "$OS_VERSION" ]]; then
+    minor=0
+  else
+    minor="${rest%%.*}"
+  fi
+  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] || return 1
+  (( major > 15 || (major == 15 && minor >= 6) ))
+}
+
+detect_os() {
+  [[ -r /etc/os-release ]] || die "Cannot detect Linux distribution: /etc/os-release is missing."
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  OS_ID="${ID:-unknown}"
+  OS_VERSION="${VERSION_ID:-unknown}"
+  OS_CODENAME="${VERSION_CODENAME:-}"
+  OS_MAJOR="${OS_VERSION%%.*}"
+
+  local arch
+  arch="$(uname -m)"
+  [[ "$arch" == "x86_64" ]] || die "Unsupported architecture '$arch'. This installer targets x86_64 management-server packages."
+
+  case "$OS_ID" in
+    ubuntu)
+      PKG_FAMILY="apt"
+      case "$OS_VERSION" in
+        22.04) OS_CODENAME="jammy" ;;
+        24.04) OS_CODENAME="noble" ;;
+        *) die "Ubuntu $OS_VERSION is outside this installer's supported targets (22.04/24.04)." ;;
+      esac
+      ;;
+    debian)
+      PKG_FAMILY="apt"
+      [[ "$OS_MAJOR" == "12" ]] || die "Debian $OS_VERSION is outside this installer's supported target (Debian 12)."
+      OS_CODENAME="bookworm"
+      ;;
+    rhel|rocky|almalinux|centos|ol)
+      PKG_FAMILY="dnf"
+      case "$OS_MAJOR" in 8|9|10) ;; *) die "EL-compatible major $OS_MAJOR is outside this installer's supported range (8/9/10)." ;; esac
+      ;;
+    sles|opensuse-leap)
+      PKG_FAMILY="zypper"
+      suse_version_supported || die "SLES/openSUSE $OS_VERSION is below the supported 15.6 baseline or has an unrecognized VERSION_ID."
+      ;;
+    *) die "Unsupported distribution: ${OS_ID} ${OS_VERSION}. No package-repository guess will be made." ;;
+  esac
+
+  info "Detected ${OS_ID} ${OS_VERSION} (${PKG_FAMILY}), x86_64."
+}
 
 install_bootstrap_tools() {
   case "$PKG_FAMILY" in
@@ -163,90 +220,18 @@ install_bootstrap_tools() {
   esac
 }
 
-detect_os() {
-  [[ -r /etc/os-release ]] || die "Cannot detect Linux distribution: /etc/os-release is missing."
-  # shellcheck disable=SC1091
-  . /etc/os-release
-  OS_ID="${ID:-unknown}"
-  OS_VERSION="${VERSION_ID:-unknown}"
-  OS_CODENAME="${VERSION_CODENAME:-}"
-  OS_MAJOR="${OS_VERSION%%.*}"
-
-  local arch
-  arch="$(uname -m)"
-  [[ "$arch" == "x86_64" ]] || die "Unsupported architecture '$arch'. This installer targets the selected release's x86_64 management-server packages."
-
-  case "$OS_ID" in
-    ubuntu)
-      PKG_FAMILY="apt"
-      case "$OS_VERSION" in
-        22.04) OS_CODENAME="jammy" ;;
-        24.04) OS_CODENAME="noble" ;;
-        *) die "Ubuntu $OS_VERSION is not an installer-supported target for CloudStack ${CLOUDSTACK_VERSION}. Use Ubuntu 22.04 or 24.04." ;;
-      esac
-      ;;
-    debian)
-      PKG_FAMILY="apt"
-      [[ "$OS_MAJOR" == "12" ]] || die "Debian $OS_VERSION is not an installer-supported target. Debian 12 (bookworm) is supported here."
-      OS_CODENAME="bookworm"
-      ;;
-    rhel|rocky|almalinux|centos|ol)
-      PKG_FAMILY="dnf"
-      case "$OS_MAJOR" in 8|9|10) ;; *) die "EL-compatible major $OS_MAJOR is outside this installer's supported range (8/9/10)." ;; esac
-      ;;
-    sles|opensuse-leap)
-      PKG_FAMILY="zypper"
-      python3 - "$OS_VERSION" <<'PY' || die "SLES/openSUSE $OS_VERSION is below the supported 15.6 baseline."
-import sys
-v=tuple(int(x) for x in sys.argv[1].split('.')[:2])
-raise SystemExit(0 if v >= (15,6) else 1)
-PY
-      ;;
-    *)
-      die "Unsupported distribution: ${OS_ID} ${OS_VERSION}. No unsafe package-repository guess will be made."
-      ;;
-  esac
-
-  info "Detected ${OS_ID} ${OS_VERSION} (${PKG_FAMILY}), x86_64."
-}
-
-check_resources() {
-  local ram_mb disk_kb disk_gb
-  ram_mb="$(awk '/MemTotal:/ {print int($2/1024)}' /proc/meminfo)"
-  disk_kb="$(df -Pk / | awk 'NR==2 {print $4}')"
-  disk_gb=$((disk_kb / 1024 / 1024))
-
-  ((ram_mb >= MIN_RAM_MB)) || die "Insufficient RAM: ${ram_mb} MiB detected; CloudStack management requires at least ${MIN_RAM_MB} MiB."
-  if [[ "$INSTALL_MODE" == "fresh" ]]; then
-    ((disk_gb >= MIN_DISK_GB)) || die "Insufficient free root-filesystem space: ${disk_gb} GiB; this installer requires ${MIN_DISK_GB} GiB for a fresh management node."
-  fi
-
-  local fqdn
-  fqdn="$(hostname -f 2>/dev/null || true)"
-  if [[ "$INSTALL_MODE" == "fresh" && "$fqdn" != *.* ]]; then
-    die "A fully qualified domain name is required for a fresh management server; 'hostname -f' returned '${fqdn:-empty}'."
-  fi
-
-  PRIMARY_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
-  [[ -n "$PRIMARY_IP" ]] || die "No primary IPv4 address could be detected. Configure a static management address before installation."
-  ip route show default >/dev/null 2>&1 || die "No default route detected."
-
-  if ! getent hosts download.cloudstack.org >/dev/null 2>&1; then
-    die "DNS resolution for download.cloudstack.org failed."
-  fi
-
-  info "Pre-flight resources: RAM ${ram_mb} MiB, free root disk ${disk_gb} GiB, management IP ${PRIMARY_IP}."
-}
-
 installed_cs_version() {
   case "$PKG_FAMILY" in
-    apt)
-      dpkg-query -W -f='${Version}' cloudstack-management 2>/dev/null || true
-      ;;
-    dnf|zypper)
-      rpm -q --qf '%{VERSION}' cloudstack-management 2>/dev/null || true
-      ;;
+    apt) dpkg-query -W -f='${Version}' cloudstack-management 2>/dev/null || true ;;
+    dnf|zypper) rpm -q --qf '%{VERSION}' cloudstack-management 2>/dev/null || true ;;
   esac
+}
+
+version_matches_release() {
+  local current="$1"
+  [[ "$current" == "$CLOUDSTACK_VERSION" ||
+     "$current" == "$CLOUDSTACK_VERSION"-* ||
+     "$current" == *:"$CLOUDSTACK_VERSION"* ]]
 }
 
 detect_install_mode() {
@@ -254,15 +239,36 @@ detect_install_mode() {
   current="$(installed_cs_version)"
   if [[ -n "$current" ]]; then
     INSTALL_MODE="branding-update"
-    if [[ "$current" != "$CLOUDSTACK_VERSION" && "$current" != "$CLOUDSTACK_VERSION"-* && "$current" != *:"$CLOUDSTACK_VERSION"* ]]; then
-      die "Existing cloudstack-management version '$current' is not ${CLOUDSTACK_VERSION}. Refusing an automatic production upgrade/downgrade. Upgrade CloudStack separately, then rerun --branding-only."
-    fi
-    info "Existing CloudStack ${current} detected; database/package reinstall is disabled."
+    version_matches_release "$current" || die "Existing cloudstack-management '$current' is not ${CLOUDSTACK_VERSION}. Refusing automatic production upgrade/downgrade."
+    info "Existing CloudStack ${current} detected; package/database initialization is disabled."
   elif ((BRANDING_ONLY)); then
     die "--branding-only was requested but cloudstack-management is not installed."
   else
     INSTALL_MODE="fresh"
   fi
+}
+
+check_resources() {
+  local ram_mb disk_kb disk_gb fqdn
+  ram_mb="$(awk '/MemTotal:/ {print int($2/1024)}' /proc/meminfo)"
+  disk_kb="$(df -Pk / | awk 'NR==2 {print $4}')"
+  disk_gb=$((disk_kb / 1024 / 1024))
+
+  ((ram_mb >= MIN_RAM_MB)) || die "Insufficient RAM: ${ram_mb} MiB; at least ${MIN_RAM_MB} MiB is required."
+  if [[ "$INSTALL_MODE" == "fresh" ]]; then
+    ((disk_gb >= MIN_DISK_GB)) || die "Insufficient free root disk: ${disk_gb} GiB; this installer requires ${MIN_DISK_GB} GiB for a fresh management node."
+  fi
+
+  fqdn="$(hostname -f 2>/dev/null || true)"
+  if [[ "$INSTALL_MODE" == "fresh" && "$fqdn" != *.* ]]; then
+    die "A fully qualified hostname is required; 'hostname -f' returned '${fqdn:-empty}'."
+  fi
+
+  PRIMARY_IP="$(hostname -I 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+\./) {print $i; exit}}')"
+  [[ -n "$PRIMARY_IP" ]] || die "No primary IPv4 address detected. Configure a static management address first."
+  ip route show default >/dev/null 2>&1 || die "No default route detected."
+  getent hosts download.cloudstack.org >/dev/null 2>&1 || die "DNS resolution for download.cloudstack.org failed."
+  info "Pre-flight: RAM ${ram_mb} MiB, free root disk ${disk_gb} GiB, management IP ${PRIMARY_IP}."
 }
 
 check_selinux() {
@@ -272,19 +278,20 @@ check_selinux() {
   mode="$(getenforce)"
   if [[ "$mode" == "Enforcing" ]]; then
     if ((SET_SELINUX_PERMISSIVE)); then
-      warn "Explicit flag supplied: setting SELinux permissive for CloudStack setup. Review production SELinux policy requirements after installation."
+      warn "Explicit approval supplied: changing SELinux to permissive for CloudStack setup."
       setenforce 0
       if [[ -f /etc/selinux/config ]]; then
         cp -a /etc/selinux/config "/etc/selinux/config.layersentry-backup.$(date +%Y%m%d-%H%M%S)"
         sed -ri 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
       fi
     else
-      die "SELinux is enforcing. This installer will not weaken host security implicitly. Configure appropriate CloudStack SELinux policy or rerun with --set-selinux-permissive if that is an approved design decision."
+      die "SELinux is enforcing. This installer will not weaken host security implicitly. Configure policy or rerun with --set-selinux-permissive after approval."
     fi
   fi
 }
 
 configure_repository() {
+  [[ "$INSTALL_MODE" == "fresh" ]] || return 0
   case "$PKG_FAMILY" in
     apt)
       install -d -m 0755 /etc/apt/keyrings
@@ -298,7 +305,7 @@ configure_repository() {
       ;;
     dnf)
       local repo_url="https://download.cloudstack.org/el/${OS_MAJOR}/${CLOUDSTACK_CHANNEL}/"
-      curl -fsI --retry 3 "$repo_url" >/dev/null || die "CloudStack EL repository is unavailable for EL${OS_MAJOR}: $repo_url"
+      curl -fsI --retry 3 "$repo_url" >/dev/null || die "CloudStack EL repository unavailable: $repo_url"
       cat > /etc/yum.repos.d/cloudstack.repo <<REPO
 [cloudstack]
 name=Apache CloudStack community packages ${CLOUDSTACK_CHANNEL}
@@ -311,7 +318,7 @@ REPO
       ;;
     zypper)
       local repo_url="https://download.cloudstack.org/suse/${CLOUDSTACK_CHANNEL}/"
-      curl -fsI --retry 3 "$repo_url" >/dev/null || die "The current CloudStack SUSE ${CLOUDSTACK_CHANNEL} community repository is unavailable; refusing to guess another path."
+      curl -fsI --retry 3 "$repo_url" >/dev/null || die "CloudStack SUSE repository unavailable: $repo_url"
       zypper --non-interactive rr cloudstack >/dev/null 2>&1 || true
       zypper --non-interactive ar -f "$repo_url" cloudstack >>"$LOG_FILE" 2>&1
       zypper --non-interactive --gpg-auto-import-keys refresh cloudstack >>"$LOG_FILE" 2>&1
@@ -319,29 +326,30 @@ REPO
   esac
 }
 
-verify_exact_package() {
-  if [[ "$INSTALL_MODE" != "fresh" ]]; then
-    return 0
-  fi
+exact_apt_version() {
+  apt-cache madison "$1" | awk '{print $3}' | grep -E "(^|:)${CLOUDSTACK_VERSION}([+~.-]|$)" | head -1 || true
+}
 
+verify_exact_package() {
+  [[ "$INSTALL_MODE" == "fresh" ]] || return 0
   case "$PKG_FAMILY" in
     apt)
       local candidate
-      candidate="$(apt-cache madison cloudstack-management | awk '{print $3}' | grep -E "(^|:)${CLOUDSTACK_VERSION}([+~.-]|$)" | head -1 || true)"
-      [[ -n "$candidate" ]] || die "Exact CloudStack ${CLOUDSTACK_VERSION} management package is not available from the configured APT repository."
-      info "Verified exact APT package candidate: cloudstack-management ${candidate}."
+      candidate="$(exact_apt_version cloudstack-management)"
+      [[ -n "$candidate" ]] || die "Exact CloudStack ${CLOUDSTACK_VERSION} management package is unavailable from the configured APT repository."
+      info "Verified exact APT candidate: cloudstack-management ${candidate}."
       ;;
     dnf)
       dnf -q --disablerepo='*' --enablerepo=cloudstack list --showduplicates cloudstack-management 2>/dev/null \
         | grep -F "${CLOUDSTACK_VERSION}-1" >/dev/null \
-        || die "Exact CloudStack ${CLOUDSTACK_VERSION}-1 RPM is not available for EL${OS_MAJOR}."
-      info "Verified exact RPM package candidate: ${CLOUDSTACK_VERSION}-1."
+        || die "Exact CloudStack ${CLOUDSTACK_VERSION}-1 management RPM is unavailable for EL${OS_MAJOR}."
+      info "Verified exact EL candidate: ${CLOUDSTACK_VERSION}-1."
       ;;
     zypper)
       zypper --non-interactive se -s -r cloudstack cloudstack-management 2>/dev/null \
         | grep -F "$CLOUDSTACK_VERSION" >/dev/null \
-        || die "Exact CloudStack ${CLOUDSTACK_VERSION} SUSE package is not available."
-      info "Verified exact SUSE package candidate: ${CLOUDSTACK_VERSION}."
+        || die "Exact CloudStack ${CLOUDSTACK_VERSION} SUSE management package is unavailable."
+      info "Verified exact SUSE candidate: ${CLOUDSTACK_VERSION}."
       ;;
   esac
 }
@@ -360,7 +368,6 @@ install_dependencies() {
       zypper --non-interactive install java-17-openjdk-headless mysql-server >>"$LOG_FILE" 2>&1
       ;;
   esac
-
   java -version 2>&1 | head -1 | grep -F '17' >/dev/null || die "Java 17 is not the active runtime after dependency installation."
 }
 
@@ -369,8 +376,9 @@ install_cloudstack_packages() {
   case "$PKG_FAMILY" in
     apt)
       local mgmt_ver ui_ver
-      mgmt_ver="$(apt-cache madison cloudstack-management | awk '{print $3}' | grep -E "(^|:)${CLOUDSTACK_VERSION}([+~.-]|$)" | head -1)"
-      ui_ver="$(apt-cache madison cloudstack-ui | awk '{print $3}' | grep -E "(^|:)${CLOUDSTACK_VERSION}([+~.-]|$)" | head -1 || true)"
+      mgmt_ver="$(exact_apt_version cloudstack-management)"
+      ui_ver="$(exact_apt_version cloudstack-ui)"
+      [[ -n "$mgmt_ver" ]] || die "Exact management package disappeared from APT metadata."
       export DEBIAN_FRONTEND=noninteractive
       if [[ -n "$ui_ver" ]]; then
         apt-get install -y "cloudstack-management=$mgmt_ver" "cloudstack-ui=$ui_ver" >>"$LOG_FILE" 2>&1
@@ -389,13 +397,11 @@ install_cloudstack_packages() {
 
   local current
   current="$(installed_cs_version)"
-  [[ "$current" == "$CLOUDSTACK_VERSION" || "$current" == "$CLOUDSTACK_VERSION"-* || "$current" == *:"$CLOUDSTACK_VERSION"* ]] \
-    || die "Installed CloudStack version '$current' does not match required ${CLOUDSTACK_VERSION}."
+  version_matches_release "$current" || die "Installed CloudStack '$current' does not match required ${CLOUDSTACK_VERSION}."
 }
 
 configure_local_mysql() {
   [[ "$INSTALL_MODE" == "fresh" && "$DB_HOST" == "localhost" ]] || return 0
-
   local mysql_service conf_dir conf_file
   case "$PKG_FAMILY" in
     apt) mysql_service="mysql"; conf_dir="/etc/mysql/conf.d" ;;
@@ -404,9 +410,7 @@ configure_local_mysql() {
   esac
   install -d -m 0755 "$conf_dir"
   conf_file="$conf_dir/cloudstack.cnf"
-  if [[ -e "$conf_file" ]]; then
-    cp -a "$conf_file" "${conf_file}.layersentry-backup.$(date +%Y%m%d-%H%M%S)"
-  fi
+  [[ ! -e "$conf_file" ]] || cp -a "$conf_file" "${conf_file}.layersentry-backup.$(date +%Y%m%d-%H%M%S)"
   cat > "$conf_file" <<'MYSQLCONF'
 [mysqld]
 server_id=1
@@ -424,9 +428,7 @@ MYSQLCONF
 prompt_secret_if_needed() {
   local var_name="$1" prompt="$2"
   if [[ -z "${!var_name:-}" ]]; then
-    if [[ ! -t 0 ]]; then
-      die "$var_name is required in non-interactive mode. Set it in the environment; it will not be logged."
-    fi
+    [[ -t 0 ]] || die "$var_name is required in non-interactive mode. Set it in the environment; it will not be logged."
     local value
     read -r -s -p "$prompt" value
     printf '\n' >&2
@@ -436,29 +438,26 @@ prompt_secret_if_needed() {
 
 configure_database() {
   [[ "$INSTALL_MODE" == "fresh" ]] || return 0
-
   prompt_secret_if_needed LAYERSENTRY_CLOUD_DB_PASSWORD "CloudStack database-user password: "
   [[ -n "${LAYERSENTRY_CLOUD_DB_PASSWORD:-}" ]] || die "CloudStack database password must not be empty."
 
-  if [[ "$DB_HOST" == "localhost" ]]; then
-    if command_exists mysql && mysql -NBe "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='cloud'" 2>/dev/null | grep -qx cloud; then
-      die "A database named 'cloud' already exists. Refusing to initialize or recreate it automatically. Use --branding-only for an existing CloudStack installation."
+  if [[ "$DB_HOST" == "localhost" ]] && command_exists mysql; then
+    if mysql -NBe "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='cloud'" 2>/dev/null | grep -qx cloud; then
+      die "Database 'cloud' already exists. Refusing automatic initialization/recreation. Use --branding-only for an existing deployment."
     fi
   fi
 
   local deploy_arg
   if [[ -n "${LAYERSENTRY_DB_DEPLOY_PASSWORD:-}" ]]; then
     deploy_arg="--deploy-as=${DB_DEPLOY_USER}:${LAYERSENTRY_DB_DEPLOY_PASSWORD}"
+  elif [[ "$DB_HOST" != "localhost" ]]; then
+    prompt_secret_if_needed LAYERSENTRY_DB_DEPLOY_PASSWORD "Database administrative password for ${DB_DEPLOY_USER}@${DB_HOST}: "
+    deploy_arg="--deploy-as=${DB_DEPLOY_USER}:${LAYERSENTRY_DB_DEPLOY_PASSWORD}"
   else
-    if [[ "$DB_HOST" != "localhost" ]]; then
-      prompt_secret_if_needed LAYERSENTRY_DB_DEPLOY_PASSWORD "Database administrative password for ${DB_DEPLOY_USER}@${DB_HOST}: "
-      deploy_arg="--deploy-as=${DB_DEPLOY_USER}:${LAYERSENTRY_DB_DEPLOY_PASSWORD}"
-    else
-      deploy_arg="--deploy-as=${DB_DEPLOY_USER}"
-    fi
+    deploy_arg="--deploy-as=${DB_DEPLOY_USER}"
   fi
 
-  # Do not echo this command: it contains a database password by design of the official setup tool.
+  # Never echo this command: it contains a database password by design of CloudStack's setup utility.
   cloudstack-setup-databases \
     "cloud:${LAYERSENTRY_CLOUD_DB_PASSWORD}@${DB_HOST}" \
     "$deploy_arg" \
@@ -474,26 +473,20 @@ configure_management() {
 
 prepare_kvm() {
   ((WITH_KVM)) || return 0
-
-  grep -Eq '(vmx|svm)' /proc/cpuinfo || die "--with-kvm requested but CPU virtualization extensions are not exposed. On a VM, enable nested virtualization first."
-  [[ -e /dev/kvm ]] || die "--with-kvm requested but /dev/kvm is unavailable."
+  grep -Eq '(vmx|svm)' /proc/cpuinfo || die "--with-kvm requested but CPU virtualization extensions are not exposed."
+  [[ -e /dev/kvm ]] || die "--with-kvm requested but /dev/kvm is unavailable. Enable hardware/nested virtualization first."
 
   case "$PKG_FAMILY" in
     apt)
       local agent_ver
-      agent_ver="$(apt-cache madison cloudstack-agent | awk '{print $3}' | grep -E "(^|:)${CLOUDSTACK_VERSION}([+~.-]|$)" | head -1 || true)"
+      agent_ver="$(exact_apt_version cloudstack-agent)"
       [[ -n "$agent_ver" ]] || die "Exact cloudstack-agent ${CLOUDSTACK_VERSION} package is unavailable."
       apt-get install -y "cloudstack-agent=$agent_ver" >>"$LOG_FILE" 2>&1
       ;;
-    dnf)
-      dnf install -y "cloudstack-agent-${CLOUDSTACK_VERSION}-1" >>"$LOG_FILE" 2>&1
-      ;;
-    zypper)
-      zypper --non-interactive install --oldpackage "cloudstack-agent=${CLOUDSTACK_VERSION}-1" >>"$LOG_FILE" 2>&1
-      ;;
+    dnf) dnf install -y "cloudstack-agent-${CLOUDSTACK_VERSION}-1" >>"$LOG_FILE" 2>&1 ;;
+    zypper) zypper --non-interactive install --oldpackage "cloudstack-agent=${CLOUDSTACK_VERSION}-1" >>"$LOG_FILE" 2>&1 ;;
   esac
-
-  warn "KVM agent installed, but bridge/VLAN/storage/libvirt security configuration was intentionally NOT guessed. Complete host networking and libvirt preparation from the CloudStack 4.22 KVM guide before adding this host."
+  warn "KVM agent installed. Bridge/VLAN/storage/libvirt security configuration was intentionally NOT guessed."
 }
 
 package_file_list() {
@@ -510,7 +503,7 @@ package_file_list() {
 }
 
 find_ui_root() {
-  local candidates=()
+  local candidates=() p
   while IFS= read -r p; do
     [[ "$p" == */index.html ]] || continue
     if [[ -f "$p" ]] && grep -Eq 'id=.*(app|root)' "$p" 2>/dev/null; then
@@ -522,10 +515,10 @@ find_ui_root() {
     while IFS= read -r p; do
       candidates+=("$(dirname "$p")")
     done < <(find /usr/share /var/lib -maxdepth 6 -type f -name index.html 2>/dev/null \
-      | grep -E 'cloudstack|client' | head -10)
+      | grep -E 'cloudstack|client' | head -10 || true)
   fi
 
-  ((${#candidates[@]} > 0)) || die "Unable to locate the installed CloudStack UI root. No arbitrary web path will be modified."
+  ((${#candidates[@]} > 0)) || die "Unable to locate installed CloudStack UI root. No arbitrary web path will be modified."
   UI_ROOT="${candidates[0]}"
   ASSETS_DIR="$UI_ROOT/assets"
   install -d -m 0755 "$ASSETS_DIR"
@@ -548,7 +541,7 @@ find_config_file() {
     c="$(package_file_list | grep -E '/config\.json$' | head -1 || true)"
     [[ -n "$c" && -e "$c" ]] && CONFIG_FILE="$c"
   fi
-  [[ -n "$CONFIG_FILE" ]] || die "Unable to locate CloudStack UI config.json. Refusing to assume a version-specific path."
+  [[ -n "$CONFIG_FILE" ]] || die "Unable to locate CloudStack UI config.json."
   CONFIG_FILE="$(readlink -f "$CONFIG_FILE")"
   info "Detected CloudStack UI config: $CONFIG_FILE"
 }
@@ -617,6 +610,7 @@ with open(path, 'w', encoding='utf-8') as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write('\n')
 PY
+
   python3 -m json.tool "$CONFIG_FILE" >/dev/null
   chmod 0644 "$CONFIG_FILE"
   info "Backed up original UI configuration to $backup"
@@ -629,13 +623,13 @@ inject_stylesheet() {
     cp -a "$index" "${index}.layersentry-backup.$(date +%Y%m%d-%H%M%S)"
     python3 - "$index" <<'PY'
 import sys
-p=sys.argv[1]
-s=open(p, encoding='utf-8').read()
-link='<link rel="stylesheet" href="assets/layersentry.css">'
+p = sys.argv[1]
+s = open(p, encoding='utf-8').read()
+link = '<link rel="stylesheet" href="assets/layersentry.css">'
 if '</head>' not in s:
     raise SystemExit('index.html has no </head>; refusing unsafe injection')
-s=s.replace('</head>', f'  {link}\n</head>', 1)
-open(p,'w',encoding='utf-8').write(s)
+s = s.replace('</head>', f'  {link}\n</head>', 1)
+open(p, 'w', encoding='utf-8').write(s)
 PY
   fi
   grep -Fq 'assets/layersentry.css' "$index" || die "Layersentry stylesheet reference was not installed."
@@ -647,12 +641,12 @@ apply_branding() {
 
   download_verified "$ASSET_BASE_URL/assets/layersentry-logo.svg" "$LOGO_SHA256" "$TMP_DIR/layersentry-logo.svg"
   download_verified "$ASSET_BASE_URL/assets/layersentry-icon.svg" "$ICON_SHA256" "$TMP_DIR/layersentry-icon.svg"
+  # layersentry.less intentionally contains standards-compliant CSS only; install it as a static CSS overlay.
   download_verified "$SOURCE_BASE_URL/src/style/layersentry.less" "$STYLE_SHA256" "$TMP_DIR/layersentry.css"
 
   install -m 0644 "$TMP_DIR/layersentry-logo.svg" "$ASSETS_DIR/layersentry-logo.svg"
   install -m 0644 "$TMP_DIR/layersentry-icon.svg" "$ASSETS_DIR/layersentry-icon.svg"
   install -m 0644 "$TMP_DIR/layersentry.css" "$ASSETS_DIR/layersentry.css"
-
   apply_config_patch
   inject_stylesheet
 }
@@ -660,10 +654,9 @@ apply_branding() {
 restart_services() {
   systemctl restart cloudstack-management >>"$LOG_FILE" 2>&1
   systemctl is-active --quiet cloudstack-management || die "cloudstack-management is not active after restart."
-
   if ((WITH_KVM)); then
     systemctl restart cloudstack-agent >>"$LOG_FILE" 2>&1 || true
-    systemctl is-active --quiet cloudstack-agent || warn "cloudstack-agent is not active yet; complete KVM host preparation before registration."
+    systemctl is-active --quiet cloudstack-agent || warn "cloudstack-agent is not active yet; finish KVM host preparation before registration."
   fi
 }
 
@@ -671,13 +664,12 @@ health_check() {
   local url="http://127.0.0.1:8080/client/" code="" i
   for i in $(seq 1 36); do
     code="$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 3 --max-time 5 "$url" || true)"
-    if [[ "$code" == "200" || "$code" == "302" || "$code" == "401" ]]; then
-      info "CloudStack web endpoint responded with HTTP $code."
-      return 0
-    fi
+    case "$code" in
+      200|302|401) info "CloudStack web endpoint responded with HTTP $code."; return 0 ;;
+    esac
     sleep 5
   done
-  die "CloudStack management service is active but $url did not return an expected HTTP response. Last HTTP code: ${code:-none}."
+  die "cloudstack-management is active but $url did not return an expected HTTP response. Last code: ${code:-none}."
 }
 
 main() {
@@ -702,7 +694,7 @@ main() {
     configure_repository
     verify_exact_package
   else
-    info "Branding-update mode: package repository and database changes are skipped."
+    info "Existing-install mode: repository and database changes are skipped."
   fi
 
   progress 35 "Installing dependencies"
@@ -731,9 +723,9 @@ main() {
   progress 100 "Layersentry installation completed"
   log_raw "Access URL: http://${PRIMARY_IP}:8080/client/"
   log_raw "CloudStack internal package/service/API names were preserved."
-  log_raw "Review firewall exposure: management ports 8096 and 8250 must not be publicly accessible."
+  log_raw "Security reminder: management ports 8096 and 8250 must not be publicly accessible."
   if ((WITH_KVM)); then
-    log_raw "KVM note: complete documented bridge/libvirt/storage preparation before adding this host to CloudStack."
+    log_raw "KVM reminder: complete documented bridge/libvirt/storage preparation before adding this host to CloudStack."
   fi
 }
 
