@@ -1,0 +1,101 @@
+/*
+ * Layersentry navigation compatibility layer for Apache CloudStack 4.22.1.1.
+ * CloudStack defaults the side menu component to Ant Design's light theme even
+ * when runtime Less variables give the navigation a dark brand background.
+ * These selectors preserve CloudStack's menu/RBAC structure and only correct
+ * presentation states for the Layersentry dark navigation treatment.
+ */
+
+body:not(.dark-mode) .sider.light {
+  background: var(--ls-nav) !important;
+}
+
+/* Keep the supplied navy logo legible above the navy navigation surface. */
+body:not(.dark-mode) .sider.light > .ant-layout-sider-children > div:first-child {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-right: 1px solid var(--ls-border-subtle);
+  border-bottom: 1px solid var(--ls-border-subtle);
+}
+
+body:not(.dark-mode) .sider.light .ant-menu-light,
+body:not(.dark-mode) .sider.light .ant-menu-light .ant-menu-sub,
+body:not(.dark-mode) .sider.light .ant-menu-submenu > .ant-menu {
+  background: var(--ls-nav) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+body:not(.dark-mode) .sider.light .ant-menu-item,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title,
+body:not(.dark-mode) .sider.light .ant-menu-item > a,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title > span,
+body:not(.dark-mode) .sider.light .ant-menu-item .anticon,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title .anticon {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+body:not(.dark-mode) .sider.light .ant-menu-item .custom-icon path,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title .custom-icon path {
+  fill: rgba(255, 255, 255, 0.82) !important;
+}
+
+body:not(.dark-mode) .sider.light .ant-menu-item:hover,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title:hover,
+body:not(.dark-mode) .sider.light .ant-menu-item-active,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-active > .ant-menu-submenu-title {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #ffffff !important;
+}
+
+body:not(.dark-mode) .sider.light .ant-menu-item:hover > a,
+body:not(.dark-mode) .sider.light .ant-menu-item:hover .anticon,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title:hover,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title:hover .anticon {
+  color: #ffffff !important;
+}
+
+body:not(.dark-mode) .sider.light .ant-menu-item:hover .custom-icon path,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title:hover .custom-icon path {
+  fill: #ffffff !important;
+}
+
+body:not(.dark-mode) .sider.light .ant-menu:not(.ant-menu-horizontal) .ant-menu-item-selected {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+body:not(.dark-mode) .sider.light .ant-menu-item-selected > a,
+body:not(.dark-mode) .sider.light .ant-menu-item-selected > a:hover,
+body:not(.dark-mode) .sider.light .ant-menu-item-selected .anticon {
+  color: #ffffff !important;
+}
+
+body:not(.dark-mode) .sider.light .ant-menu-item-selected .custom-icon path {
+  fill: #ffffff !important;
+}
+
+/* Collapsed side-menu popups are teleported outside .sider; keep them coherent. */
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light > .ant-menu,
+body:not(.dark-mode) .ant-menu-submenu-popup .ant-menu-light {
+  background: var(--ls-nav) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item,
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item > a {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item:hover,
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item-selected {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item:hover > a,
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item-selected > a {
+  color: #ffffff !important;
+}
