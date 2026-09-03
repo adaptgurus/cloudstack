@@ -26,6 +26,7 @@ import './core/lazy_use'
 import extensions from './core/ext'
 import './permission' // permission control
 import './utils/filter' // global filter
+import './style/layersentry.less'
 import {
   pollJobPlugin,
   notifierPlugin,
