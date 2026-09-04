@@ -23,6 +23,7 @@ git log -5 --oneline --decorate
 
 Read specialist documents only when the task requires them:
 
+- troubleshooting/regression/root-cause work: `docs/layersentry/LAYERSENTRY_DEBUGGING_RUNBOOK.md`
 - secure coding/trust-boundary/security-sensitive implementation: `docs/layersentry/LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
 - release/upgrade/IP/supply-chain work: `docs/layersentry/LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`
 - upstream/core-delta/rebase review: `docs/layersentry/LAYERSENTRY_UPSTREAM_DIFF.md`
@@ -89,6 +90,23 @@ At minimum:
 - use security/negative tests proportional to the changed trust boundary.
 
 Do not claim security/compliance properties beyond actual evidence.
+
+## Debugging baseline
+
+For non-trivial failures, use `LAYERSENTRY_DEBUGGING_RUNBOOK.md` rather than random fixes/restarts.
+
+At minimum:
+
+- capture read-only baseline evidence first;
+- define expected vs observed behavior precisely;
+- classify the failing layer;
+- preserve exact source/artifact/target/job identifiers;
+- rank hypotheses and use discriminating checks;
+- change one causal variable at a time;
+- never blind-retry timed-out mutations;
+- do not call a disappearing symptom a confirmed root-cause fix;
+- add regression coverage and live validation at the correct evidence gate;
+- keep unresolved root cause as `UNKNOWN`/`SUPPORTED` rather than fabricating certainty.
 
 ## Secrets
 
