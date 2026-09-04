@@ -1,17 +1,23 @@
-# LayerSentry DRaaS — Simple Recovery-Plan Architecture
+# LayerSentry DRaaS — Production-Oriented Recovery-Plan Architecture
 
 **Status:** `DESIGN_DEFINED`  
 **Baseline:** Apache CloudStack 4.22.1.1 + LayerSentry KVM-first product layer  
-**Design goal:** Nutanix-like simplicity for the customer, storage-aware production-grade replication underneath  
-**Scope of this document:** target architecture and implementation contract only. It is not runtime or production-certification evidence.
+**Design goal:** Nutanix-like customer simplicity with storage-native-first replication and a provider-neutral recovery plane  
+**Scope:** target architecture and implementation contract. This is not runtime or production-certification evidence.
+
+The detailed pre-implementation comparison and decision record is:
+
+`docs/layersentry/evidence/dr/2026-09-05-draas-architecture-revalidation.md`
+
+The stable project relationships are indexed in:
+
+`docs/layersentry/LAYERSENTRY_KNOWLEDGE_GRAPH.md`
 
 ---
 
 ## 1. Customer outcome
 
-The customer should not need to understand QEMU dirty bitmaps, NBD, Ceph mirroring, ZFS streams, storage-array replication, fencing state machines or CloudStack internals.
-
-The desired product experience is:
+The customer workflow must remain simple regardless of whether the underlying storage is NAS, LINSTOR/DRBD, Ceph, enterprise SAN or another certified provider.
 
 ```text
 DR
@@ -20,789 +26,876 @@ DR
  -> Select DR Site
  -> Select DR Network / VLAN
  -> Select DR IP policy
- -> Select RPO policy
+ -> Select RPO / retention
  -> Enable Protection
 ```
 
-After protection is enabled:
-
-```text
-Healthy
- -> incremental changed data continuously moves to DR
- -> recovery points are created at the configured RPO
- -> LayerSentry continuously verifies DR readiness
-
-DC failure
- -> validate failure
- -> obtain witness/quorum decision
- -> fence/isolate source where required
- -> promote latest safe DR replica
- -> attach DR network/IP mapping
- -> start application tiers in order
- -> validate health
- -> switch traffic
- -> DR ACTIVE
-
-DC returns
- -> reverse-sync
- -> planned failback
- -> validate
- -> production returns to the preferred site
-```
-
-The customer-facing operational controls should normally be only:
+Normal operations expose only:
 
 - **Test Recovery**
 - **Planned Failover**
 - **Failback**
-- **Auto Failover** toggle, available only when witness/fencing/network prerequisites are certified
+- **Recover** from a selected recovery point
+- **Auto Failover** only when witness/fencing prerequisites are certified
 
-Do not expose low-level replication choices in normal mode unless support/advanced mode is explicitly requested.
+The normal user must not need to understand QEMU dirty bitmaps, DRBD protocol, RBD mirroring, SAN consistency groups, NBD, multipath or provider-specific promotion commands.
 
----
-
-## 2. Nutanix design principles to copy — not proprietary implementation
-
-LayerSentry should copy the successful product principles visible in Nutanix DR rather than attempt to clone proprietary Nutanix storage internals:
-
-1. Protection policy and recovery plan are separate concepts.
-2. Recovery points are replicated to the remote site.
-3. Near-synchronous DR is based on lightweight change tracking rather than repeatedly copying whole VM images.
-4. Recovery plans contain boot sequencing and network mapping.
-5. IP re-mapping and traffic recovery are part of the recovery plan.
-6. Test recovery must not disrupt the protected production VM.
-7. Automatic failover requires a third-fault-domain witness/quorum concept for safe site-failure decisions.
-8. Multiple replication technologies can serve different RPO classes.
-
-Useful public references used for this design:
-
-- Nutanix DR product: https://www.nutanix.com/products/nutanix-cloud-infrastructure/disaster-recovery
-- Nutanix NearSync / lightweight snapshot architecture discussion: https://www.nutanix.com/blog/ensuring-resilient-mission-critical-applications
-- Nutanix NCI 7.5 DR enhancements: https://www.nutanix.com/blog/disaster-recovery-dr-enhancements-in-nci-7-5
-- QEMU dirty bitmap and incremental backup design: https://www.qemu.org/docs/master/interop/bitmaps.html
-- QEMU NBD dirty-bitmap metadata: https://www.qemu.org/docs/master/interop/nbd.html
-- libvirt incremental backup internals: https://libvirt.org/kbase/internals/incremental-backup.html
-- Ceph RBD mirroring: https://docs.ceph.com/en/latest/rbd/rbd-mirroring/
-- OpenZFS send/receive: https://openzfs.github.io/openzfs-docs/Basic%20Concepts/Operations/Send%20and%20Receive.html
-
----
-
-## 3. Do not use rsync as the primary VM DR engine
-
-`rsync` may remain useful for copying small configuration/evidence files. It must not be the primary VM-disk replication mechanism.
-
-Reasons:
-
-- file-level scanning is the wrong abstraction for multi-hundred-GB/TB VM disks;
-- a small guest write can modify blocks inside a very large QCOW2/raw image;
-- file-level copying does not by itself establish a VM-consistent multi-disk recovery point;
-- repeated scanning does not scale linearly with changed data;
-- there is no native VM changed-block lineage, replication epoch or durable recovery-point protocol;
-- retry/failover semantics and split-brain handling would have to be reinvented around an unsuitable data plane.
-
-The LayerSentry generic KVM engine should use block-level changed-data tracking.
-
----
-
-## 4. One LayerSentry DR plan, multiple replication providers
-
-The UI and orchestration layer expose one provider-neutral protection-plan contract.
-
-The controller automatically selects the best certified data-plane provider for the VM's primary storage.
-
-### Provider priority
-
-| Storage type | Preferred replication provider | Purpose |
-| --- | --- | --- |
-| Ceph RBD | Ceph `rbd-mirror` | native journal/snapshot delta replication |
-| ZFS / ZVOL | ZFS send/receive | native incremental block-aware replication |
-| QCOW2 on filesystem/NFS/local storage | LayerSentry QEMU CBT provider | QEMU/libvirt dirty-bitmap incremental replication |
-| RAW/LVM/SAN | certified array/native replication provider where available | avoid fragile transient-bitmap dependence |
-| Unsupported storage provider | native CloudStack B&R / full recovery fallback | truthful reduced-RPO service tier |
-
-The user does **not** select these providers in normal mode. LayerSentry detects storage capability and shows only the DR SLA/RPO tiers that the current source+DR storage topology can actually meet.
-
-This avoids pretending every backend supports the same RPO.
-
----
-
-## 5. Generic KVM replication engine — QEMU CBT + NBD, not repeated snapshots
-
-For supported QCOW2-backed KVM workloads, the default LayerSentry block-delta engine should use supported QEMU/libvirt primitives.
-
-### Initial enable-protection flow
+Target lifecycle:
 
 ```text
-1. Discover VM disks and source storage.
-2. Verify target capacity/network/storage mapping.
-3. Establish VM/disk checkpoint lineage.
-4. Start full baseline copy while the VM remains online.
-5. Track writes that occur during the full seed.
-6. Send the catch-up delta.
-7. Seal a durable recovery point at DR.
-8. Mark the VM Protected only after the destination acknowledges durable state.
+Protect
+ -> Protected / measured lag
+ -> choose latest or older Recovery Point when needed
+ -> Test Recovery without production impact
+ -> planned or safe automatic failover
+ -> DR Active
+ -> reverse replication
+ -> Failback
 ```
 
-### Steady-state incremental flow
+---
 
-At each RPO epoch:
+## 2. Preserve CloudStack as the infrastructure authority
+
+LayerSentry DR is an orchestration extension around CloudStack; it is not a second cloud scheduler.
+
+CloudStack remains authoritative for:
+
+- Site/Zone;
+- Pod/Infrastructure Group;
+- Compute Cluster/KVM Host;
+- VM lifecycle;
+- volumes and primary-storage attachment;
+- networks and network services;
+- account/domain/project/RBAC;
+- normal KVM/libvirt orchestration;
+- native Backup & Recovery APIs and supported snapshot behavior.
+
+LayerSentry owns only DR-specific product state:
+
+- Site pairing metadata;
+- Protection Plans;
+- provider capability bindings;
+- Recovery Point Catalog;
+- Recovery Groups and dependency order;
+- DR network/VLAN/IP mappings;
+- recovery/failover/failback state machine;
+- witness/fencing eligibility;
+- traffic-switch adapters;
+- DR audit/RPO/RTO evidence.
+
+Do not add DR convenience columns/tables to CloudStack core merely because it is easier. Use a LayerSentry-specific service/state store outside upstream CloudStack tables unless a documented exception is approved.
+
+---
+
+## 3. Reuse existing CloudStack 4.22.1.1 capabilities first
+
+CloudStack already supplies important DR/recovery foundations:
+
+- provider/plugin-based Backup & Recovery framework;
+- KVM NAS B&R provider;
+- backup offerings, adhoc backup and user scheduling;
+- `createBackup`, `listBackups`, `restoreBackup`, volume restore and `createVMFromBackup` APIs;
+- VM metadata retained with backups;
+- creation of a new VM from a selected older backup;
+- since 4.22, creation of a VM from NAS backup in another Zone;
+- destination resource/network selection where resources differ;
+- native KVM file-backed incremental Volume Snapshot capability when prerequisites are met;
+- storage-based and file-based KVM Instance Snapshot capabilities with documented limitations;
+- native LINSTOR KVM primary storage;
+- CloudStack 4.22.1.x NAS B&R support for VMs on LINSTOR primary storage.
+
+### Native B&R role in LayerSentry
+
+Native CloudStack B&R is the mandatory baseline and safe fallback. It is particularly suitable for:
+
+- **Backup DR** tiers with hourly-or-greater RPO;
+- long-retention recovery points;
+- independent full/base recovery points;
+- re-seeding when an incremental/storage-native lineage is invalid;
+- cross-Zone recovery proof before advanced orchestration is enabled.
+
+CloudStack B&R alone is not the target low-RPO DR controller because native user schedules are HOURLY/DAILY/WEEKLY/MONTHLY and upstream does not provide the complete Recovery Plan/witness/fencing/failback control plane.
+
+---
+
+## 4. Final provider-selection hierarchy
+
+The selected architecture uses the highest-level, most mature supported primitive available for the backend.
 
 ```text
-Guest writes
-   -> QEMU/libvirt dirty-block tracking
-   -> lightweight consistency/checkpoint marker
-   -> export changed extents only
-   -> local replication agent reads changed extents
-   -> compress + integrity-frame + encrypt in transit
-   -> DR replication receiver
-   -> apply delta to DR replica
-   -> flush/fsync and seal DR recovery point
-   -> DR acknowledges epoch N
-   -> source advances checkpoint lineage
+Protection Plan
+  |
+  +-> Does a CloudStack-native capability satisfy the exact SLA/action?
+  |      YES -> use supported CloudStack API
+  |
+  +-> Is a certified storage-native replication provider available?
+  |      YES -> use provider-native replication adapter
+  |
+  +-> Is this a supported QCOW2/file-backed KVM workload?
+  |      YES -> use libvirt backup/checkpoint adapter
+  |
+  +-> otherwise
+         -> expose Backup DR/native B&R only
 ```
 
-QEMU documents dirty bitmaps specifically for incremental/differential backup. QEMU can expose dirty-bitmap metadata through NBD; libvirt's QEMU driver uses QEMU dirty bitmaps underneath its incremental-backup checkpoint model.
+### Provider matrix
 
-### Critical correctness rule
+| Storage | Hot/current replica | PITR/retention | Baseline/fallback |
+| --- | --- | --- | --- |
+| **LINSTOR/DRBD HCI/SDS** | DRBD/LINSTOR real-time or certified async mode | LINSTOR snapshot + snapshot shipping | CloudStack NAS B&R where supported |
+| **Ceph RBD** | `rbd-mirror` journal/snapshot mode according to certified SLA | RBD snapshots/bookmarks + catalog | CloudStack supported recovery path |
+| **Enterprise SAN** | certified array-native async/sync consistency-group replication | array snapshot/bookmark/clone | CloudStack VM metadata/lifecycle + backup fallback |
+| **NFS/SharedMountPoint/QCOW2** | libvirt domain backup/checkpoint incremental path | sealed DR-side incremental/full points | CloudStack NAS B&R |
+| **ZFS/ZVOL where independently managed/certified** | native ZFS replication/send-receive where it is the actual storage contract | ZFS snapshots | CloudStack lifecycle integration as applicable |
+| **Unsupported/uncertified** | none beyond supported upstream capability | native backups only | CloudStack B&R |
 
-Never clear/advance the source changed-block checkpoint merely because transmission started.
+The user never chooses this low-level provider in normal mode. LayerSentry detects it and exposes only protection tiers the source+DR topology has actually qualified for.
 
-Advance only after the destination has durably committed and acknowledged the exact replication epoch.
+---
 
-Use an idempotent tuple such as:
+## 5. Why storage-native replication is preferred for low-RPO DR
+
+A storage system already knows its own consistency, allocation, replication, promotion and ownership semantics better than a host-side generic copier.
+
+For LINSTOR, Ceph and enterprise SAN, storage-native replication normally gives:
+
+- less data movement through KVM hosts;
+- provider-native change tracking;
+- better consistency-group support;
+- explicit primary/secondary or promote/demote semantics;
+- provider telemetry for lag/health;
+- more efficient reverse replication;
+- lower custom code and better long-term maintainability;
+- a clearer fencing/dual-writer model.
+
+LayerSentry standardizes orchestration and evidence without pretending all storage engines behave identically.
+
+Each backend/firmware family remains a separate certification target.
+
+---
+
+## 6. Preferred LayerSentry HCI profile — LINSTOR/DRBD
+
+LINSTOR/DRBD is the preferred LayerSentry-owned HCI/SDS profile because it aligns well with KVM, CloudStack and the DR requirements.
+
+### Local HCI/HA
+
+Use LINSTOR placement and DRBD replication inside the site according to the certified HCI profile.
+
+### Remote DR
+
+Choose the replication mode according to measured WAN latency/bandwidth and target RPO:
+
+1. continuous DRBD replication where topology and workload permit;
+2. certified asynchronous/semi-synchronous mode for longer links;
+3. optional DRBD Proxy only where licensing and performance requirements justify it;
+4. LINSTOR snapshot shipping when WAN characteristics or PITR requirements favor point-in-time delta shipment.
+
+Do not stretch synchronous write acknowledgment across an unsuitable WAN simply to advertise a low RPO.
+
+### PITR
+
+Use LINSTOR snapshots/backup shipping for independently addressable historical points. Real-time replication and point-in-time backup are complementary: corruption/deletion can be replicated immediately, so DRBD replication alone is not a substitute for retained snapshots.
+
+### Product positioning
+
+Customers choosing LayerSentry HCI can receive the most integrated low-RPO path. Customers with NAS/SAN are not forced to migrate to LINSTOR.
+
+---
+
+## 7. Enterprise SAN adapter contract
+
+Do not create a host-level block copier for arrays that already provide certified replication.
+
+A SAN adapter must be able to implement, when the array supports it:
 
 ```text
-protection_plan_id
-vm_id
-disk_id
-epoch_id
-source_checkpoint_id
-payload_sequence
+discoverCapabilities()
+resolveCloudStackVolumeToArrayObject()
+createConsistencyPoint()
+startProtection()
+getReplicationState()
+getReplicationLag()
+listRecoveryPoints()
+verifyRecoveryPoint()
+promote()
+demote()
+reverseReplication()
+createTestClone()
+mapToDRHosts()
+verifyHostAccess()
+fenceWriteOwnership()
+deleteRecoveryPoint()
 ```
 
-A retry of an acknowledged or partially transmitted epoch must be safe and deduplicated.
+Required correctness checks include:
 
-### Bitmap rollover
+- exact source/destination array identity;
+- LUN/volume mapping;
+- consistency group membership;
+- host group/initiator mapping;
+- WWID identity;
+- multipath health;
+- no dual-writable source/DR presentation during failover;
+- safe promote/demote/reprotect sequence;
+- exact firmware/API version certification.
 
-Use a safe bitmap/checkpoint rollover model so guest writes that occur while epoch N is being transmitted are tracked for epoch N+1. Do not stop dirty tracking during transfer.
-
-If persistent QEMU bitmap state becomes inconsistent or unavailable, fail closed to a new baseline/full resync rather than silently claiming the replica is current.
-
----
-
-## 6. Replication transport
-
-Do not expose a QEMU NBD server directly to the WAN as the product interface.
-
-Use a local Unix-socket/QMP/NBD interaction between the KVM host and the LayerSentry replication agent. The agent sends only approved changed ranges to the paired DR receiver.
-
-Target transport requirements:
-
-- mutual TLS 1.3;
-- short-lived site/agent credentials;
-- certificate rotation/revocation;
-- no reusable infrastructure secrets in UI/browser/logs;
-- bounded parallel streams;
-- configurable per-site/per-plan bandwidth limits;
-- backpressure;
-- resumable epochs;
-- per-chunk/extent integrity verification;
-- compression such as Zstandard when it provides measured benefit;
-- sparse/zero-range awareness;
-- explicit timeouts and bounded retries;
-- sequence/epoch replay protection at the application protocol level;
-- metrics for bytes changed, bytes transmitted, compression ratio, lag and retry count.
-
-The source host must never accept arbitrary remote block-write requests through the DR transport.
+If the adapter cannot establish safe write ownership, automatic failover is ineligible.
 
 ---
 
-## 7. Source snapshot policy — keep it simple
+## 8. Ceph RBD provider
 
-The user described a model where an incremental snapshot appears and is replicated to DR. The product should present this as a **Recovery Point**, but the source does not need to accumulate a long chain of heavyweight snapshots.
+Use native `rbd-mirror` rather than pulling RBD blocks through a generic LayerSentry copier.
 
-Preferred implementation:
+Ceph supports asynchronous mirroring in journal-based and snapshot-based modes. The exact mode is a provider-policy decision:
 
-- one baseline seed;
-- lightweight changed-block/checkpoint tracking at source;
-- changed blocks replicated forever-incrementally;
-- recovery-point history sealed primarily on DR storage;
-- short source checkpoint metadata retained only as required for safe delta lineage;
-- configurable immutable/retained recovery points at DR or an external backup repository.
+- journal mode gives fine-grained ordered replication but adds write overhead;
+- snapshot mode transfers changed deltas and may provide a better write-performance tradeoff for some workloads;
+- both require enough WAN capacity and correct primary/non-primary management.
 
-This reduces source capacity consumption and avoids snapshot-chain operational debt.
+LayerSentry is responsible for:
 
----
+- mapping the CloudStack VM/disk to the exact RBD image;
+- checking mirror state/lag;
+- coordinating multi-disk application epochs where required;
+- safe promotion/demotion;
+- Recovery Point Catalog metadata;
+- network/application recovery;
+- witness/fencing/failback orchestration.
 
-## 8. Application consistency
-
-Default protection level: **crash consistent**.
-
-Optional higher consistency:
-
-1. QEMU Guest Agent filesystem freeze/thaw for supported Linux guests.
-2. Windows VSS integration through supported guest-agent mechanisms.
-3. application/database pre-freeze and post-thaw hooks for workloads that require transactional consistency.
-4. Recovery Groups for coordinated application tiers.
-
-Freeze only long enough to establish the consistency marker/checkpoint; do not hold the application frozen for WAN replication.
-
-A filesystem-consistent snapshot must never be labelled application-consistent unless the relevant application integration has actually succeeded.
+Forced promotion without safely excluding the prior primary is an emergency exception, not the normal automatic path.
 
 ---
 
-## 9. DR Site pairing and cluster sync
+## 9. Generic NAS/file-backed fallback — libvirt, not a custom raw QMP protocol
 
-The user should configure the DR cluster once.
+For supported QCOW2/file-backed KVM workloads where no better storage-native replication exists, use libvirt's backup/checkpoint API as the product boundary.
 
-### Pair Site
+### Why
+
+`virDomainBackupBegin()` supports full/incremental backups and domain checkpoints. Libvirt uses QEMU dirty bitmaps underneath, so LayerSentry gets changed-block efficiency without making raw QMP commands its external contract.
+
+Benefits:
+
+- lower QEMU version coupling;
+- domain-level semantics;
+- fewer custom low-level failure paths;
+- supported push/pull backup abstraction;
+- easier future libvirt/QEMU validation.
+
+### Initial protection
+
+```text
+Discover VM + disks
+ -> verify destination capacity/mapping
+ -> create full baseline + checkpoint
+ -> copy/ship baseline to DR
+ -> track writes during seed
+ -> transfer catch-up delta
+ -> seal destination recovery point
+ -> mark Protected only after durable destination acknowledgement
+```
+
+### Incremental epoch
+
+```text
+libvirt checkpoint N
+ -> changed extents since prior checkpoint
+ -> bounded transfer/receiver
+ -> destination durable write + integrity validation
+ -> seal Recovery Point N
+ -> source lineage advances only after successful destination commit
+```
+
+### QEMU bitmap correctness remains relevant
+
+- persistent dirty bitmaps are QCOW2-specific;
+- raw-image transient bitmaps do not survive QEMU exit;
+- an inconsistent bitmap after unclean shutdown cannot be trusted;
+- chain loss triggers a safe new baseline/reseed;
+- never display `Protected` when lineage is inconsistent.
+
+Do not expose an unauthenticated NBD endpoint over the DR WAN. If pull mode is used internally, constrain it to the local trusted host/agent boundary and move data through the authenticated LayerSentry replication transport.
+
+---
+
+## 10. `rsync` policy
+
+`rsync` is explicitly **not** the generic running-VM replication engine.
+
+It may be used for:
+
+- small configuration/evidence files;
+- a zone-local CloudStack backup-repository synchronization design where the repository content is already immutable/consistent and the exact workflow has been tested;
+- operational transfers that do not pretend to provide changed-block VM consistency.
+
+Repository synchronization still needs:
+
+- atomic publication/manifest;
+- integrity checks;
+- partial-transfer handling;
+- retention coordination;
+- sufficient WAN bandwidth;
+- proof that CloudStack sees a complete backup before recovery is allowed.
+
+---
+
+## 11. Hot replica and point-in-time recovery are separate
+
+The DR site maintains both:
+
+```text
+HOT REPLICA
+  -> newest safely promotable state
+  -> used for planned/emergency failover
+
+RECOVERY POINT CATALOG
+  -> RP-N
+  -> RP-N-1
+  -> older hourly/daily/weekly points
+  -> application-consistent points where actually proven
+```
+
+A user can choose **Recover** or **Test Recovery** and select an older point.
+
+### Recovery Point minimum record
+
+- plan/application/VM ID;
+- source and DR Site IDs;
+- consistency epoch ID;
+- timestamp/source clock reference;
+- consistency class;
+- every disk/provider checkpoint ID;
+- baseline/parent dependencies;
+- destination object/storage IDs;
+- integrity/checksum state where supported;
+- retention class/expiry;
+- measured lag/RPO;
+- validation state;
+- last successful Test Recovery reference.
+
+A point is usable only when its entire data/dependency chain exists.
+
+### Multi-disk atomicity
+
+One VM/application recovery point may contain multiple provider checkpoints. Seal the logical point only after all required disks are durable. Partial disk success must not be presented as a complete VM/application recovery point.
+
+---
+
+## 12. Snapshot safety policy
+
+CloudStack 4.22 documents KVM limitations between VM/Instance snapshots and Volume snapshots. LayerSentry must not combine them indiscriminately.
+
+For each storage profile, certify one supported protection strategy and guard conflicting actions.
+
+Principles:
+
+- do not maintain unbounded VM snapshot chains;
+- do not rely on a long qcow2 parent/child chain as the only DR copy;
+- create periodic durable baselines/full points;
+- keep DR recovery history independent of the source's ordinary user snapshot lifecycle where possible;
+- detect incompatible existing VM/Volume snapshot state before protection or restore;
+- regression-test snapshot/create/delete/revert/restore interactions for the exact release.
+
+---
+
+## 13. Application consistency
+
+Default: **crash-consistent**.
+
+Filesystem consistency may use QEMU Guest Agent freeze/thaw where supported. Freeze only for the short checkpoint/consistency-marker window, never for WAN transfer duration.
+
+Application consistency requires application-aware integration such as:
+
+- Windows VSS where properly integrated;
+- database-native pre/post hooks;
+- transactional application hooks;
+- application-group coordination.
+
+Never label a filesystem-frozen point `Application Consistent` without successful application-specific evidence.
+
+---
+
+## 14. Site pairing and metadata sync
+
+The user pairs the DR Site once:
 
 ```text
 Administration -> DR Sites -> Pair Site
 ```
 
-Pairing establishes mutual trust and continuously synchronizes **metadata only** that is required to build recovery plans:
+Pairing synchronizes only the metadata/capabilities needed for plans:
 
 - Site/Zone identity;
-- Compute Clusters and available capacity;
-- Storage pools and DR capability labels;
-- VM Networks;
-- VLAN IDs;
-- CIDR/subnet;
-- gateway;
-- DNS/NTP metadata where required;
-- available DR IP pools;
-- traffic-switch integrations;
-- provider capabilities;
-- health and last-sync timestamp.
+- compute clusters/capacity;
+- storage pools/provider capabilities;
+- VM networks/VLAN IDs;
+- CIDR/subnet/gateway;
+- DR IP pools;
+- traffic-switch capability;
+- provider health/last sync.
 
-Do not copy long-lived CloudStack administrator secrets between sites. Each site's agent/controller keeps its local credentials within that site's trust boundary.
-
-The LayerSentry controller must not build a second independent VM scheduler/inventory. CloudStack remains authoritative for VM, network, account, Zone and storage lifecycle; LayerSentry stores only DR-plan, mapping, replication and recovery state.
+Do **not** copy a long-lived CloudStack administrator password or storage-array credential to the peer site. Each site keeps local provider credentials in its own secret boundary.
 
 ---
 
-## 10. Simplest DR plan UI
+## 15. Simplified Protection Plan UI
 
 ### Step 1 — Workloads
 
-- VM
-- multiple VMs
-- Application Group / Recovery Group
+- one VM;
+- multiple VMs;
+- application/Recovery Group.
 
 ### Step 2 — DR Site
 
-Destination Site list comes from paired-site sync.
+Show only paired Sites that satisfy minimum compute/storage/network prerequisites.
 
-Show only sites that currently satisfy minimum compute/storage/network requirements.
+### Step 3 — Network mapping
 
-### Step 3 — Network
-
-For every source VM network, auto-suggest a destination mapping using paired-site metadata.
-
-Normal UI:
+Auto-suggest destination networks from synchronized metadata.
 
 ```text
-Source Network     DR Network          IP Mode
-VLAN 120 / WEB ->  VLAN 520 / DR-WEB   Use DR IP Pool
-VLAN 121 / APP ->  VLAN 521 / DR-APP   Use DR IP Pool
-VLAN 122 / DB  ->  VLAN 522 / DR-DB    Use DR IP Pool
+Source                     DR
+WEB / VLAN 120       ->    DR-WEB / VLAN 520
+APP / VLAN 121       ->    DR-APP / VLAN 521
+DB  / VLAN 122       ->    DR-DB  / VLAN 522
 ```
 
-Supported IP modes:
+IP modes:
 
-1. **Keep IP** — only when validated stretched L2/routing semantics make it safe.
-2. **Use DR IP Pool** — recommended default; LayerSentry deterministically allocates and persists a DR IP per NIC.
-3. **Static Mapping** — operator supplies exact destination IP when required.
-4. **DHCP** — only where the DR network is intentionally DHCP-driven.
+1. **Use DR IP Pool** — preferred general default;
+2. **Static Mapping** — deterministic operator mapping;
+3. **Keep IP** — only when stretched-L2/routing semantics are validated;
+4. **DHCP** — only for intentionally DHCP-driven DR networks.
 
-The customer should normally choose a DR VLAN/network and an IP pool, not manually type every VM's address.
+### Step 4 — Protection policy
 
-Advanced mode may show per-VM/per-NIC override.
+The UI shows only provider-qualified policies. Example product categories:
 
-### Step 4 — Protection level
+- **Backup DR** — >= 60 min target, manual/planned recovery;
+- **Standard DR** — <= 5 min target, only for measured/certified providers;
+- **Advanced DR** — <= 1 min target, only for measured/certified providers;
+- **Metro DR** — near-zero/zero target only with certified synchronous storage, latency, quorum/fencing and application topology.
 
-Expose only policies the current provider can support:
-
-- **Backup DR** — 1 hour or greater, manual recovery
-- **Standard DR** — target <= 5 minutes, automated recovery eligible
-- **Advanced DR** — target <= 1 minute, automated recovery eligible
-- **Metro DR** — near-zero/zero RPO only when synchronous storage, latency, witness and application prerequisites are certified
-
-Do not advertise a 1-minute/5-minute tier merely because the UI has a selector.
+These are policy targets, not universal promises.
 
 ### Step 5 — Review
 
-Show:
+Display:
 
-- source Site;
-- DR Site;
-- protected VMs;
-- destination storage;
-- source -> destination network mapping;
-- DR IP mapping/pool;
-- target RPO;
-- detected replication provider;
+- protected workloads;
+- source/DR Site;
+- source -> destination network/IP mapping;
+- detected provider;
+- target RPO/retention;
 - initial seed size;
-- estimated bandwidth requirement as an estimate, not an SLA;
-- auto-failover eligibility and missing prerequisites.
+- current eligibility/missing prerequisites;
+- auto-failover eligibility.
 
 Button: **Enable Protection**.
 
 ---
 
-## 11. Recovery Group
+## 16. Recovery Groups
 
-A Recovery Group is the application-level failover unit.
-
-Example:
+A Recovery Group is the application failover unit.
 
 ```text
-Stage 0: network / firewall / required virtual appliances
+Stage 0: required network/security virtual appliances
 Stage 1: database
-Stage 2: cache / message queue
-Stage 3: application servers
-Stage 4: web servers
+Stage 2: cache / queue
+Stage 3: application
+Stage 4: web
 Stage 5: load balancer / traffic endpoint
 ```
 
-Each stage may define:
+Each stage can define:
 
-- start order;
 - parallelism;
 - startup timeout;
 - TCP/HTTP/application health gate;
 - pre/post recovery hook;
-- failure behavior: stop, continue, or manual approval.
+- stop/continue/manual-approval behavior.
 
-Traffic must not be switched to DR until required application health gates pass.
+Do not switch production traffic until all required health gates pass.
 
 ---
 
-## 12. Automatic failover — witness and fencing are mandatory
+## 17. Test Recovery
+
+Test Recovery is first-class and must not modify the production replica lineage.
+
+```text
+selected Recovery Point
+ -> isolated DR test network
+ -> temporary VM/group
+ -> apply test IP mappings
+ -> boot dependency stages
+ -> application/guest validation
+ -> timing/evidence report
+ -> cleanup + orphan check
+```
+
+Default isolation must prevent accidental production DNS/BGP/IP advertisements.
+
+Users should be able to Test Recovery from the latest point **or an older retained point**.
+
+---
+
+## 18. Planned failover before emergency automation
+
+Certify Planned Failover and Failback before enabling automatic disaster declaration.
+
+Planned sequence:
+
+```text
+preflight source + DR
+ -> stop/quiesce application according to policy
+ -> final replication epoch
+ -> verify DR caught up
+ -> fence/demote source write side
+ -> promote DR storage
+ -> recover VM definitions through CloudStack
+ -> apply network/IP mapping
+ -> start dependency stages
+ -> validate application
+ -> switch traffic
+ -> DR_ACTIVE
+```
+
+Every operation is persisted, idempotent or explicitly recovery-controlled.
+
+---
+
+## 19. Automatic failover — witness and fencing are mandatory
 
 Never implement:
 
 ```text
-ping failed -> boot DR VMs
+ping fails -> start DR
 ```
 
-That is not production DR and creates split-brain risk.
+Automatic site recovery requires:
 
-### Required failure decision
+- multiple independent source health signals;
+- third-fault-domain witness/quorum;
+- exclusive recovery lease;
+- proven source fence;
+- no dual-writer storage condition;
+- provider-safe promotion;
+- durable state machine;
+- application validation;
+- traffic switching only after validation.
 
-A site may be declared failed only after multiple independent signals are evaluated, such as:
+Possible fencing mechanisms depend on the deployment:
 
-- source LayerSentry controller heartbeat;
-- source CloudStack management/API health;
-- KVM/agent/site heartbeat;
-- protected application probes;
-- network reachability from DR;
-- independent Witness result.
+- BMC/OOBM;
+- provider-native storage demotion/fence;
+- SAN presentation removal;
+- SDN/firewall isolation;
+- BGP/route withdrawal;
+- hypervisor/cluster fence.
 
-### Witness
-
-Deploy a small independent Witness/Quorum service in a third fault domain outside both source and DR sites.
-
-The witness participates in an exclusive recovery lease/fencing decision.
-
-### Fencing
-
-The exact fence mechanism depends on topology and may include:
-
-- BMC/OOBM power fencing;
-- storage primary/demotion fencing;
-- SDN/network isolation;
-- external ADC/BGP route withdrawal;
-- hypervisor/cluster fencing;
-- provider-native promotion/demotion.
-
-If LayerSentry cannot establish a safe exclusivity/fencing condition for a topology, automatic failover must be disabled or require explicit operator override with a strong split-brain warning.
-
-Ceph documentation explicitly warns that forced RBD promotion when the old primary cannot be demoted creates a split-brain condition; LayerSentry orchestration must treat that as a last-resort emergency action, not the normal path.
+If exclusivity cannot be established, automatic failover is disabled or requires explicit high-risk operator override.
 
 ---
 
-## 13. Failover state machine
-
-Use a durable, resumable state machine:
+## 20. Durable failover state machine
 
 ```text
 NORMAL
-  -> SUSPECT
-  -> VALIDATE_FAILURE
-  -> ACQUIRE_RECOVERY_LEASE
-  -> FENCE_SOURCE
-  -> SELECT_RECOVERY_POINT
-  -> PROMOTE_STORAGE
-  -> CREATE_OR_RECOVER_VM_DEFINITIONS
-  -> APPLY_NETWORK_MAPPING
-  -> APPLY_IP_MAPPING
-  -> START_RECOVERY_STAGES
-  -> VALIDATE_APPLICATION
-  -> SWITCH_TRAFFIC
-  -> DR_ACTIVE
+ -> SUSPECT
+ -> VALIDATE_FAILURE
+ -> ACQUIRE_RECOVERY_LEASE
+ -> FENCE_SOURCE
+ -> SELECT_RECOVERY_POINT
+ -> PROMOTE_STORAGE
+ -> CREATE_OR_RECOVER_VM_DEFINITIONS
+ -> APPLY_NETWORK_MAPPING
+ -> APPLY_IP_MAPPING
+ -> START_RECOVERY_STAGES
+ -> VALIDATE_APPLICATION
+ -> SWITCH_TRAFFIC
+ -> DR_ACTIVE
 ```
 
-Every phase must be:
+Each phase must be:
 
-- idempotent;
-- persisted;
+- durable/persisted;
+- bounded by timeout;
+- idempotent or deduplicated;
 - restartable after controller failure;
 - auditable;
-- bounded by explicit timeout;
-- safe to query without mutation;
-- capable of returning a clear partial/failed state.
+- queryable without mutation;
+- explicit about partial/failure state.
 
-Never rerun an unknown in-flight failover operation blindly.
-
----
-
-## 14. Test Recovery
-
-Test Recovery is a first-class product function, not a support script.
-
-```text
-Production VM keeps running
-        |
-        +-> latest replicated recovery point
-             -> isolated DR test network
-             -> temporary recovered VM/group
-             -> health checks
-             -> evidence/report
-             -> cleanup
-```
-
-Requirements:
-
-- isolated bubble network by default;
-- no accidental production IP/BGP/DNS advertisement;
-- configurable test-IP mapping;
-- test boot and application validation;
-- automatic cleanup with explicit orphan detection;
-- report actual boot/application timings;
-- no promotion of the production replica state by a test.
+A lost session/timeout never authorizes blindly rerunning the phase.
 
 ---
 
-## 15. Failback
+## 21. Failback
 
-Failback is part of DR, not a future manual procedure.
+Failback is part of the product.
 
 ```text
 DR_ACTIVE
- -> verify source Site repaired
- -> rebuild/re-seed or reverse incremental replication
- -> catch source up from DR primary
- -> validate source readiness
+ -> validate preferred/source Site repaired
+ -> reverse replication or rebuild/reseed
+ -> catch source up
+ -> source readiness preflight
  -> acquire cutback lease
- -> quiesce/final delta
- -> fence DR write side as required
- -> promote preferred/source Site
- -> recover workloads in dependency order
+ -> final application consistency epoch
+ -> fence/demote DR write side
+ -> promote source storage
+ -> recover/start workload stages
  -> validate
- -> switch traffic
- -> resume normal forward protection
+ -> switch traffic back
+ -> resume normal source -> DR protection
 ```
 
-Failback must use the same idempotency, fencing, health-gate and evidence rules as failover.
+Use the same fencing, idempotency, health and evidence rules as failover.
 
 ---
 
-## 16. Network and traffic recovery
+## 22. Traffic-switch adapter
 
-A VM being powered on is not a completed DR event.
+A powered-on DR VM is not a completed disaster recovery event.
 
-LayerSentry needs a provider-neutral Traffic Switch adapter layer.
+Provider-neutral traffic integrations may include:
 
-Supported adapters may include:
-
-- DNS/GSLB update;
-- external ADC/LB pool activation;
+- DNS/GSLB;
+- ADC/LB pool activation;
 - BGP route advertisement/withdrawal;
 - firewall/NAT mapping;
-- SDN integration;
-- stretched-L2 no-change mode where validated.
+- SDN;
+- certified stretched-L2 mode.
 
-Traffic switch occurs only after application health validation.
+Traffic moves only after application health gates pass.
 
-For DNS-based recovery, show configured TTL and warn that end-to-end convergence can exceed VM boot time.
-
----
-
-## 17. Storage-native providers
-
-### Ceph RBD
-
-Prefer native `rbd-mirror` for Ceph-backed VM disks.
-
-Advantages:
-
-- journal or snapshot-based asynchronous mirroring;
-- changed-data replication handled by the storage platform;
-- primary/non-primary semantics;
-- provider health/status APIs.
-
-LayerSentry remains responsible for recovery-plan ordering, CloudStack VM lifecycle, networking, traffic switching, witness/fencing and failback orchestration.
-
-### ZFS
-
-Prefer ZFS snapshot + incremental `zfs send`/`zfs receive` for ZFS-backed volumes.
-
-OpenZFS computes incremental streams from its own block-level snapshot bookkeeping, so replication cost is proportional to changed data rather than directory/file-tree scanning.
-
-### Enterprise SAN
-
-Where the primary storage array has certified replication APIs, use a LayerSentry storage-replication adapter rather than reading/writing every block through a host-side generic path.
-
-Required adapter contract:
-
-- capability discovery;
-- establish protection;
-- get replication lag/state;
-- create consistency point;
-- promote/demote;
-- resync/reverse;
-- test clone where supported;
-- fence state;
-- capacity/error reporting.
-
-Unsupported arrays fall back to a truthful lower service tier rather than an unverified near-sync claim.
+For DNS, show configured TTL and do not equate VM boot time with user traffic convergence.
 
 ---
 
-## 18. Scale architecture
+## 23. Scale and performance architecture
 
-Production design targets many plans/VMs without a single giant replication worker.
+Do not create one giant single-threaded replication worker.
 
 ### Data plane
 
-- one lightweight replication agent per KVM host or storage-access domain;
-- bounded worker pool;
-- per-disk parallelism limits;
-- WAN bandwidth scheduler;
-- priority queues by protection tier;
-- site-level admission control;
+- distributed agent per KVM host/storage-access domain where generic host-side transfer is needed;
+- storage-native provider workers where the storage owns replication;
+- bounded worker/concurrency pools;
+- WAN bandwidth scheduling;
+- priority by protection policy;
 - destination backpressure;
-- staggered recovery-point epochs to avoid snapshot storms;
-- multi-stream transfer only after measuring provider/network behavior.
+- staggered checkpoint creation to avoid snapshot storms;
+- resumable transfer where the provider supports it.
 
 ### Control plane
 
-- stateless/restartable DR controller replicas where practical;
-- durable protection-plan and state-machine storage separate from CloudStack core tables;
-- third-site witness/quorum for automatic failover;
-- no customer VM data through the management UI process;
-- replication data plane separate from CloudStack management/API traffic.
+- restartable controller replicas where practical;
+- durable plan/state-machine store;
+- no guest data through the web UI process;
+- DR data path separated from ordinary CloudStack management traffic;
+- witness outside source/DR failure domains.
 
-### Capacity signals
+### Measure continuously
 
-Continuously measure:
-
-- change rate MB/s per VM/disk;
-- replication throughput;
-- replication lag seconds;
+- VM/disk change rate;
+- provider replication throughput;
+- lag seconds;
 - queue depth;
-- source/destination storage latency;
 - WAN utilization/loss;
-- estimated time to RPO breach;
-- DR compute/storage headroom.
+- storage latency;
+- expected time to RPO breach;
+- destination capacity/headroom;
+- recovery-point creation/validation time.
 
-A plan becomes **At Risk** before it exceeds RPO when current throughput predicts that the RPO cannot be met.
-
----
-
-## 19. Security and tenant isolation
-
-The DR service is privileged and must follow `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`.
-
-Minimum contract:
-
-- CloudStack RBAC remains authoritative for source workload ownership/actions;
-- LayerSentry separately authorizes DR-plan/failover/fencing operations;
-- per-tenant plan/resource authorization;
-- mutual TLS between trusted site components;
-- certificate rotation/revocation;
-- least-privilege local CloudStack credentials;
-- no arbitrary URL/host replication target supplied directly by an untrusted tenant;
-- allowlisted paired sites only;
-- no shell-string construction from VM/network names;
-- bounded payloads/concurrency/timeouts;
-- audit every protection, test, failover, failback and override action;
-- secrets redacted from logs/artifacts;
-- encrypt data in transit;
-- encryption-at-rest status is reported only according to the actual storage provider mechanism;
-- explicit tenant isolation tests for plan/object-ID tampering.
+Mark a plan `At Risk` before the configured RPO is actually exceeded when measured throughput predicts an imminent breach.
 
 ---
 
-## 20. Truthful dashboard
+## 24. Security and tenant isolation
 
-Main DR dashboard should show only decision-useful state:
+The DR service is privileged.
+
+Minimum requirements:
+
+- CloudStack server-side RBAC remains authoritative for CloudStack resources;
+- LayerSentry authorizes the exact DR operation/resource/tenant;
+- no cross-tenant object-ID substitution;
+- least-privilege service identities;
+- mTLS between paired-site components;
+- short-lived/rotatable credentials;
+- provider credentials remain local to the required site;
+- no arbitrary untrusted replication target/URL;
+- explicit allowlisted Site pairing;
+- secrets never in browser bundles/Git/logs/artifacts;
+- bounded payloads/timeouts/retries/concurrency;
+- audit every protect/test/recover/failover/fence/failback/delete/override action;
+- data-in-transit encryption;
+- at-rest encryption status only from the real provider;
+- direct API/RBAC and cross-tenant negative tests.
+
+Follow `docs/layersentry/LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`.
+
+---
+
+## 25. Truthful dashboard
 
 | Field | Meaning |
 | --- | --- |
 | Status | Protected / Syncing / At Risk / Failed / DR Active |
 | Source | source Site |
 | DR Site | paired recovery Site |
-| Target RPO | configured policy objective |
-| Current Lag | measured replication lag |
-| Last Safe Recovery Point | destination-acknowledged durable point |
+| Target RPO | configured objective |
+| Current Lag | measured provider lag |
+| Last Safe Recovery Point | destination-validated point |
 | Recovery Readiness | compute + storage + network + provider preflight |
-| Last Test | last successful isolated Test Recovery |
+| Last Test | successful isolated Test Recovery |
 | Auto Failover | Enabled / Disabled / Blocked with reason |
-| Failback Ready | measured readiness, not a static label |
+| Failback Ready | measured state, not static text |
 
-Never show `Protected`, `Replicated`, `DR Ready` or `Healthy` without current supporting evidence.
-
----
-
-## 21. Suggested product SLA tiers
-
-These are product targets, not current claims.
-
-| Tier | Target RPO | Recovery mode | Eligible provider examples |
-| --- | ---: | --- | --- |
-| Backup DR | >= 60 min | manual/planned | CloudStack B&R |
-| Standard DR | <= 5 min | planned + automatic when fenced | QEMU CBT, Ceph snapshot mirror, ZFS incremental, array-native |
-| Advanced DR | <= 1 min | planned + automatic when fenced | measured high-rate CBT, Ceph journal/native, certified array-native |
-| Metro DR | ~0 | automatic | certified synchronous storage + witness/fencing + latency/app qualification |
-
-Do not guarantee an RPO tier until the provider/topology has passed sustained change-rate, restart, WAN-loss and recovery testing at the intended scale.
+Never show `Protected`, `Healthy`, `Replicated` or `DR Ready` without current evidence.
 
 ---
 
-## 22. Architecture score
+## 26. Mandatory implementation/evidence gates
 
-### Target design score after this architecture
+### Gate A — native CloudStack two-Zone recovery
 
-| Area | Target design score |
-| --- | ---: |
-| Customer simplicity | 9.8/10 |
-| Replication architecture | 9.6/10 |
-| Storage portability | 9.7/10 |
-| Recovery orchestration | 9.7/10 |
-| Network/IP recovery | 9.4/10 |
-| Split-brain prevention | 9.8/10 when witness + fencing is certified |
-| Test Recovery | 9.7/10 |
-| Failback | 9.6/10 |
-| Security/audit model | 9.6/10 |
-| Scale/operability | 9.5/10 |
-| Overall target architecture | **9.6/10** |
-
-This score applies to the **design**, not the current implementation.
-
-Current production readiness remains governed by live evidence. A design cannot become `PRODUCTION_CERTIFIED` by documentation or code review alone.
-
-A practical maximum claim after implementation should remain approximately 9-9.5/10 until repeated independent-site failure tests, security testing, scale tests and real failback evidence exist. A literal 10/10 resilience claim is not credible for a production infrastructure product.
-
----
-
-## 23. Required implementation gates
-
-The existing LayerSentry rule remains in force: first prove the native CloudStack 4.22.1.1 two-Zone recovery baseline, then build/enable advanced orchestration.
-
-### Gate A — native recovery baseline
-
-- two Zones/Sites;
 - supported B&R provider/repository;
 - cross-Zone create-from-backup;
-- network mapping;
-- repeat recovery;
-- measured RPO/RTO;
-- negative tests.
+- destination network mapping;
+- repeated recoveries;
+- older backup recovery;
+- RPO/RTO timing;
+- negative cases.
 
-### Gate B — Site Pairing + DR inventory sync
+### Gate B — Site Pairing
 
-- paired-site mutual trust;
-- DR network/VLAN/IP pool discovery;
-- capacity/storage capability discovery;
-- no long-lived credential leakage.
+- mutual trust;
+- metadata/capability sync;
+- network/VLAN/IP pool sync;
+- provider/capacity discovery;
+- no secret leakage.
 
-### Gate C — Protection Plan API/model
+### Gate C — Protection Plan + Recovery Point Catalog
 
-- VM/Recovery Group;
-- destination Site;
-- storage/provider binding;
-- network/IP mapping;
-- RPO/retention;
+- provider-neutral plan;
 - RBAC;
-- idempotency.
+- network/IP mapping;
+- retention;
+- full disk/epoch membership;
+- provider capability gating.
 
-### Gate D — generic QEMU CBT replication
+### Gate D — first production provider
 
-- full seed;
-- persistent changed-block tracking on supported QCOW2 path;
-- incremental transfer;
-- disconnect/resume;
-- controller/agent restart;
-- corrupt/inconsistent bitmap -> safe resync;
-- multi-disk recovery point;
-- measured source overhead.
+Prefer the actual storage profile intended for LayerSentry production. If LayerSentry HCI is first, certify LINSTOR/DRBD. If current customer storage is NAS/SAN, certify that backend first.
 
-### Gate E — storage-native providers
+For every provider:
 
-At minimum certify selected production backends, starting with the storage profiles LayerSentry actually sells/supports.
+- baseline/seed;
+- >=2 incremental/replication epochs where applicable;
+- restart/resume;
+- provider loss/recovery;
+- latest-point restore;
+- older-point restore;
+- data validation;
+- measured overhead/lag.
 
-### Gate F — Test Recovery
+### Gate E — Test Recovery
 
 - isolated network;
-- no production traffic collision;
+- no production collision;
+- selected old/latest point;
 - automated validation/cleanup.
 
-### Gate G — planned failover/failback
+### Gate F — planned failover/failback
 
-- reverse replication;
-- dependency order;
+- final delta;
+- provider demote/promote;
+- Recovery Group order;
 - network/IP mapping;
 - traffic switch;
+- reverse replication;
 - repeatability.
 
-### Gate H — automatic failover
+### Gate G — automatic failover
 
 - independent witness;
-- fencing;
-- source/DR partition tests;
-- witness-loss tests;
-- controller restart during failover;
+- fence/exclusive lease;
+- WAN partition tests;
+- witness loss;
+- source return;
+- controller restart during every phase;
 - no double promotion.
 
-### Gate I — production certification
+### Gate H — production certification
 
-Minimum destructive/chaos matrix:
-
-- DC hard power loss;
-- WAN/site partition;
-- source management loss with workloads healthy;
-- DR management restart;
-- witness loss;
-- storage provider unavailable;
-- stale replica;
-- corrupt recovery point;
-- missing network mapping;
-- DR capacity exhaustion;
-- replication backlog/RPO breach;
-- application stage failure;
-- controller restart in every failover phase;
-- duplicate/replayed recovery request;
-- source returns unexpectedly during DR operation;
-- successful failback after each supported disaster class;
-- security/RBAC/tenant isolation negative tests;
-- sustained scale/performance test at the advertised VM/change-rate envelope.
-
-Only successful, repeatable independent-site evidence can promote the implementation to `PRODUCTION_CERTIFIED`.
+- independent physical/site failure domains;
+- hard source power/network loss;
+- storage/provider failure;
+- stale/corrupt recovery point;
+- capacity exhaustion;
+- RPO backlog;
+- missing mapping;
+- application-stage failure;
+- duplicate/replayed requests;
+- successful failback;
+- RBAC/security negative testing;
+- performance/scale/soak;
+- supported upgrade/rollback regression.
 
 ---
 
-## 24. Non-negotiable architectural boundaries
+## 27. Rocky Linux 9 acceptance
 
-1. CloudStack remains authoritative for VM/network/storage/account/Zone lifecycle.
-2. LayerSentry DR orchestration remains outside CloudStack core unless a documented exception is approved.
-3. No `rsync`-based primary VM replication engine.
-4. No `ping failed -> boot DR` automation.
-5. No automatic failover without safe witness/fencing eligibility.
-6. No source checkpoint advance before durable DR acknowledgement.
-7. No `Protected` status before the initial seed and catch-up are complete.
-8. No advertised RPO that the selected provider/topology has not measured and certified.
-9. No traffic switch before required application health gates pass.
-10. Failback and Test Recovery are part of the product definition, not optional support procedures.
+Rocky Linux 9 is the primary LayerSentry acceptance environment.
+
+Runtime-affecting DR changes require final validation on the authorized Rocky Linux 9 environment using the `adaptgurus/cozystack` GitHub runner/integration path or another explicitly approved durable path.
+
+Development/preliminary validation on WSL or another OS does not replace Rocky Linux 9 acceptance.
+
+Evidence must include exact source/artifact, target, provider, workflow/job/artifact IDs where runner automation is used, mutations, assertions, negative cases, rollback state and remaining limitations.
+
+Documentation/design changes do not require a meaningless VM mutation; their described runtime capability remains `PENDING`/`NOT_TESTED` until implemented and live-tested.
+
+---
+
+## 28. Architecture score and status
+
+Weighted pre-implementation review selected this architecture at approximately **9.3/10 as a design direction** because it provides the best balance of reliability, maintainability, performance, security, scalability, operational simplicity and long-term supportability.
+
+That score is **not** implementation readiness.
+
+Current state:
+
+- architecture: `DESIGN_DEFINED`;
+- advanced multi-backend DR implementation: `PENDING`;
+- independent-site automatic failover/failback: `NOT_TESTED`;
+- production certification: `PENDING`.
+
+A literal 10/10 production resilience claim is not credible. After implementation, the practical target is roughly 9–9.5/10 with repeated independent-site failure, security, upgrade, scale and failback evidence.
+
+---
+
+## 29. Non-negotiable boundaries
+
+1. CloudStack remains authoritative for normal VM/network/storage/account/Zone lifecycle.
+2. Advanced DR orchestration stays outside CloudStack core unless a documented exception passes review.
+3. Prefer storage-native replication for low-RPO DR when certified.
+4. Prefer libvirt backup/checkpoint APIs over a LayerSentry-owned raw QMP/NBD protocol for the generic file-backed fallback.
+5. No `rsync` primary running-VM replication engine.
+6. No unbounded VM snapshot chain as the only DR copy.
+7. No incompatible VM/Volume snapshot combination hidden behind the UI.
+8. No `ping failed -> boot DR` automatic recovery.
+9. No automatic failover without witness/quorum and safe fencing/exclusivity.
+10. No source lineage advancement or `Protected` state before the destination has durably committed the required point.
+11. No advertised RPO/failover tier without provider/topology certification.
+12. No traffic switch before required application health gates pass.
+13. Test Recovery, older-point recovery and Failback are part of the product definition.
+14. Every runtime claim requires Rocky Linux 9 evidence at the applicable status gate.
