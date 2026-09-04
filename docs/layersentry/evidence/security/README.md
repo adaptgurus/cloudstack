@@ -34,14 +34,34 @@ python3 -m unittest tools/layersentry/security/test_validate_rbac_matrix.py
 An optional `--emit-not-tested PATH` creates a schema-shaped planning record.
 It must not be treated as execution evidence. The next gate is a reviewed
 runner adapter that resolves ephemeral role sessions and authorized foreign
-object fixtures, executes this exact matrix on Rocky Linux 9, validates output
-against the JSON Schema, and retains sanitized evidence.
+object fixtures and executes this exact matrix on Rocky Linux 9.
+
+The executable evidence boundary is
+`tools/layersentry/security/evaluate_rbac_observations.py`. A browser/API adapter
+streams bounded observations over stdin; the evaluator rejects any
+secret-named field, requires exact matrix coverage, independently classifies
+the outcomes, hashes the target and response bodies, and creates (without
+overwriting) a mode-`0600` evidence file. Authentication stays entirely in the
+runner adapter/process environment. Example integration shape:
+
+```bash
+browser_and_api_adapter \
+  | python3 tools/layersentry/security/evaluate_rbac_observations.py \
+      tools/layersentry/security/rbac_matrix.json evidence.json \
+      --status LIVE_VERIFIED
+```
+
+The evaluator returns `1` and records `PARTIAL` if any assertion fails; malformed,
+incomplete, duplicate, oversized, or secret-bearing input returns `2` without
+creating trusted evidence. The remaining gate is implementing the controlled
+browser/API observation adapter, validating the output against the JSON Schema,
+and retaining it as a runner artifact.
 
 ## Decision record
 
 - Current approach: no dedicated LayerSentry RBAC/direct-route evidence harness existed.
-- Advantages of the selected approach: stdlib-only linting, explicit role and tamper coverage, read-only failure safety, no credential persistence, stable evidence contract.
-- Disadvantages: it does not execute browser/API calls yet and cannot prove deployed RBAC.
+- Advantages of the selected approach: stdlib-only linting/evaluation, explicit role and tamper coverage, read-only failure safety, stdin-only observation transport, no credential persistence, bounded inputs, and a stable body-free evidence contract.
+- Disadvantages: a browser/API adapter must still acquire runtime identities and perform the calls; source tests cannot prove deployed RBAC.
 - Alternatives: extend legacy Marvin suites immediately, embed credentials in a local integration configuration, or wait for A/B implementation. Marvin is useful for later live integration but is heavier and does not itself define sanitized evidence; credential files violate the secret boundary; waiting leaves no reusable contract.
 - Recommendation: integrate this source-only contract first, then add runner execution after ephemeral identities/fixtures are available.
 - Impact: validation tooling/docs only; no CloudStack API, RBAC, database, UI, KVM agent, or installer behavior changes.
