@@ -936,6 +936,7 @@ import _ from 'lodash'
 import { mixin, mixinDevice } from '@/utils/mixin.js'
 import store from '@/store'
 import eventBus from '@/config/eventBus'
+import { filterProductHypervisors } from '@/config/productProfile'
 
 import OwnershipSelection from '@views/compute/wizard/OwnershipSelection'
 import InfoCard from '@/components/view/InfoCard'
@@ -2695,10 +2696,12 @@ export default {
                   return
                 }
                 param.opts = response
-                this.options[name] = response
+                this.options[name] = name === 'hypervisors'
+                  ? filterProductHypervisors(response)
+                  : response
 
                 if (name === 'hypervisors') {
-                  const hypervisorFromResponse = response[0] && response[0].name ? response[0].name : null
+                  const hypervisorFromResponse = this.options[name][0]?.name || null
                   this.dataPreFill.hypervisor = hypervisorFromResponse
                   this.form.hypervisor = hypervisorFromResponse
                 }
