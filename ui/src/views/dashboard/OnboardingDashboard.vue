@@ -49,7 +49,7 @@
       <div>
         <div class="setup-title">Complete infrastructure setup</div>
         <div class="setup-copy">
-          Continue to change the initial administrator password and configure the first infrastructure zone.
+          Change the initial administrator password, then create the first datacenter or edge site.
         </div>
       </div>
       <a-button @click="() => { step = 1 }" type="primary" size="large">
@@ -73,7 +73,7 @@
         @refresh-data="() => { step = 2 }" />
     </a-modal>
     <a-modal
-      title="Add infrastructure zone"
+      title="Create infrastructure site"
       :visible="step === 2"
       :closable="true"
       :maskClosable="false"
