@@ -441,6 +441,7 @@ import { mixinForm } from '@/utils/mixin'
 import ResourceIcon from '@/components/view/ResourceIcon'
 import TooltipLabel from '@/components/widgets/TooltipLabel'
 import UserDataSelection from '@views/compute/wizard/UserDataSelection'
+import { filterProductHypervisors } from '@/config/productProfile'
 
 export default {
   name: 'CreateKubernetesCluster',
@@ -739,7 +740,9 @@ export default {
 
       getAPI('listHypervisors', params).then(json => {
         const listResponse = json.listhypervisorsresponse.hypervisor || []
-        this.selectedZoneHypervisors = listResponse.filter(hypervisor => hypervisor.name !== 'External')
+        this.selectedZoneHypervisors = filterProductHypervisors(
+          listResponse.filter(hypervisor => hypervisor.name !== 'External')
+        )
       }).finally(() => {
         this.hypervisorLoading = false
       })
