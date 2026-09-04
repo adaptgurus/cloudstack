@@ -41,7 +41,12 @@ installer preflight, atomic promotion and rollback remain separate mandatory gat
 ## Risks, mitigation and recovery
 
 - npm lock/manifest drift remains inherited from upstream and prevents a full
-  `npm ci` claim; the exact lock digest is recorded as provenance material.
+  deterministic dependency-source claim until the candidate workflow succeeds;
+  the workflow now uses lockfile-strict `npm ci` and fails if the lockfile changes.
+- `npm ci --ignore-scripts` was not selected because this UI has lifecycle hooks
+  and its dependency install-time requirements have not been proven safe without
+  scripts. Dependency lifecycle scripts therefore run only in the isolated build
+  job, which has read-only repository permission and receives no release secrets.
 - GitHub runner labels and action tags are not immutable builder digests; the exact
   Node version is pinned and builder strengthening remains pending.
 - The SBOM reflects lockfile components and is a valid foundation, not evidence of
