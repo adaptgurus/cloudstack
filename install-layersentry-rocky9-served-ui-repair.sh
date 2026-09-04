@@ -17,7 +17,7 @@ readonly PRODUCT='Layersentry'
 readonly CLOUDSTACK_VERSION='4.22.1.1'
 readonly CLOUDSTACK_RELEASE='1'
 readonly UI_REPOSITORY='https://github.com/adaptgurus/cloudstack.git'
-readonly UI_COMMIT='b448226098ff3e53163445eadfb9483d58eb02fa'
+readonly UI_COMMIT='0361a0cccb9956b4c57f62dfbf091b01d0fa9f3c'
 readonly STAGED_UI='/usr/share/cloudstack-ui'
 readonly SERVED_UI='/usr/share/cloudstack-management/webapp'
 readonly SERVED_CONFIG='/etc/cloudstack/management/config.json'
@@ -122,11 +122,28 @@ validate_target(){
 
 prepare_build_runtime(){
   stage 'preparing CloudStack 4.22 UI build runtime'
-  dnf -y install dnf-plugins-core >>"$LOG_FILE" 2>&1
+  dnf -y install dnf-plugins-core ca-certificates curl git python3 rsync tar gzip jq which gcc-c++ make >>"$LOG_FILE" 2>&1
+
+  local node_major=''
+  if command -v node >/dev/null 2>&1; then
+    node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
+  fi
+
+  # Reuse the already-proven Node 16 runtime when present. Rocky AppStream
+  # metadata on long-lived/offline-ish hosts may no longer expose nodejs:16 even
+  # though the working Node 16 + npm toolchain is already installed.
+  if [[ "$node_major" == '16' ]] && command -v npm >/dev/null 2>&1; then
+    info "Reusing existing UI build runtime: Node.js $(node --version), npm $(npm --version)."
+    return 0
+  fi
+
   dnf -y module reset nodejs >>"$LOG_FILE" 2>&1 || true
-  dnf -y module enable nodejs:16 >>"$LOG_FILE" 2>&1 || die 'Unable to enable Rocky Linux 9 Node.js 16 module.'
-  dnf -y install ca-certificates curl git python3 rsync tar gzip jq which gcc-c++ make nodejs npm >>"$LOG_FILE" 2>&1
+  if ! dnf -y module enable nodejs:16 >>"$LOG_FILE" 2>&1; then
+    die "Node.js 16 is not installed and the Rocky Linux 9 nodejs:16 module is unavailable; detected $(node --version 2>/dev/null || echo none)."
+  fi
+  dnf -y install nodejs npm >>"$LOG_FILE" 2>&1
   [[ "$(node -p 'process.versions.node.split(".")[0]')" == '16' ]] || die "CloudStack 4.22 UI build requires Node.js 16; detected $(node --version 2>/dev/null || echo none)."
+  command -v npm >/dev/null 2>&1 || die 'npm is required for the Layersentry UI build.'
   info "Build runtime: Node.js $(node --version), npm $(npm --version)."
 }
 
