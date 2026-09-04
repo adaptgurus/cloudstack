@@ -2,83 +2,110 @@
 
 ## Mission
 
-Make LayerSentry installation, release, rollback, and future upgrades deterministic, supportable, and low-risk. The customer should install signed/versioned LayerSentry artifacts; production management nodes must not compile the Vue UI.
+Make LayerSentry installation, release, rollback/recovery and future upgrades deterministic, integrity-verifiable, supportable and low-risk. Production management nodes consume verified LayerSentry artifacts; they do not compile the Vue UI.
 
 ## Startup
 
-Read `/AGENTS.md`, `docs/layersentry/CODEX_MASTER_CONTEXT.md`, and all mandatory documents. Fetch the actual integration HEAD and create/use an isolated branch/worktree such as `codex/layersentry-release-installer`.
+Read:
+
+1. `/AGENTS.md`
+2. `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md`
+3. `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`
+4. `docs/layersentry/LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`
+5. this workstream file.
+
+Fetch/inspect the actual integration HEAD before editing. Use an isolated worktree/branch such as `codex/layersentry-release-installer`.
+
+Read `LAYERSENTRY_UPSTREAM_DIFF.md` when the change touches upstream files or upgrade/rebase behavior. Historical handoffs/re-audits are not normal startup context.
 
 ## File ownership
 
 Primary ownership:
 
 - `install-layersentry*.sh`
-- build/release scripts added under a LayerSentry-specific path
+- LayerSentry build/release scripts
 - `ui/vue.config.js` and build-only production settings
-- release manifest/SBOM/checksum/signature tooling
-- installer/resume/rollback logic
-- CI configuration in this repository if introduced for product artifacts
+- release manifest/SBOM/provenance/digest/signature tooling
+- installer/resume/repair/rollback logic
+- LayerSentry product-artifact CI configuration
 
-Avoid dashboard/wizard implementation and avoid CloudStack Java/backend changes.
+Avoid dashboard/wizard implementation and CloudStack Java/backend changes unless the integration lead explicitly reassigns scope.
 
 ## Required outcomes
 
-1. Move production UI compilation off the CloudStack management VM.
-2. Define a reproducible builder with exact/pinned Node/npm/toolchain versions suitable for the CloudStack 4.22 UI.
-3. Build one immutable LayerSentry UI artifact (archive or package) from an exact source commit.
-4. Disable production source maps by default; support builds may enable them explicitly.
-5. Produce digest metadata and a versioned release manifest.
-6. Add a signing/verification design; never commit private signing keys.
-7. Installer verifies exact artifact provenance/digest/signature before deployment.
-8. Maintain fresh/resume parity and idempotent/retry-safe stages.
-9. Add explicit backup/atomic deployment/rollback behavior for the served UI.
-10. Preserve `/WEB-INF`, `/META-INF`, runtime config, and CloudStack backend files.
-11. Reduce/eliminate production-side Node/npm/compiler dependencies.
-12. Prepare an SBOM/support-bundle path for production releases.
-13. Preserve future CloudStack upgradeability and keep the upstream delta minimal.
+1. Move production UI compilation off CloudStack management nodes.
+2. Define a pinned deterministic builder/toolchain compatible with the target CloudStack UI.
+3. Build one immutable LayerSentry UI artifact/package from an exact source commit.
+4. Disable production source maps by default; explicit controlled support builds may differ.
+5. Produce a versioned release manifest, cryptographic digest, SBOM and provenance.
+6. Implement the production signing/verification trust model without committing private keys.
+7. Make fresh install, resume, repair/redeploy and upgrade consume one artifact contract.
+8. Verify manifest compatibility, trust/signature and digest before target mutation; fail closed on mismatch.
+9. Make stages idempotent/deduplicated or explicitly non-idempotent with recovery procedure.
+10. Provide safe staging/atomic deployment or a proven equivalent and deterministic rollback/recovery classification.
+11. Preserve CloudStack runtime/backend directories/configuration that must not be replaced by UI deployment.
+12. Remove production dependence on Node/npm/compiler dependencies.
+13. Preserve future CloudStack upgradeability and minimal upstream delta.
+14. Generate enough evidence that a released artifact can be tied to source, builder, dependency state and release policy.
 
-## Current source facts
+## Stable compatibility baseline
 
-- DBaaS/APaaS placeholders are already removed and live-verified. Do not reintroduce their old checks.
-- Current main/resume/served-repair pins are aligned for the cleaned V1 UI, but the existing process still contains legacy production-side npm build behavior.
-- Current target CloudStack is 4.22.1.1; Rocky Linux 9; Java 17; product DB compatibility baseline MySQL 8.4/equivalent.
+For LayerSentry V1, use the target baseline in the canonical context: CloudStack 4.22.1.1, Rocky Linux 9 product profile, Java 17 and MySQL 8.4/equivalent baseline. Do not encode historical branch HEADs or current completion state in this workstream file; read the progress ledger/current source.
+
+## Supply-chain/security requirements
+
+- Never commit signing/license private keys or reusable secrets.
+- Define signer/trust-root/key-rotation/revocation behavior as required by the specialist policy.
+- Production source maps off by default.
+- Pin/validate build image/toolchain and dependency lock state.
+- Run secret/dependency/vulnerability/license checks required by the release policy.
+- Use a standard machine-readable SBOM format and provenance adequate to identify source/builder/artifact.
+- Do not claim SLSA/reproducible-build compliance unless the exact standard requirements are actually implemented and evidenced.
+- Signed artifacts provide authenticity/integrity; they do not make software impossible to reverse engineer.
+- Keep proprietary decision logic server-side when practical.
 
 ## Upgrade requirements
 
-Respect `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`:
+Follow `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`:
 
-- no unsupported automatic downgrade promises after DB schema migration;
-- versioned release manifest for every release;
-- pre-upgrade backups/checkpoints;
+- versioned immutable release manifest;
+- compatibility preflight;
+- durable DB/config/release checkpoint;
 - CloudStack schema-aware management-server sequencing;
-- supported N-1 -> N tests before certification;
-- rolling KVM host upgrades only after capacity/maintenance validation;
-- post-upgrade functional regression.
+- supported N-1 -> N test before certification;
+- interruption/resume and rollback/recovery tests;
+- rolling KVM-host update only with capacity/maintenance validation;
+- post-upgrade functional/security regression;
+- no unsupported automatic downgrade promise after DB/schema migration.
 
-## Security/IP requirements
+## Risk classification
 
-- No production source maps by default.
-- No secrets, signing keys, proprietary decision logic, or licensing secrets in browser JS.
-- Keep proprietary LayerSentry orchestration server-side when practical.
-- Do not claim reverse engineering can be made impossible.
-- Signed artifacts are integrity controls, not obscurity.
+Normal source/build work is R1. A controlled UI deployment may be R2. Package/repository changes, service topology/reboot, CloudStack upgrade or DB/schema-affecting work is R3/R4 and requires the canonical checkpoint/authorization/recovery gate.
+
+Do not run destructive CloudStack/package upgrade work on a live target merely because a test would be useful.
 
 ## Testing
 
-At minimum validate:
+At minimum, as applicable to the implemented batch:
 
-- deterministic build from clean checkout;
-- repeated build/provenance behavior;
-- artifact digest verification;
-- installer syntax/static checks;
-- fresh/resume idempotency at the level available in the test environment;
-- atomic UI deployment/rollback behavior;
-- source maps absent from production artifact;
-- DBaaS/APaaS still absent;
-- LayerSentry branding/config/terminology still present.
+- clean-checkout build using pinned toolchain;
+- dependency/lock/toolchain policy checks;
+- production source maps absent;
+- V1 DBaaS/APaaS placeholders absent;
+- branding/config/terminology gates preserved;
+- release manifest schema validation;
+- SBOM/provenance generation;
+- digest verification positive/negative tests;
+- signature/trust positive and tamper/unknown-key/revocation behavior when implemented;
+- installer syntax/static tests;
+- fresh/resume/repair parity;
+- idempotent retry/deduplication behavior;
+- pre-deploy fail-closed behavior;
+- atomic/proven UI deployment and rollback/recovery tests;
+- CloudStack backend/runtime-config preservation.
 
-Do not run destructive CloudStack upgrade or package mutation on the live `sen` VM unless the task explicitly authorizes it and a durable checkpoint exists.
+Do not describe a deterministic/reproducible property based only on one successful build; define and test the exact property being claimed.
 
 ## Handoff
 
-Report exact branch/base/final commit, artifact/build design, changed files, tests run/not run, runtime mutation, rollback behavior, security assumptions, and dependencies on Workstream A/C/D. Do not edit the shared progress ledger unless explicitly assigned.
+Report exact branch/base/final commit, changed files, artifact/provenance behavior, core impact YES/NO, checks actually run/not run, runtime mutation/risk class, rollback/retry behavior, security assumptions/limitations and dependencies on A/C/D. Do not edit the shared progress ledger or self-merge unless explicitly assigned.
