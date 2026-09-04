@@ -3,7 +3,7 @@
 #
 # CloudStack 4.22 management serves its UI from the management webapp. Replacing
 # only the cloudstack-ui RPM payload can therefore leave an already-running
-# management node serving stale Apache CloudStack assets. This script repairs the
+# management node serving stale upstream assets. This script repairs the
 # actually served webapp while preserving backend WEB-INF/META-INF.
 #
 # It never creates/modifies zones, pods, clusters, hosts, cloudbr0, VLANs,
@@ -17,7 +17,7 @@ readonly PRODUCT='Layersentry'
 readonly CLOUDSTACK_VERSION='4.22.1.1'
 readonly CLOUDSTACK_RELEASE='1'
 readonly UI_REPOSITORY='https://github.com/adaptgurus/cloudstack.git'
-readonly UI_COMMIT='72b76a30f3dadf0dbe9e333ade073034c1afc514'
+readonly UI_COMMIT='b448226098ff3e53163445eadfb9483d58eb02fa'
 readonly STAGED_UI='/usr/share/cloudstack-ui'
 readonly SERVED_UI='/usr/share/cloudstack-management/webapp'
 readonly SERVED_CONFIG='/etc/cloudstack/management/config.json'
@@ -77,6 +77,7 @@ p,label=sys.argv[1],sys.argv[2]
 with open(p,encoding='utf-8') as f: c=json.load(f)
 checks={
  'appTitle':c.get('appTitle')=='Layersentry',
+ 'brandLocked':c.get('brandLocked') is True,
  'loginTitle':c.get('loginTitle')=='Layersentry',
  'footer':c.get('footer')=='Layersentry V1.0',
  'logo':c.get('logo')=='assets/layersentry-logo.svg',
@@ -97,6 +98,9 @@ validate_ui_tree(){
   grep -Rqs --include='*.js' 'DBaaS' "$root" || die "DBaaS is absent from $label."
   grep -Rqs --include='*.js' 'APaaS' "$root" || die "APaaS is absent from $label."
   grep -Rqs --include='*.js' 'Secure cloud infrastructure management' "$root" || die "Layersentry onboarding is absent from $label."
+  grep -Rqs --include='*.js' 'Infrastructure group name' "$root" || die "Customer-friendly infrastructure terminology is absent from $label."
+  grep -Rqs --include='*.js' 'Datacenter site' "$root" || die "Customer-friendly site terminology is absent from $label."
+  grep -Rqs --include='*.js' 'Management network gateway' "$root" || die "Customer-friendly management-network terminology is absent from $label."
   [[ -f "$root/assets/layersentry-logo.svg" && -f "$root/assets/layersentry-icon.svg" ]] || die "Layersentry logo assets are absent from $label."
 }
 
@@ -205,13 +209,16 @@ verify_runtime(){
   grep -Rqs --include='*.js' 'DBaaS' "$SERVED_UI" || die 'DBaaS is absent from the served webapp.'
   grep -Rqs --include='*.js' 'APaaS' "$SERVED_UI" || die 'APaaS is absent from the served webapp.'
   grep -Rqs --include='*.js' 'Secure cloud infrastructure management' "$SERVED_UI" || die 'Layersentry onboarding is absent from the served webapp.'
+  grep -Rqs --include='*.js' 'Infrastructure group name' "$SERVED_UI" || die 'Customer-friendly infrastructure terminology is absent from the served webapp.'
+  grep -Rqs --include='*.js' 'Datacenter site' "$SERVED_UI" || die 'Customer-friendly site terminology is absent from the served webapp.'
+  grep -Rqs --include='*.js' 'Management network gateway' "$SERVED_UI" || die 'Customer-friendly management-network terminology is absent from the served webapp.'
   [[ "$(readlink -f "$SERVED_UI/config.json")" == "$SERVED_CONFIG" ]] || die 'Served config symlink target is wrong.'
   systemctl is-active --quiet cloudstack-management || die 'cloudstack-management is not active.'
   code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$HTTP_URL")"
   [[ "$code" == '200' ]] || die "Final UI endpoint returned HTTP $code."
   log "HTTP=$code"
   log "SERVED_CONFIG=$(readlink -f "$SERVED_UI/config.json")"
-  log 'DBaaS=PASS APaaS=PASS ONBOARDING=PASS LOGO_ASSETS=PASS RUNTIME_CONFIG=PASS'
+  log 'DBaaS=PASS APaaS=PASS ONBOARDING=PASS LOGO_ASSETS=PASS RUNTIME_CONFIG=PASS TERMINOLOGY=PASS'
   log '[100%] Layersentry V1.0 served-UI branding verified'
 }
 
