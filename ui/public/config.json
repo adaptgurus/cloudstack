@@ -9,7 +9,7 @@
   ],
   "docBase": "https://docs.cloudstack.apache.org/en/4.22.1.1",
   "appTitle": "Layersentry",
-  "footer": "Layersentry &middot; Apache CloudStack is licensed under the <a href='https://www.apache.org/licenses/LICENSE-2.0' target='_blank' rel='noopener noreferrer'>Apache License, Version 2.0</a>.",
+  "footer": "Layersentry V1.0",
   "loginTitle": "Layersentry",
   "loginFavicon": "assets/layersentry-icon.svg",
   "loginFooter": "Secure cloud infrastructure management.",
@@ -27,17 +27,17 @@
     "@layout-mode": "light",
     "@logo-background-color": "#ffffff",
     "@mini-logo-background-color": "#ffffff",
-    "@navigation-background-color": "#071536",
-    "@project-nav-background-color": "#071536",
-    "@project-nav-text-color": "rgba(255, 255, 255, 0.82)",
-    "@navigation-text-color": "rgba(255, 255, 255, 0.82)",
-    "@primary-color": "#1849b5",
-    "@link-color": "#1849b5",
-    "@link-hover-color": "#123a91",
-    "@loading-color": "#1849b5",
-    "@processing-color": "#1849b5",
-    "@success-color": "#14804a",
-    "@warning-color": "#b54708",
+    "@navigation-background-color": "#1f2933",
+    "@project-nav-background-color": "#1f2933",
+    "@project-nav-text-color": "rgba(255, 255, 255, 0.86)",
+    "@navigation-text-color": "rgba(255, 255, 255, 0.86)",
+    "@primary-color": "#0f766e",
+    "@link-color": "#0f766e",
+    "@link-hover-color": "#115e59",
+    "@loading-color": "#0f766e",
+    "@processing-color": "#0f766e",
+    "@success-color": "#15803d",
+    "@warning-color": "#b45309",
     "@error-color": "#b42318",
     "@font-size-base": "14px",
     "@heading-color": "#101828",
@@ -65,47 +65,22 @@
     "es-latam": "Spanish Latin American Keyboard"
   },
   "userCard": {
-    "enabled": true,
-    "title": "label.help",
+    "enabled": false,
+    "title": "Help",
     "icon": "question-circle-outlined",
-    "links": [
-      {
-        "title": "Documentation",
-        "text": "Apache CloudStack 4.22.1.1 documentation",
-        "link": "https://docs.cloudstack.apache.org/en/4.22.1.1/",
-        "icon": "read-outlined"
-      },
-      {
-        "title": "API Documentation",
-        "text": "Refer to Apache CloudStack API documentation",
-        "link": "https://cloudstack.apache.org/api.html",
-        "icon": "api-outlined"
-      },
-      {
-        "title": "Community Support",
-        "text": "Join the Apache CloudStack users mailing list",
-        "link": "mailto:users-subscribe@cloudstack.apache.org",
-        "icon": "mail-outlined"
-      },
-      {
-        "title": "Report Upstream Issue",
-        "text": "Submit an Apache CloudStack bug or improvement request",
-        "link": "https://github.com/apache/cloudstack/issues/new",
-        "icon": "bug-outlined"
-      }
-    ]
+    "links": []
   },
   "plugins": [],
-  "apidocs": true,
+  "apidocs": false,
   "basicZoneEnabled": true,
   "multipleServer": false,
-  "allowSettingTheme": true,
+  "allowSettingTheme": false,
   "displayProjectFieldOnLogin": false,
   "imageSelectionInterface": "modern",
   "showUserCategoryForModernImageSelection": true,
   "showAllCategoryForModernImageSelection": false,
   "docHelpMappings": {},
-  "notifyLatestCSVersion": true,
+  "notifyLatestCSVersion": false,
   "showSearchFilters": true,
   "announcementBanner": {
     "enabled": false,
