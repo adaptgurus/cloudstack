@@ -1010,3 +1010,19 @@ A successful LayerSentry change is not the one that produces the most code. It i
 For a new ChatGPT/Codex session:
 
 > Continue LayerSentry from repository evidence, not memory. Read `AGENTS.md`, `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md`, `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`, and the assigned workstream file. Fetch actual current refs before editing. Read specialist upgrade/delta/runbook documents only when the task needs them. Preserve CloudStack core, do not redo evidenced work, and never promote status beyond the evidence gate.
+
+---
+
+## 31. Mandatory live-validation contract
+
+Every LayerSentry **source, configuration, installer, workflow or automation change that can affect runtime behavior** must be exercised on the authorized LayerSentry test VM/environment before it can be labeled `LIVE_VERIFIED`. Static/source/CI success alone is not runtime proof.
+
+The default validation path is the `adaptgurus/cozystack` GitHub runner/integration branch and its durable workflow evidence. Before live mutation, fetch the actual current runner branch, inspect in-flight/conflicting workflows, verify the exact target, apply the R0-R4 risk rules and record the rollback/recovery path.
+
+Controlled direct SSH access to an authorized LayerSentry test VM is an approved validation transport for read-only discovery, deployment, diagnostics and bounded verification when appropriate. SSH access does not bypass CloudStack APIs, RBAC, change-risk classification, target verification or destructive-operation safeguards. Reusable SSH credentials/private keys must be supplied only through approved runtime secret injection or existing authorized access and must never be committed, embedded in browser code, printed in logs or stored in evidence artifacts.
+
+Live evidence must record the exact source/artifact, workflow/run/job/artifact identifiers where runner automation is used, target/resource scope, mutations performed, assertions, negative/retry cases where applicable, cleanup/rollback state and remaining certification limits.
+
+If live validation is unavailable or blocked, keep the result at `SOURCE_COMPLETE`, `CI_VERIFIED`, `NOT_TESTED`, `BLOCKED` or another truthful lower status. Documentation-only changes do not require a meaningless VM mutation, but documented runtime procedures/capabilities must be live-tested when their implementation is claimed.
+
+For Backup/DR/storage behavior, the live test must use the exact storage/provider path being claimed. When point-in-time recovery is part of the product, validation must include both the latest safe recovery point and at least one older retained checkpoint on disposable/approved data, verify recovered guest data and DR network/IP mapping, and exercise a relevant failure/retry/idempotency case. Automatic failover, fencing and failback remain R4 and require explicit failure-domain, witness/quorum and recovery safeguards before execution.
