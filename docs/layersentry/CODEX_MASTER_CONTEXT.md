@@ -13,6 +13,7 @@ Every Codex workstream reads:
 
 Read specialist files only when relevant:
 
+- unified provisioning/KVM-only UI/Network Blueprint/Storage Profile/DR mapping/Cozystack runner acceptance -> `LAYERSENTRY_UNIFIED_PROVISIONING_UI_DR_POLICY.md`
 - troubleshooting/root-cause/regression -> `LAYERSENTRY_DEBUGGING_RUNBOOK.md`
 - secure implementation/trust-boundary review -> `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
 - control-plane HA/XaaS/failure-domain/future-version review -> `LAYERSENTRY_CONTROL_PLANE_XAAS_AND_FUTURE_UPGRADE_POLICY.md`
@@ -44,7 +45,27 @@ Preserve CloudStack APIs, DB schema, RBAC, scheduler, VM lifecycle, storage/netw
 
 V1 includes self-service VMs, native CKS, native object-store workflows, backup/recovery/DR foundation, role-aware administration, appliance/bootstrap and controlled releases/updates. DBaaS/APaaS are excluded from V1.
 
-Native CloudStack KVM remains the primary orchestration path. XaaS is used selectively only where an external system/lifecycle extension is genuinely required. The virtualized production control plane may use 3 Management VMs, 3 DB VMs and 2 LB VMs without dedicated physical Management/DB servers, but only with certified failure-domain placement, quorum, N+1 capacity, redundant dependencies and an independent rescue path.
+The customer-facing LayerSentry product is KVM-only across all supported roles. Non-KVM upstream implementations remain in CloudStack source for compatibility but are not exposed as normal LayerSentry choices, labels, filters or help content.
+
+LayerSentry adds a polished role-aware **Quick Provision** one-page experience that composes supported CloudStack APIs for compute, Storage Profiles, Network Blueprints, VPC/network/IP/DNS selection, HA and optional post-deploy protection. Safe defaults are capability-gated; the UI does not blindly enable unavailable or unsafe features. iSCSI/SAN is consumed through administrator-configured/certified CloudStack storage pools and LayerSentry Storage Profiles, never raw tenant SAN credentials/LUN management.
+
+Native CloudStack KVM remains the primary orchestration path. XaaS is used selectively only where an external system/lifecycle extension is genuinely required. A thin LayerSentry idempotent orchestration service may coordinate multi-step provisioning, DNS/IPAM or DR-provider actions, but it is not a second VM/storage/network scheduler.
+
+DR uses native cross-Zone B&R as the mandatory foundation plus provider-native replication for low-RPO tiers. Site Pair, DR Network Mapping and Recovery IP Policy resolve source networks/VPC tiers to recovery networks/VLAN policy/IP pools/DNS. VLAN IDs do not have to match between Sites. Automatic failover remains prohibited until Planned Failover/Failback, witness/exclusive recovery lease and safe fencing are implemented and proven.
+
+The virtualized production control plane may use 3 Management VMs, 3 DB VMs and 2 LB VMs without dedicated physical Management/DB servers, but only with certified failure-domain placement, quorum, N+1 capacity, redundant dependencies and an independent rescue path.
+
+## Mandatory Cozystack validation gates
+
+For every runtime-affecting UI or feature change, source/CI validation alone is insufficient.
+
+- Every **merge-candidate UI/feature change** must run the relevant fast validation set and must not bypass KVM-only leakage, terminology, RBAC/security and affected-regression checks.
+- When a coherent **development portion/module is complete**, the exact CloudStack commit/release artifact being claimed must be deployed/tested through the current `adaptgurus/cozystack` runner path against the authorized Rocky Linux 9 acceptance target before the module can be called `LIVE_VERIFIED` or complete.
+- Browser-facing completed modules test the applicable Platform Admin, Department Admin, User/Operator and Read-only personas in current Chrome and Firefox, including allowed/forbidden flows, direct-route/API negatives, responsive/accessibility behavior, loading/error/partial states and existing-functionality regression.
+- Runner evidence records exact CloudStack commit/artifact digest, runner commit, workflow/job/artifact IDs, target/test scope, mutations, outcomes and rollback/cleanup state.
+- A historical runner result for an older UI commit never validates a later untested commit.
+
+Read `LAYERSENTRY_UNIFIED_PROVISIONING_UI_DR_POLICY.md` for the full contract.
 
 ## Workstreams
 
@@ -52,7 +73,7 @@ Native CloudStack KVM remains the primary orchestration path. XaaS is used selec
 
 File: `docs/layersentry/codex/WORKSTREAM_A_UI_SELF_SERVICE.md`
 
-Owns KVM-only customer profile, role-aware UI, dashboards, terminology and simplified VM/CKS/Bucket/Site workflows. Reuse native CloudStack APIs/components. Do not modify CloudStack core or release/DR-owned files without coordination.
+Owns KVM-only customer profile, polished role-aware UI, relevant iconography, dashboards, terminology, Quick Provision, Network Blueprint/Storage Profile presentation and simplified VM/CKS/Bucket/Site workflows. Reuse native CloudStack APIs/components. Do not modify CloudStack core or release/DR-owned files without coordination.
 
 ### B — Release / Installer / Build
 
@@ -72,7 +93,7 @@ Owns RBAC/direct-URL negative tests, feature-prerequisite validation, SELinux/fi
 
 File: `docs/layersentry/codex/WORKSTREAM_D_DR_HA_UPGRADE.md`
 
-Owns runner/Hyper-V discovery and safe proof automation, native two-Zone NAS B&R recovery evidence, later HA failure tests and supported upgrade/resume/rollback validation. Do not build a custom DR controller before native recovery is proven.
+Owns runner/Hyper-V discovery and safe proof automation, native two-Zone NAS B&R recovery evidence, Site Pair/network/IP mapping proof, storage-native DR provider validation, later HA failure tests and supported upgrade/resume/rollback validation. Do not build a custom DR controller before native recovery is proven.
 
 For the VM-based production control plane, D must explicitly test one Management VM loss, one DB VM loss, one LB VM loss, one physical failure-domain loss, DB primary/quorum behavior, all-Management outage recovery and the independent rescue/bootstrap path. Do not call an undefined set of "all worst cases" supported.
 
@@ -88,6 +109,7 @@ For the VM-based production control plane, D must explicitly test one Management
 - Use R0-R4 change-risk classification.
 - R3/R4 operations require a durable checkpoint, target verification, rollback/recovery method and task authorization.
 - Do not disable tests/security controls just to make a build pass.
+- Do not mark a UI/feature portion/module complete until its applicable Cozystack runner acceptance gate passes for the exact source/artifact being claimed.
 - Do not self-merge into the shared integration branch unless explicitly assigned integration responsibility.
 - Do not edit the shared progress ledger from parallel workstreams unless assigned by the integration lead.
 
