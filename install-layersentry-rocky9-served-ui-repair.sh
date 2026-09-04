@@ -17,7 +17,7 @@ readonly PRODUCT='Layersentry'
 readonly CLOUDSTACK_VERSION='4.22.1.1'
 readonly CLOUDSTACK_RELEASE='1'
 readonly UI_REPOSITORY='https://github.com/adaptgurus/cloudstack.git'
-readonly UI_COMMIT='0361a0cccb9956b4c57f62dfbf091b01d0fa9f3c'
+readonly UI_COMMIT='9ad724eb76843d40d6a883c0a0ab47a75ceed449'
 readonly STAGED_UI='/usr/share/cloudstack-ui'
 readonly SERVED_UI='/usr/share/cloudstack-management/webapp'
 readonly SERVED_CONFIG='/etc/cloudstack/management/config.json'
@@ -50,8 +50,9 @@ Usage:
 
 Options:
   --from-staged   Deploy the already-built /usr/share/cloudstack-ui payload after
-                  validating Layersentry config, DBaaS, APaaS and onboarding.
-                  This avoids a second npm build when called by the main installer.
+                  validating Layersentry config, V1 placeholder removal,
+                  customer terminology and onboarding. This avoids a second npm
+                  build when called by the main installer.
   --verify-only   Read-only verification of the currently served Layersentry UI.
   -h, --help      Show this help.
 USAGE
@@ -95,8 +96,8 @@ validate_ui_tree(){
   local root="$1" label="$2"
   [[ -f "$root/index.html" && -f "$root/config.json" ]] || die "$label is missing index.html/config.json at $root."
   validate_config_file "$root/config.json" "${label}_CONFIG_CHECKS"
-  grep -Rqs --include='*.js' 'DBaaS' "$root" || die "DBaaS is absent from $label."
-  grep -Rqs --include='*.js' 'APaaS' "$root" || die "APaaS is absent from $label."
+  if grep -Rqs --include='*.js' 'DBaaS' "$root"; then die "Obsolete DBaaS placeholder is present in $label."; fi
+  if grep -Rqs --include='*.js' 'APaaS' "$root"; then die "Obsolete APaaS placeholder is present in $label."; fi
   grep -Rqs --include='*.js' 'Secure cloud infrastructure management' "$root" || die "Layersentry onboarding is absent from $label."
   grep -Rqs --include='*.js' 'Infrastructure group name' "$root" || die "Customer-friendly infrastructure terminology is absent from $label."
   grep -Rqs --include='*.js' 'Datacenter site' "$root" || die "Customer-friendly site terminology is absent from $label."
@@ -223,8 +224,8 @@ verify_runtime(){
     code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "${HTTP_URL}assets/${asset}")"
     [[ "$code" == '200' ]] || die "Served asset $asset returned HTTP $code."
   done
-  grep -Rqs --include='*.js' 'DBaaS' "$SERVED_UI" || die 'DBaaS is absent from the served webapp.'
-  grep -Rqs --include='*.js' 'APaaS' "$SERVED_UI" || die 'APaaS is absent from the served webapp.'
+  if grep -Rqs --include='*.js' 'DBaaS' "$SERVED_UI"; then die 'Obsolete DBaaS placeholder is present in the served webapp.'; fi
+  if grep -Rqs --include='*.js' 'APaaS' "$SERVED_UI"; then die 'Obsolete APaaS placeholder is present in the served webapp.'; fi
   grep -Rqs --include='*.js' 'Secure cloud infrastructure management' "$SERVED_UI" || die 'Layersentry onboarding is absent from the served webapp.'
   grep -Rqs --include='*.js' 'Infrastructure group name' "$SERVED_UI" || die 'Customer-friendly infrastructure terminology is absent from the served webapp.'
   grep -Rqs --include='*.js' 'Datacenter site' "$SERVED_UI" || die 'Customer-friendly site terminology is absent from the served webapp.'
@@ -235,7 +236,7 @@ verify_runtime(){
   [[ "$code" == '200' ]] || die "Final UI endpoint returned HTTP $code."
   log "HTTP=$code"
   log "SERVED_CONFIG=$(readlink -f "$SERVED_UI/config.json")"
-  log 'DBaaS=PASS APaaS=PASS ONBOARDING=PASS LOGO_ASSETS=PASS RUNTIME_CONFIG=PASS TERMINOLOGY=PASS'
+  log 'V1_PLACEHOLDERS=ABSENT ONBOARDING=PASS LOGO_ASSETS=PASS RUNTIME_CONFIG=PASS TERMINOLOGY=PASS'
   log '[100%] Layersentry V1.0 served-UI branding verified'
 }
 
