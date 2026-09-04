@@ -26,7 +26,8 @@ jobs:
           LAYERSENTRY_SUPPORT_BUILD: "0"
         run: |
           cd ui
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
           npm run lint -- --no-fix
           npm run test:unit
           npm run build
