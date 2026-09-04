@@ -2,6 +2,7 @@
 """Build and verify the LayerSentry UI release-contract foundation."""
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -15,6 +16,12 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 VERSION_RE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$")
 EPOCH_RE = re.compile(r"^[0-9]+$")
+MAX_ARTIFACT_BYTES = 256 * 1024 * 1024
+MAX_EXPANDED_BYTES = 512 * 1024 * 1024
+MAX_MEMBER_BYTES = 128 * 1024 * 1024
+MAX_ARCHIVE_MEMBERS = 20000
+MAX_JSON_BYTES = 16 * 1024 * 1024
+MAX_EXTENDED_HEADER_BYTES = 1024 * 1024
 
 
 class ContractError(Exception):
@@ -22,6 +29,7 @@ class ContractError(Exception):
 
 
 def sha256(path):
+    require_regular_file(path, "digest input")
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -30,12 +38,33 @@ def sha256(path):
 
 
 def write_json(path, value):
+    reject_symlinks(path, "JSON output")
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def require(condition, message):
     if not condition:
         raise ContractError(message)
+
+
+def reject_symlinks(path, label):
+    # Check before resolve() erases link evidence, including linked parents.
+    path = Path(path).absolute()
+    require(not any(part.is_symlink() for part in (path, *path.parents)),
+            f"{label} must not use symlinks")
+
+
+def require_regular_file(path, label):
+    reject_symlinks(path, label)
+    require(path.is_file(), f"{label} is missing or not a regular file")
+
+
+def unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        require(key not in result, "JSON contains duplicate keys")
+        result[key] = value
+    return result
 
 
 def safe_name(name, field):
@@ -46,12 +75,18 @@ def safe_name(name, field):
 
 def load_json(path, label):
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        require_regular_file(path, label)
+        with path.open("rb") as stream:
+            content = stream.read(MAX_JSON_BYTES + 1)
+        require(len(content) <= MAX_JSON_BYTES, f"{label} exceeds JSON size policy")
+        return json.loads(content.decode("utf-8"), object_pairs_hook=unique_json_object)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ContractError(f"invalid {label}: {error}") from error
 
 
 def build_contract(args):
+    require_regular_file(Path(args.artifact), "artifact")
+    reject_symlinks(Path(args.output_dir), "output directory")
     artifact = Path(args.artifact).resolve()
     output = Path(args.output_dir).resolve()
     package_lock_path = Path(args.package_lock)
@@ -103,30 +138,96 @@ def build_contract(args):
         "signature": {"requiredForProduction": True, "status": "unsigned"},
         "policies": {"productionSourceMaps": False},
     })
+    reject_symlinks(output / "SHA256SUMS", "checksum output")
     (output / "SHA256SUMS").write_text(
         "".join(f"{sha256(path)}  {path.name}\n" for path in (artifact, sbom_path, provenance_path, manifest_path)), encoding="ascii")
 
 
+class BoundedArchiveReader:
+    """Bound decompressed bytes, including PAX/GNU headers hidden by tarfile."""
+
+    def __init__(self, stream):
+        self.stream = stream
+        self.total = 0
+
+    def read(self, size):
+        data = self.stream.read(min(size, MAX_EXPANDED_BYTES - self.total + 1))
+        self.total += len(data)
+        require(self.total <= MAX_EXPANDED_BYTES, "artifact exceeds expanded-size policy")
+        return data
+
+
+class StrictTarInfo(tarfile.TarInfo):
+    @classmethod
+    def frombuf(cls, buf, encoding, errors):
+        return cls._frombuf(buf, encoding, errors)
+
+    @classmethod
+    def _frombuf(cls, buf, encoding, errors, **kwargs):
+        # Patched Python releases parse internal headers through _frombuf;
+        # older Python 3.9 releases call the public frombuf directly.
+        try:
+            parse = getattr(super(), "_frombuf", super().frombuf)
+            member = parse(buf, encoding, errors, **kwargs)
+        except tarfile.EOFHeaderError:
+            raise  # A zero block is the valid tar terminator.
+        except tarfile.HeaderError as error:
+            # TarFile.next otherwise treats invalid/truncated later headers as EOF.
+            raise ContractError("invalid artifact archive header") from error
+        require(member.size >= 0, "artifact member has negative size")
+        if member.type in (tarfile.XHDTYPE, tarfile.XGLTYPE, tarfile.SOLARIS_XHDTYPE,
+                           tarfile.GNUTYPE_LONGNAME, tarfile.GNUTYPE_LONGLINK):
+            require(member.size <= MAX_EXTENDED_HEADER_BYTES,
+                    "artifact extended header exceeds size policy")
+        return member
+
+
 def validate_archive(path):
+    require_regular_file(path, "artifact")
     try:
-        with tarfile.open(path, "r:gz") as archive:
-            members = archive.getmembers()
-            require(members, "artifact archive is empty")
-            names = []
-            for member in members:
-                name = PurePosixPath(member.name)
-                require(not name.is_absolute() and ".." not in name.parts, "unsafe artifact archive path")
-                require(not (member.issym() or member.islnk() or member.isdev()), "artifact archive contains link/device")
-                normalized = str(name)
-                names.append(normalized)
-                require(not normalized.endswith((".map", ".map.gz")), "artifact contains source map")
-            require(any(name.endswith("index.html") for name in names), "artifact has no index.html")
-            require(any(name.endswith("config.json") for name in names), "artifact has no config.json")
-    except (tarfile.TarError, OSError) as error:
+        with gzip.open(path, "rb") as compressed:
+            reader = BoundedArchiveReader(compressed)
+            with tarfile.open(fileobj=reader, mode="r|", tarinfo=StrictTarInfo) as archive:
+                names = {}
+                expanded_files = 0
+                for count, member in enumerate(archive, 1):
+                    require(count <= MAX_ARCHIVE_MEMBERS, "artifact exceeds member-count policy")
+                    name = PurePosixPath(member.name)
+                    require(member.name and not name.is_absolute() and ".." not in name.parts
+                            and "\\" not in member.name, "unsafe artifact archive path")
+                    normalized = str(name)
+                    require(normalized not in names, "artifact contains duplicate normalized path")
+                    require(member.type in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE)
+                            and member.sparse is None, "artifact contains link/device or unsupported member type")
+                    require(member.size >= 0 and member.size <= MAX_MEMBER_BYTES,
+                            "artifact member exceeds size policy")
+                    require(not member.isdir() or member.size == 0, "artifact directory has file data")
+                    require(normalized != "." or member.isdir(), "artifact root must be a directory")
+                    require(not member.isfile() or not member.name.endswith("/"),
+                            "artifact file has directory path")
+                    expanded_files += member.size
+                    require(expanded_files <= MAX_EXPANDED_BYTES, "artifact exceeds expanded-size policy")
+                    names[normalized] = member.isdir()
+                    require(not normalized.endswith((".map", ".map.gz")), "artifact contains source map")
+                require(names, "artifact archive is empty")
+                for required in ("index.html", "config.json"):
+                    require(required in names and not names[required], f"artifact has no regular root {required}")
+                for name in names:
+                    require(all(names.get(str(parent), True) for parent in PurePosixPath(name).parents),
+                            "artifact contains file/directory path conflict")
+                # Continue through tar padding and gzip trailers. Reading via the
+                # tar stream also includes any bytes it already buffered.
+                while True:
+                    padding = archive.fileobj.read(64 * 1024)
+                    if not padding:
+                        break
+                    require(not any(padding), "artifact contains data after tar terminator")
+    except (tarfile.TarError, OSError, EOFError, RecursionError) as error:
         raise ContractError(f"invalid artifact archive: {error}") from error
 
 
 def verify_contract(args):
+    reject_symlinks(Path(args.bundle_dir), "bundle directory")
     bundle = Path(args.bundle_dir).resolve()
     require(bundle.is_dir(), "bundle directory is missing")
     manifest = load_json(bundle / "release-manifest.json", "release manifest")
@@ -155,8 +256,8 @@ def verify_contract(args):
     digest = artifact.get("sha256")
     require(isinstance(digest, str) and SHA256_RE.fullmatch(digest), "invalid artifact digest")
     path = bundle / name
-    require(path.is_file(), "artifact is missing")
-    require(path.stat().st_size <= 256 * 1024 * 1024, "artifact exceeds size policy")
+    require_regular_file(path, "artifact")
+    require(path.stat().st_size <= MAX_ARTIFACT_BYTES, "artifact exceeds size policy")
     require(path.stat().st_size == artifact.get("size"), "artifact size mismatch")
     require(sha256(path) == digest, "artifact digest mismatch")
     for field in ("sbom", "provenance"):
@@ -165,6 +266,7 @@ def verify_contract(args):
         metadata_digest = record.get("sha256")
         require(isinstance(metadata_digest, str) and SHA256_RE.fullmatch(metadata_digest), f"invalid {field} digest")
         metadata_path = bundle / metadata_name
+        require_regular_file(metadata_path, field)
         require(metadata_path.is_file() and sha256(metadata_path) == metadata_digest, f"{field} digest mismatch")
     sbom = load_json(bundle / manifest["metadata"]["sbom"]["name"], "SBOM")
     require(sbom.get("bomFormat") == "CycloneDX" and sbom.get("specVersion") == "1.5", "unsupported SBOM")

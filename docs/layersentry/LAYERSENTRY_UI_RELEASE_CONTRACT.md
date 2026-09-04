@@ -71,3 +71,36 @@ The focused unit suite covers valid candidate verification, default unsigned
 rejection, artifact tampering, SBOM tampering, source-commit mismatch and a source-map
 archive with internally consistent updated digests. CI must additionally perform the
 real UI lint/unit/build and contract verification before this becomes `CI_VERIFIED`.
+
+## Candidate verifier input hardening
+
+The verifier treats candidate bundles as untrusted files. Duplicate JSON keys,
+symlink inputs (including parent directories), ambiguous archive paths and
+special archive entries can otherwise cause validation to inspect different data
+from a later consumer. The scoped mitigation retains the standard-library JSON
+and tar parsers and adds explicit rejection and resource limits before accepting
+a candidate. No extraction or signing is added.
+
+The alternatives were extraction filters (which do not cover JSON ambiguity or
+resource limits and are not available on every supported Python runtime) and a
+new archive parser (unnecessary maintenance and compatibility risk). The decision
+uses `object_pairs_hook` and streaming tar inspection documented by Python
+([JSON](https://docs.python.org/3.9/library/json.html),
+[tarfile](https://docs.python.org/3.9/library/tarfile.html)).
+
+Policy limits are 256 MiB compressed artifact size, 512 MiB total decompressed
+tar bytes including headers/padding, 128 MiB per file, 20,000 logical tar members,
+16 MiB per JSON input, and 1 MiB per extended tar header. These are engineering
+ceilings for a static UI bundle, not measured production capacity. Ordinary
+directories and `./` prefixes remain
+supported; root `index.html` and `config.json` must be regular files. Duplicate
+normalized paths, file/directory conflicts, traversal, links, devices, FIFOs,
+sparse files and nonzero data after the tar terminator are rejected.
+
+Local negative tests cover the changed boundary. Rocky Linux 9 runner acceptance
+and an exact real UI artifact remain the next evidence gates. The files must stay
+in a trusted, non-concurrently-mutated staging directory through validation and
+consumption: path checks do not establish a race-free installer transaction.
+Production authenticity/signature verification remains unimplemented. This is
+an R1 source change with no runtime mutation; rollback is reverting its commit.
+No product architecture or knowledge-graph relationship changes are introduced.
