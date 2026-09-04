@@ -12,10 +12,10 @@ umask 077
 
 readonly FULL_INSTALLER_COMMIT='83e77eb1ed7fa2e18f5cdfdc3c5e9148247a447f'
 readonly FULL_INSTALLER_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${FULL_INSTALLER_COMMIT}/install-layersentry-rocky9.sh"
-readonly UI_COMMIT='0361a0cccb9956b4c57f62dfbf091b01d0fa9f3c'
-readonly RECOVERY_COMMIT='5d6897079fae9d3680b6319b658307831d4cd578'
+readonly UI_COMMIT='9ad724eb76843d40d6a883c0a0ab47a75ceed449'
+readonly RECOVERY_COMMIT='8b9999a98af0d410d051e851578d31008cb5383f'
 readonly RECOVERY_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${RECOVERY_COMMIT}/install-layersentry-rocky9-resume-v3.sh"
-readonly SERVED_BRANDING_COMMIT='75b993753055868a4e7ce448eea3526f96ae1cc8'
+readonly SERVED_BRANDING_COMMIT='49dbbeafe6e02c0797dac8d675e89ec440e44437'
 readonly SERVED_BRANDING_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${SERVED_BRANDING_COMMIT}/install-layersentry-rocky9-served-ui-repair.sh"
 readonly EXPECTED_VERSION='4.22.1.1-1'
 
@@ -39,7 +39,7 @@ Pinned customer UI source: ${UI_COMMIT}
 CloudStack: 4.22.1.1; Java 17; UI build runtime: Node.js 16.
 The final step verifies Layersentry branding from the actually served management
 webapp, including logo, V1.0 runtime config, customer-friendly setup terminology,
-DBaaS, APaaS and onboarding.
+onboarding, and the absence of obsolete DBaaS/APaaS V1 placeholders.
 USAGE
 }
 
@@ -124,6 +124,11 @@ new_root='''find_ui_root() {\n  local index_file ui_files management_files\n  ui
 if s.count(old_root) != 1:
     raise SystemExit('ERROR: full-installer UI-root anchor changed unexpectedly.')
 s=s.replace(old_root,new_root,1)
+
+# Keep the immutable base installer but remove now-obsolete V1 placeholder wording
+# so --help and logs describe the actual LayerSentry product scope.
+s=s.replace('reviewed Layersentry UI (including DBaaS/APaaS)', 'reviewed Layersentry UI')
+s=s.replace('Builds the pinned Layersentry UI and verifies DBaaS/APaaS are compiled.', 'Builds the pinned Layersentry UI and validates the reviewed customer experience.')
 
 p.write_text(s,encoding='utf-8')
 PY
