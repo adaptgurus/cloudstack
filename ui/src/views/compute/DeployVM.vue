@@ -50,6 +50,12 @@
                         :selectedValue="form.zoneid"
                         @change="onSelectZoneId" />
                     </a-form-item>
+                    <a-alert
+                      v-if="kvmProfile && kvmStatus"
+                      :message="$t(kvmStatus)"
+                      :type="loading.hypervisors ? 'info' : 'warning'"
+                      show-icon
+                      style="margin-bottom: 16px" />
                     <a-form-item
                       v-if="!isNormalAndDomainUser"
                       :label="$t('label.podid')"
@@ -936,7 +942,8 @@ import _ from 'lodash'
 import { mixin, mixinDevice } from '@/utils/mixin.js'
 import store from '@/store'
 import eventBus from '@/config/eventBus'
-import { filterProductHypervisors } from '@/config/productProfile'
+import { filterProductHypervisors, filterProductImages, isLayersentryKvmProfile } from '@/config/productProfile'
+import { checkKvmSite, checkKvmImage } from '@/config/kvmProvisioning'
 
 import OwnershipSelection from '@views/compute/wizard/OwnershipSelection'
 import InfoCard from '@/components/view/InfoCard'
@@ -1093,6 +1100,9 @@ export default {
       selectedTemplateConfiguration: {},
       iso: {},
       hypervisor: '',
+      kvmProfile: isLayersentryKvmProfile(),
+      kvmStatus: 'message.layersentry.kvm.select.site',
+      kvmRequest: 0,
       serviceOffering: {},
       diskOffering: {},
       affinityGroups: [],
@@ -2293,7 +2303,8 @@ export default {
     handleSubmit (e) {
       console.log('wizard submit')
       if (this.loading.deploy) return
-      this.formRef.value.validate().then(async () => {
+      return this.formRef.value.validate().then(async () => {
+        if (this.loading.deploy) return
         const values = toRaw(this.form)
         if (!values.templateid && !values.isoid && !values.volumeid && !values.snapshotid) {
           this.$notification.error({
@@ -2539,6 +2550,28 @@ export default {
           }
         }
 
+        if (this.kvmProfile) {
+          const selection = [this.form.zoneid, this.imageType, this.form[this.imageType]]
+          try {
+            await checkKvmSite(getAPI, deployVmData.zoneid)
+            await checkKvmImage(getAPI, deployVmData.zoneid, selection[1], selection[2], {
+              account: deployVmData.account,
+              domainid: deployVmData.domainid,
+              projectid: deployVmData.projectid
+            })
+            if (selection[0] !== this.form.zoneid || selection[1] !== this.imageType || selection[2] !== this.form[this.imageType]) {
+              throw new Error('message.layersentry.kvm.selection.changed')
+            }
+            deployVmData.hypervisor = 'KVM'
+            this.kvmStatus = ''
+          } catch (error) {
+            this.kvmStatus = error.message
+            this.$notification.error({ message: this.$t('message.request.failed'), description: this.$t(error.message) })
+            this.loading.deploy = false
+            return
+          }
+        }
+
         postAPI('deployVirtualMachine', deployVmData).then(response => {
           const jobId = response.deployvirtualmachineresponse.jobid
           if (jobId) {
@@ -2660,6 +2693,7 @@ export default {
       })
     },
     fetchOptions (param, name, exclude) {
+      if (this.kvmProfile && name === 'hypervisors') return this.fetchKvmHypervisors()
       return new Promise((resolve, reject) => {
         if (exclude && exclude.length > 0 && exclude.includes(name)) {
           return resolve(null)
@@ -2765,7 +2799,7 @@ export default {
           let count = 0
           const volumes = []
           response.listvolumesresponse.volume.forEach(volume => {
-            if (!volume.virtualmachineid) {
+            if (!volume.virtualmachineid && (!this.kvmProfile || volume.hypervisor === 'KVM')) {
               count += 1
               volumes.push({ ...volume, displaytext: volume.name })
             }
@@ -2842,6 +2876,7 @@ export default {
       args.showicon = 'true'
       args.id = this.queryTemplateId
       args.isvnf = false
+      if (this.kvmProfile) args.hypervisor = 'KVM'
 
       delete args.category
       delete args.public
@@ -2849,6 +2884,9 @@ export default {
 
       return new Promise((resolve, reject) => {
         getAPI('listTemplates', args).then((response) => {
+          if (this.kvmProfile && response.listtemplatesresponse) {
+            response.listtemplatesresponse.template = filterProductImages(response.listtemplatesresponse.template)
+          }
           resolve(response)
         }).catch((reason) => {
           // ToDo: Handle errors
@@ -2884,6 +2922,9 @@ export default {
 
       return new Promise((resolve, reject) => {
         getAPI('listIsos', args).then((response) => {
+          if (this.kvmProfile && response.listisosresponse) {
+            response.listisosresponse.iso = filterProductImages(response.listisosresponse.iso, true)
+          }
           resolve(response)
         }).catch((reason) => {
           // ToDo: Handle errors
@@ -3065,6 +3106,25 @@ export default {
       } catch (error) {
         console.error('Error fetching backup offerings:', error)
         this.zoneAllowsBackupOperations = false
+      }
+    },
+    async fetchKvmHypervisors () {
+      const request = ++this.kvmRequest
+      const zoneid = this.form.zoneid
+      this.options.hypervisors = []
+      this.form.hypervisor = null
+      this.loading.hypervisors = true
+      this.kvmStatus = 'message.layersentry.kvm.checking'
+      try {
+        const choices = await checkKvmSite(getAPI, zoneid)
+        if (request !== this.kvmRequest || zoneid !== this.form.zoneid) return
+        this.options.hypervisors = choices
+        this.form.hypervisor = 'KVM'
+        this.kvmStatus = ''
+      } catch (error) {
+        if (request === this.kvmRequest && zoneid === this.form.zoneid) this.kvmStatus = error.message
+      } finally {
+        if (request === this.kvmRequest) this.loading.hypervisors = false
       }
     },
     onSelectZoneId (value) {

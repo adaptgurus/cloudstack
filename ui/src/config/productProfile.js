@@ -33,3 +33,10 @@ export function filterProductHypervisors (hypervisors, config = vueProps.$config
     return name === 'KVM'
   })
 }
+
+export function filterProductImages (images, isIso = false, config = vueProps.$config) {
+  const available = Array.isArray(images) ? images : []
+  if (!isLayersentryKvmProfile(config)) return available
+  return available.filter(image => image?.hypervisor === 'KVM' ||
+    (isIso && image?.hypervisor === 'None'))
+}

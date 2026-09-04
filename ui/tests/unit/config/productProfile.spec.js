@@ -17,9 +17,12 @@
 
 import {
   filterProductHypervisors,
+  filterProductImages,
   isLayersentryKvmProfile,
   LAYERSENTRY_KVM_PROFILE
 } from '@/config/productProfile'
+
+jest.mock('@/vue-app', () => ({ vueProps: { $config: {} } }))
 
 describe('LayerSentry product profile', () => {
   const profile = { productProfile: LAYERSENTRY_KVM_PROFILE }
@@ -46,5 +49,12 @@ describe('LayerSentry product profile', () => {
 
   it('fails safely for a missing hypervisor response', () => {
     expect(filterProductHypervisors(undefined, profile)).toEqual([])
+  })
+
+  it('restricts OS images while retaining neutral boot media', () => {
+    const images = [{ hypervisor: 'KVM' }, { hypervisor: 'VMware' }, { hypervisor: 'None' }, {}]
+    expect(filterProductImages(images, false, profile)).toEqual([images[0]])
+    expect(filterProductImages(images, true, profile)).toEqual([images[0], images[2]])
+    expect(filterProductImages(images, false, {})).toBe(images)
   })
 })

@@ -27,6 +27,13 @@ const messages = {}
 // group. The zone wizard separately calls the Pod networking step Management
 // network because that is what the customer is configuring there.
 const layersentryEnglishTerminology = {
+  'message.layersentry.kvm.select.site': 'Select a Site to check KVM availability.',
+  'message.layersentry.kvm.checking': 'Checking KVM availability for the selected Site…',
+  'message.layersentry.kvm.unavailable': 'The selected Site does not report KVM capability. Choose another Site or ask your administrator to configure KVM.',
+  'message.layersentry.kvm.lookup.failed': 'KVM availability could not be verified. Check your connection and permissions, then select the Site again.',
+  'message.layersentry.kvm.image.invalid': 'The selected OS image cannot be verified for KVM in this Site. Select a ready KVM image or a compatible bootable ISO. Snapshot sources must have a readable KVM volume.',
+  'message.layersentry.kvm.image.lookup.failed': 'The selected image could not be checked. Check your connection and permissions, then retry.',
+  'message.layersentry.kvm.selection.changed': 'The Site or image selection changed during validation. Review your selection and submit again.',
   'label.zone': 'Site',
   'label.zones': 'Sites',
   'label.zone.id': 'Site ID',
