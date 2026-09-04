@@ -1,50 +1,86 @@
-# LayerSentry — Four-Agent Codex Startup Guide
+# LayerSentry — Codex Workstream Startup Index
 
-Open the repository root in Codex so root `AGENTS.md` is in scope. Codex should read `AGENTS.md` automatically; each thread is also told exactly which workstream document to read.
+This directory contains scoped Codex workstream contracts. It does not contain the authoritative current project state.
 
-## Agent A — UI / Self-Service
+## Common read order
 
-Paste this as the first task in the A thread:
+Every Codex workstream starts with:
 
-> You are LayerSentry Codex Workstream A. Read `/AGENTS.md`, `docs/layersentry/CODEX_MASTER_CONTEXT.md`, and `docs/layersentry/codex/WORKSTREAM_A_UI_SELF_SERVICE.md`, plus every mandatory document referenced by AGENTS.md. First fetch/inspect the actual current `layersentry/4.22.1.1-ui` HEAD and current progress ledger. Use an isolated worktree/branch named `codex/layersentry-ui-self-service` or equivalent. Do not modify CloudStack Java/backend/database/KVM-agent code. Do not edit the shared progress ledger. Implement only your owned UI/self-service scope, run real tests, commit atomically, and finish with the standard evidence handoff. Do not call anything complete without its evidence gate.
+1. repository `/AGENTS.md`;
+2. `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md`;
+3. `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`;
+4. the assigned workstream file below.
 
-## Agent B — Release / Installer / Build
+Read specialist upgrade/IP, upstream-delta or four-agent runbooks only when the current task needs them.
 
-Paste this as the first task in the B thread:
+Always fetch the actual current integration refs before editing. Do not use historical SHAs/run IDs/live addresses from old handoffs.
 
-> You are LayerSentry Codex Workstream B. Read `/AGENTS.md`, `docs/layersentry/CODEX_MASTER_CONTEXT.md`, and `docs/layersentry/codex/WORKSTREAM_B_RELEASE_INSTALLER.md`, plus every mandatory document referenced by AGENTS.md. First fetch/inspect the actual current `layersentry/4.22.1.1-ui` HEAD and current progress ledger. Use an isolated worktree/branch named `codex/layersentry-release-installer` or equivalent. Own release/build/installer only. Do not redesign dashboards or modify CloudStack core. Do not edit the shared progress ledger. Prioritize moving production UI compilation to a deterministic CI-built immutable artifact with no production source maps, digest/signature/release manifest/SBOM and safe installer deployment/rollback. Run real tests, commit atomically, and finish with the standard evidence handoff.
+## A — UI / Self-Service
 
-## Agent C — Security / Validation
+Workstream:
 
-Paste this as the first task in the C thread:
+`docs/layersentry/codex/WORKSTREAM_A_UI_SELF_SERVICE.md`
 
-> You are LayerSentry Codex Workstream C. Read `/AGENTS.md`, `docs/layersentry/CODEX_MASTER_CONTEXT.md`, and `docs/layersentry/codex/WORKSTREAM_C_SECURITY_VALIDATION.md`, plus every mandatory document referenced by AGENTS.md. First fetch/inspect the actual current `layersentry/4.22.1.1-ui` HEAD and current progress ledger. Use an isolated worktree/branch named `codex/layersentry-security-validation` or equivalent. Own test/security/evidence tooling only. Do not weaken SELinux, firewalld, RBAC, or tests merely to pass. Do not make broad UI or installer rewrites. Do not edit the shared progress ledger. Build evidence-driven RBAC, SELinux/firewalld, package-lock, snapshot-safety, CKS metadata-isolation/CSI validation and support-bundle coverage. Commit atomically and finish with the standard evidence handoff.
+Starter prompt:
 
-## Agent D — DR / HA / Upgrade
+```text
+You are LayerSentry Workstream A: UI / Self-service. Read AGENTS.md, the canonical Super Master Context, current progress ledger and WORKSTREAM_A_UI_SELF_SERVICE.md. Fetch/inspect the actual current integration ref before editing. Work only inside A ownership on an isolated worktree/branch. Preserve CloudStack core and server-side RBAC, do not recreate DBaaS/APaaS, use the governed status/risk/evidence rules, run real relevant tests, commit atomically and stop at a reviewable branch with the standard evidence handoff. Do not self-merge or edit the shared progress ledger unless explicitly assigned.
+```
 
-This thread normally needs the runner repository as well as the CloudStack context.
+## B — Release / Installer / Build
 
-Paste this as the first task in D:
+Workstream:
 
-> You are LayerSentry Codex Workstream D. Read the LayerSentry root `/AGENTS.md`, `docs/layersentry/CODEX_MASTER_CONTEXT.md`, and `docs/layersentry/codex/WORKSTREAM_D_DR_HA_UPGRADE.md`, plus every mandatory document referenced by AGENTS.md. Inspect actual current HEADs of `adaptgurus/cloudstack:layersentry/4.22.1.1-ui` and `adaptgurus/cozystack:ops/layersentry-hyperv-inventory`, current workflows, and live evidence before mutation. Use isolated worktrees/branches. Own runner/Hyper-V/DR/HA/upgrade test automation. Do not alter CloudStack core to make tests pass. Do not edit the shared progress ledger. Before every destructive or connectivity-affecting action create a durable checkpoint and rollback plan. First prove native two-Zone B&R recovery on disposable workloads before advanced DR orchestration. Commit atomically and finish with exact workflow/job/artifact/live evidence.
+`docs/layersentry/codex/WORKSTREAM_B_RELEASE_INSTALLER.md`
 
-## Integration / Lead thread
+Also read `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`.
 
-Keep one non-coding lead/review thread (ChatGPT or Codex) responsible for:
+Starter prompt:
 
-1. checking all four branch HEADs and handoff reports;
-2. reviewing file overlap and CloudStack-core impact;
-3. merging/cherry-picking in a controlled order;
-4. running combined build/regression;
-5. deploying only reviewed exact artifacts;
-6. updating `LAYERSENTRY_PROGRESS_LEDGER.md` after evidence changes status;
-7. resolving cross-workstream conflicts;
-8. preserving the integration branch as the authoritative LayerSentry state.
+```text
+You are LayerSentry Workstream B: Release / Installer / Build. Read AGENTS.md, the canonical Super Master Context, current progress ledger, upgrade/supply-chain policy and WORKSTREAM_B_RELEASE_INSTALLER.md. Fetch/inspect the actual current integration ref before editing. Own only release/build/installer scope on an isolated worktree/branch. Build verified CI artifacts, manifest/SBOM/provenance/digest/signature and safe fresh/resume/repair/rollback behavior without CloudStack-core changes or dashboard redesign. Apply governed status/risk/evidence rules, never commit secrets/signing keys, run real relevant tests and stop at a reviewable branch with the standard handoff. Do not self-merge or edit the shared ledger unless assigned.
+```
 
-Recommended integration order is B -> A -> C -> D unless a change is demonstrably independent and non-overlapping.
+## C — Security / Validation
 
-## Parallelism rule
+Workstream:
 
-Four agents may work simultaneously, but no two agents should share one writable worktree. The safest arrangement is one Codex project with four independent worktree-backed threads, or four Codex windows each opened on a different Git worktree.
+`docs/layersentry/codex/WORKSTREAM_C_SECURITY_VALIDATION.md`
 
-Never have four agents directly commit to `layersentry/4.22.1.1-ui`.
+Starter prompt:
+
+```text
+You are LayerSentry Workstream C: Security / Validation. Read AGENTS.md, the canonical Super Master Context, current progress ledger and WORKSTREAM_C_SECURITY_VALIDATION.md. Fetch/inspect the actual current integration ref before editing. Work only inside C ownership on an isolated worktree/branch. Build evidence-driven RBAC/direct-URL, feature-gating, SELinux/firewall/package/update/snapshot/CKS security and support validation. Do not weaken safeguards to pass tests. Use governed statuses and R0-R4 risk gates, preserve uncertainty honestly and stop at a reviewable branch with exact evidence. Do not self-merge or edit the shared ledger unless assigned.
+```
+
+## D — DR / HA / Upgrade
+
+Workstream:
+
+`docs/layersentry/codex/WORKSTREAM_D_DR_HA_UPGRADE.md`
+
+D normally uses both `adaptgurus/cloudstack` context and `adaptgurus/cozystack` runner automation. Also read `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`.
+
+Starter prompt:
+
+```text
+You are LayerSentry Workstream D: DR / HA / Upgrade. From the parent containing cloudstack/ and cozystack/, read cloudstack/AGENTS.md, canonical Super Master Context, current progress ledger, upgrade policy and WORKSTREAM_D_DR_HA_UPGRADE.md. Fetch/inspect actual current refs in both repositories plus relevant workflow/live state before mutation. Own safe runner/Hyper-V/DR/HA/upgrade proof automation only; do not change CloudStack core to make a test pass or build advanced DR before native recovery is proven. Apply R0-R4 gates rigorously, never duplicate an in-flight operation, use disposable approved data for destructive tests and hand off exact commits/workflow/artifact/live evidence. Do not self-merge or edit the shared ledger unless assigned.
+```
+
+## Integration / Lead
+
+A separate integration/lead session should:
+
+1. fetch current integration refs;
+2. review each branch diff and ownership overlap;
+3. reject unexplained CloudStack-core changes;
+4. integrate one coherent change at a time;
+5. run combined tests;
+6. coordinate all live deployment/mutation;
+7. update `LAYERSENTRY_PROGRESS_LEDGER.md` only when evidence changes project status.
+
+Default dependency order when overlap exists: **B -> A -> C -> D**.
+
+## Local setup
+
+Use `docs/layersentry/CODEX_4_AGENT_RUNBOOK.md` for WSL/worktree/launch commands. Never allow two writing agents to share one worktree, and serialize conflicting live mutations/heavy tests on the same runner/Hyper-V target.
