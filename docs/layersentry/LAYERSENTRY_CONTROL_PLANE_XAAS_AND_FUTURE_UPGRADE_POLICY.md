@@ -226,9 +226,90 @@ Use single-writer semantics unless a multi-writer design is explicitly proven sa
 
 ## 8. Load-balancer/VIP contract
 
-When no external enterprise ADC is available, the LayerSentry-certified virtual LB design must remove a single LB VM as a single point of failure.
+### Version-pinned CloudStack boundary
 
-A typical candidate is two LB VMs using an HA VIP/failover mechanism and health-checked backends. Exact software is an implementation choice, not a claim in this policy.
+CloudStack's Virtual Router load-balancing service is a tenant **guest-network
+data-plane** feature. It applies load-balancing rules to Virtual Routers that
+belong to a guest network; it is not the load balancer for the CloudStack
+Management Server control plane. Using a CloudStack-created Virtual Router in
+front of the Management Servers would also create an avoidable recovery loop:
+the Management plane would depend on a system VM whose lifecycle it manages.
+
+The exact CloudStack `4.22.1.1` Management Server HA documentation instead
+places the stateless Management Servers behind an administrator-provided load
+balancer. It requires persistence for UI/API traffic (`80/443` to `8080`, or
+`20400` with AJP) and for TCP agent traffic on `8250`; `8096` does not require
+persistence. If port `8250` is exposed through that VIP, the global `host`
+configuration must name the VIP.
+
+CloudStack also supplies a simpler native HA path for KVM and System VM agent
+traffic: `host` accepts a comma-separated Management Server address list and
+`indirect.agent.lb.algorithm=roundrobin` distributes preferred servers. The
+Management Server propagates the list to connected agents. LayerSentry prefers
+this native direct-agent mechanism for `8250`, avoiding unnecessary TCP proxy
+state while preserving supported CloudStack behavior. A unified `8250` VIP
+remains an option only after persistence, TLS/certificate behavior, failover and
+agent reconnection are tested for the exact release.
+
+Primary evidence:
+
+- [CloudStack 4.22.1.1 Management Server HA and load-balancing contract](https://docs.cloudstack.apache.org/en/4.22.1.1/adminguide/reliability.html)
+- [`host` CSV configuration in the exact 4.22.1.1 source](https://github.com/apache/cloudstack/blob/4.22.1.1/api/src/main/java/org/apache/cloudstack/config/ApiServiceConfiguration.java#L26-L30)
+- [native indirect-agent algorithms in the exact 4.22.1.1 source](https://github.com/apache/cloudstack/blob/4.22.1.1/server/src/main/java/org/apache/cloudstack/agent/lb/IndirectAgentLBServiceImpl.java#L62-L74)
+- [Virtual Router LB rules target routers belonging to a network](https://github.com/apache/cloudstack/blob/4.22.1.1/server/src/main/java/com/cloud/network/element/VirtualRouterElement.java#L321-L340)
+- [CloudStack-managed external LB devices reject non-guest traffic](https://github.com/apache/cloudstack/blob/4.22.1.1/server/src/main/java/com/cloud/network/ExternalLoadBalancerDeviceManagerImpl.java#L1028-L1033)
+
+### Selected topology
+
+Use an existing enterprise ADC when it is already supported and available. It
+replaces the LayerSentry-owned LB VMs; do not deploy two additional appliances
+merely to satisfy a component-count diagram.
+
+Without an external ADC, the LayerSentry production candidate is:
+
+- two small external LB/VIP VMs on separate physical failure domains;
+- health-checked, sticky UI/API forwarding to all Management Servers;
+- TLS termination or pass-through according to the certified certificate
+  design;
+- native `host=<mgmt1>,<mgmt2>,<mgmt3>` with
+  `indirect.agent.lb.algorithm=roundrobin` for KVM and System VM agents;
+- optional VIP forwarding for `8250` only when a unified endpoint is required
+  and the CloudStack persistence contract has passed validation.
+
+HAProxy plus a tested VIP-owner mechanism such as Keepalived/VRRP is a simple
+candidate, not an implementation mandate. The network must support safe VIP
+ownership and the design must prevent simultaneous ownership. A single direct
+Management endpoint or single lab LB is useful for functional testing but is
+not production HA.
+
+### Alternatives and trade-offs
+
+| Approach | Advantages | Disadvantages / decision |
+|---|---|---|
+| CloudStack Virtual Router | Native guest LB lifecycle | Guest data plane only; creates control-plane recovery dependency; rejected for Management Server LB |
+| Native Management address CSV for agents | Built into CloudStack; no extra `8250` proxy; dynamic propagation | Does not provide the browser/API VIP; agent reconnect behavior still requires live validation; selected for `8250` |
+| Two HAProxy/VIP VMs | Simple, automatable, no proprietary dependency | Adds two lifecycle/failure-domain responsibilities; selected only when no ADC exists |
+| Existing enterprise ADC | Reuses established HA, certificate and monitoring capability | External operational dependency and configuration must be certified; preferred when available |
+| DNS round-robin | Very little infrastructure | No deterministic backend removal or required session persistence; insufficient for production certification |
+| Direct/single endpoint | Fastest lab bootstrap | Single point of failure; lab only |
+
+### Risks and mitigations
+
+- Stale or incorrect `host` values can strand agents/System VMs: use the exact
+  Management address CSV, verify propagation, and retain a tested rollback to
+  the previous known-good value.
+- UI/API sessions can move between Management Servers: configure and test the
+  documented persistence behavior.
+- A failed LB can continue receiving traffic: use application-aware health
+  checks, backend draining and bounded failure/recovery tests.
+- VRRP can produce dual VIP ownership during a partition: validate network
+  support, priority/preemption behavior and split-brain controls before use.
+- TLS offload can change source-address, certificate and trust behavior: record
+  the chosen mode and test browser, API and agent certificates end to end.
+- Native agent distribution does not remove the need for Management placement
+  and capacity: retain three independent Management failure domains.
+
+### Acceptance, rollback and current status
 
 Validate:
 
@@ -242,7 +323,24 @@ Validate:
 - split-brain prevention;
 - restart/upgrade behavior.
 
-The two LB VMs must occupy separate physical failure domains for the certified HA profile.
+Also validate `host` CSV propagation, preferred-server distribution, each
+Management Server loss, KVM and System VM reconnect, certificate trust, and
+behavior when an agent's preferred server returns. If unified VIP `8250` is
+selected, repeat these tests through the VIP with persistence enabled.
+
+Rollback consists of draining the candidate LB backend, restoring the prior
+UI/API endpoint and `host` value, verifying agents have received the restored
+list, and only then withdrawing the candidate VIP. Never change `host`, VIP
+ownership and firewall policy simultaneously without checkpoints.
+
+Status: `DESIGN_DEFINED`. The exact documentation and source establish the
+supported mechanisms and reject the Virtual Router interpretation. No
+LayerSentry three-Management/two-LB Rocky Linux 9 failover, persistence, agent
+reconnection or split-brain evidence exists yet, so this is not
+`LIVE_VERIFIED` or `PRODUCTION_CERTIFIED`.
+
+When LayerSentry owns the LB tier, both LB VMs must occupy separate physical
+failure domains for the certified HA profile.
 
 ---
 
@@ -337,4 +435,8 @@ For LayerSentry V1:
 7. remain on the current LTS baseline until a newer target is deliberately certified;
 8. make all version tooling compatible with the announced `24.0.0` naming scheme;
 9. define exact failure tolerance instead of promising arbitrary worst-case survival;
-10. use a second site/DR design for site-level failures rather than expecting local HA to solve them.
+10. use an external ADC when available, otherwise two external LB/VIP VMs for
+    sticky UI/API traffic, while preferring CloudStack native round-robin
+    Management address distribution for agent traffic;
+11. never use the tenant Virtual Router as the Management control-plane LB;
+12. use a second site/DR design for site-level failures rather than expecting local HA to solve them.
