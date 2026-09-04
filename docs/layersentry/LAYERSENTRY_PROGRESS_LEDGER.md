@@ -95,6 +95,16 @@ Exact Apache CloudStack documentation tag `4.22.1.1` contains conflicting databa
 
 Combined source verification for this checkpoint is recorded in the final integration commit and command evidence. Runtime-affecting claims remain below `LIVE_VERIFIED` until exact artifacts are exercised on Rocky Linux 9.
 
+Pinned-toolchain build attempt after integration:
+
+- official Node.js `v16.20.2` Linux x64 archive was downloaded to temporary storage and its SHA-256 `874463523f26ed528634580247f403d200ba17a31adf2de98a7b124c6eb33d87` matched the official Node.js `SHASUMS256.txt` entry;
+- bundled npm version was `8.19.4`;
+- `npm ci --no-audit --no-fund` failed before build because the checked-in `ui/package-lock.json` is not synchronized with `ui/package.json` and old-lock metadata resolution also reported no matching `vue-loader-v16@16.8.3`;
+- no tracked file changed and no artifact/runtime deployment occurred;
+- the release workflow was not dispatchable from the non-default integration branch because GitHub had not registered the newly added workflow on the repository default branch.
+
+This is a failed evidence gate, not `CI_VERIFIED`. The next release-build action is to research and repair the upstream UI dependency/lock contract in a controlled change, including the `vue-loader-v16` alias and the package-version mismatches, then repeat the exact pinned clean install, lint, unit, build, deterministic artifact comparison, and verifier negatives.
+
 ### SOURCE_COMPLETE — DR architecture revalidation + Super Master Context v3 + knowledge graph
 
 Before advanced DR implementation, the existing LayerSentry DR direction was revalidated against CloudStack 4.22.1.1 source/documentation plus current public libvirt/QEMU, Ceph, LINSTOR/DRBD and Nutanix DR architecture material.
