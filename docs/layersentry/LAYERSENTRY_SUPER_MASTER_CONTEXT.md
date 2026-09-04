@@ -1595,19 +1595,20 @@ This avoids wasting time while still preventing false assumptions.
 Every new ChatGPT/Codex session that continues LayerSentry must execute this sequence before proposing or changing implementation:
 
 1. Read the current `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md` from the active branch.
-2. Fetch the actual current HEAD of `adaptgurus/cloudstack` branch `layersentry/4.22.1.1-ui`.
-3. Fetch the actual current HEAD of `adaptgurus/cozystack` branch `ops/layersentry-hyperv-inventory` when runner work is relevant.
-4. Inspect the latest relevant workflow run/job/artifact rather than assuming the run IDs in this document are still latest.
-5. Compare the current completion ledger with source/runtime evidence.
-6. Do not reclassify any `PENDING`, `NOT_TESTED`, `UNKNOWN`, or `PARTIAL` item as complete without new evidence.
-7. Do not downgrade/rebuild `LIVE_VERIFIED` work without checking its evidence and current regression state.
-8. For any customer-facing terminology change, run the wrong-label protocol in Section 38.
-9. Before infrastructure mutation, inspect current live state and identify whether the action is read-only, reversible or destructive.
-10. Before ending the session, update the ledger when the authoritative status changed.
+2. Read the current `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md` from the active branch.
+3. Fetch the actual current HEAD of `adaptgurus/cloudstack` branch `layersentry/4.22.1.1-ui`.
+4. Fetch the actual current HEAD of `adaptgurus/cozystack` branch `ops/layersentry-hyperv-inventory` when runner work is relevant.
+5. Inspect the latest relevant workflow run/job/artifact rather than assuming the run IDs in this document are still latest.
+6. Compare the current completion/progress ledger with source/runtime evidence.
+7. Do not reclassify any `PENDING`, `NOT_TESTED`, `UNKNOWN`, or `PARTIAL` item as complete without new evidence.
+8. Do not downgrade/rebuild `LIVE_VERIFIED` work without checking its evidence and current regression state.
+9. For any customer-facing terminology change, run the wrong-label protocol in Section 38.
+10. Before infrastructure mutation, inspect current live state and identify whether the action is read-only, reversible or destructive.
+11. Before ending the session, update the durable progress ledger whenever authoritative project state changed.
 
 Copy-paste starter for a new chat:
 
-`Continue LayerSentry from the current docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md in adaptgurus/cloudstack. Enforce Sections 36-40 anti-hallucination, status-label and wrong-label rules. First fetch actual current branch HEADs, latest relevant workflow evidence and live state. Do not call anything complete unless its required evidence gate passed; do not redo LIVE_VERIFIED work without regression evidence.`
+`Continue LayerSentry from the current docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md and docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md in adaptgurus/cloudstack. Enforce Sections 36-43 anti-hallucination, status-label, wrong-label and refresh-safe checkpoint rules. First fetch actual current branch HEADs, latest relevant workflow evidence and live state. Do not call anything complete unless its required evidence gate passed; do not redo LIVE_VERIFIED or already checkpointed work without regression evidence.`
 
 ---
 
@@ -1662,3 +1663,137 @@ A future AI should say:
 - `PRODUCTION_CERTIFIED` only after all applicable production gates passed.
 
 The LayerSentry project must move quickly by reusing proven CloudStack functionality and preserving completed work, **not by converting assumptions into false completion claims**.
+
+---
+
+## 43. Durable progress / refresh-safe checkpoint protocol
+
+This section is mandatory and exists specifically to protect progress if the user refreshes the browser, closes/reopens the tab, loses the connection, switches models, a ChatGPT/Codex session crashes, context is exhausted, a tool call returns late, or work continues in a new chat.
+
+### Persistence principle
+
+**Chat state is not the authoritative persistence layer. GitHub source, the durable progress ledger, workflow artifacts/logs, and verified live runtime evidence are the persistence layer.**
+
+Already completed/evidenced work must not disappear merely because the visible conversation disappears.
+
+The frequently updated execution checkpoint is:
+
+`docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`
+
+The architecture/rules/status governance remain in this Super Master Context.
+
+### Mandatory checkpoint cadence
+
+The active AI session must checkpoint progress rather than waiting until the entire project or a long workflow is finished.
+
+Checkpoint after every meaningful atomic task, for example:
+
+- one coherent source change is committed;
+- one build succeeds/fails with useful evidence;
+- one deployment succeeds/fails with useful evidence;
+- one runtime test changes the status of a task;
+- one infrastructure discovery step establishes authoritative state;
+- before starting a destructive, risky, long-running or non-idempotent operation;
+- before deliberately rebooting/stopping a node;
+- before launching a workflow expected to outlive the current response/session;
+- before a context-heavy session approaches its practical limit.
+
+At each checkpoint, persist as much of the following as applicable:
+
+1. task name;
+2. exact status from Section 37;
+3. source repository/branch;
+4. exact source commit SHA;
+5. files changed;
+6. build/static checks;
+7. workflow run/job IDs;
+8. artifact ID/digest;
+9. live target and assertions actually executed;
+10. current failure/error if blocked;
+11. exact next action;
+12. whether retry is safe/idempotent;
+13. user input still required.
+
+### Atomic-commit rule
+
+Prefer small coherent commits over holding many completed changes only in an AI response or uncommitted working tree.
+
+If a source subtask is valid and independently reviewable, commit it before moving to an unrelated subtask. Do not wait for the entire milestone merely to create one giant commit.
+
+A browser refresh cannot erase a committed subtask.
+
+### Runtime-only progress rule
+
+Some tasks change runtime state without changing source. Those tasks must still receive durable evidence.
+
+Where practical, record the runtime result in:
+
+- `LAYERSENTRY_PROGRESS_LEDGER.md`;
+- workflow/request/evidence files;
+- immutable workflow artifacts;
+- or another versioned evidence document.
+
+Do not allow the only record of a successful runtime action to exist in a chat message.
+
+### Refresh/reconnect recovery procedure
+
+If the user refreshes in the middle of a task, the next AI session must **not restart from the beginning**.
+
+It must:
+
+1. read this Super Master Context;
+2. read `LAYERSENTRY_PROGRESS_LEDGER.md`;
+3. fetch current branch HEADs;
+4. inspect the latest relevant workflow/job/artifact;
+5. inspect live runtime where the previous action may have changed infrastructure;
+6. determine the last proven evidence gate;
+7. resume from the **first unmet gate**.
+
+Example:
+
+- source committed before refresh -> do not rewrite it; verify/build next;
+- build passed before refresh -> do not rebuild unless needed; deploy next;
+- workflow was started before refresh -> inspect that run first; do not trigger a duplicate run blindly;
+- deployment succeeded before refresh -> inspect runtime/evidence and continue validation;
+- destructive action may have partially executed -> mark state `UNKNOWN` until inspected; never repeat blindly.
+
+### In-flight workflow protection
+
+If a refresh occurs while GitHub Actions or another remote operation is running, assume neither success nor failure.
+
+The next session must identify the exact run/job and read its current state before creating another request or retry.
+
+This prevents duplicate deployments, duplicate VM creation, repeated network mutations, repeated backup jobs, or duplicate DR recoveries.
+
+### Destructive-operation checkpoint
+
+Before any operation that may disconnect management, change networking/storage, reboot nodes, destroy/recover VMs, change DB topology, fail over DR, or otherwise be non-trivial to undo:
+
+- create a durable pre-action checkpoint;
+- record current known-good state/evidence;
+- record rollback/recovery method;
+- record the exact action about to be executed.
+
+After the action, immediately checkpoint the result before proceeding.
+
+### Completed-task preservation
+
+A previously `SOURCE_COMPLETE`, `CI_VERIFIED`, `LIVE_VERIFIED`, or `PRODUCTION_CERTIFIED` task remains at that status after refresh/new chat unless newer evidence proves regression or scope changed.
+
+A new AI session is prohibited from saying a task was “lost” merely because the previous chat output is not visible.
+
+A new AI session is also prohibited from redoing that task simply to recreate conversational context.
+
+### Partial-work preservation
+
+If a task was only partially completed, preserve the proven atomic subtasks and continue from the remaining gate. Do not discard valid committed work because the parent task is still `PARTIAL`.
+
+### No fake persistence
+
+Do not claim progress was persisted unless it was actually written to Git, a workflow/artifact, or another durable evidence source.
+
+If an interruption occurs before a checkpoint was created, state that the uncheckpointed portion is uncertain and re-inspect repository/runtime state instead of reconstructing it from memory.
+
+### Refresh-safe invariant
+
+**If the user refreshes the page at any point, all previously committed and evidenced completed work must remain discoverable and preserved. The next chat/session resumes from durable GitHub/workflow/live evidence and the first unmet validation gate, not from the beginning.**
