@@ -13,6 +13,8 @@ Specialist stable policy:
 - secure implementation/trust boundaries: `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
 - upgrade/supply-chain/IP protection: `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`
 - upstream/fork deltas: `LAYERSENTRY_UPSTREAM_DIFF.md`
+- DR target architecture: `LAYERSENTRY_DRAAS_ARCHITECTURE.md`
+- stable relationship index: `LAYERSENTRY_KNOWLEDGE_GRAPH.md`
 
 Historical re-audits/handoffs are audit history after their findings are incorporated and are not normal startup authority.
 
@@ -38,14 +40,81 @@ Before changing anything:
 2. Read `LAYERSENTRY_SUPER_MASTER_CONTEXT.md`.
 3. Read this progress ledger.
 4. Read the assigned workstream file when applicable.
-5. Fetch the actual current HEAD of `adaptgurus/cloudstack` branch `layersentry/4.22.1.1-ui`.
-6. Fetch the `adaptgurus/cozystack` runner integration branch when relevant.
-7. Inspect the latest relevant workflow/run/artifact.
-8. If the previous action may still be running, inspect its exact state before retrying.
-9. Read specialist secure-engineering/upgrade/delta/runbook documents only if the current task needs them.
+5. Use `LAYERSENTRY_KNOWLEDGE_GRAPH.md` when the task crosses components/decisions.
+6. Fetch the actual current HEAD of `adaptgurus/cloudstack` branch `layersentry/4.22.1.1-ui`.
+7. Fetch the actual current `adaptgurus/cozystack` runner integration branch when relevant.
+8. Inspect the latest relevant workflow/run/artifact.
+9. If the previous action may still be running, inspect its exact state before retrying.
 10. Resume from the first unmet evidence gate.
 
 ## Current checkpoint
+
+### SOURCE_COMPLETE — DR architecture revalidation + Super Master Context v3 + knowledge graph
+
+Before advanced DR implementation, the existing LayerSentry DR direction was revalidated against CloudStack 4.22.1.1 source/documentation plus current public libvirt/QEMU, Ceph, LINSTOR/DRBD and Nutanix DR architecture material.
+
+CloudStack branch at the completion of the canonical-context update before this ledger checkpoint:
+
+`a9d9c906292e4df58f84076aaad9c12902b47a1f`
+
+Runner/integration branch re-fetched during this review:
+
+- repository: `adaptgurus/cozystack`;
+- branch: `ops/layersentry-hyperv-inventory`;
+- current observed HEAD: `605866aa1b3736e52357cc9aff52272c73cb2ded`.
+
+Source commits produced by the research/governance pass:
+
+- DR pre-implementation revalidation decision record: `ef8b4c9e511f2485f9976f6c14c478d2e4ab8ea5`;
+- stable engineering knowledge graph: `770f256b0c4f59f10caceb9d99352d9a20358317`;
+- refined storage-native-first DR architecture: `a9dd8cd8767e885cf7ee30f5ca697e2e9752ab91`;
+- root `AGENTS.md` research-first/Rocky9 lifecycle rules: `4058bac7f6671247c0a8214e58f233f99ee0e28d`;
+- consolidated Super Master Context schema 3.0: `a9d9c906292e4df58f84076aaad9c12902b47a1f`.
+
+Architecture decision:
+
+1. keep CloudStack authoritative for VM/network/storage/account/Zone/KVM lifecycle;
+2. prove/reuse native CloudStack B&R/cross-Zone recovery first;
+3. use one provider-neutral LayerSentry Protection Plan/Recovery Point experience;
+4. prefer certified storage-native replication for low-RPO current replicas;
+5. LayerSentry HCI preference: LINSTOR/DRBD, without forcing SAN/NAS customers to migrate;
+6. Ceph path: native RBD mirroring when selected/certified;
+7. enterprise SAN path: array-native consistency-group replication/promotion/reverse replication adapters;
+8. generic QCOW2/file-backed NAS fallback: libvirt backup/checkpoint APIs rather than a LayerSentry-owned raw QMP/NBD protocol;
+9. CloudStack NAS B&R remains baseline/fallback/long-retention/reseed path;
+10. `rsync` is not the generic primary running-VM replication engine;
+11. Hot Replica and historical point-in-time Recovery Point Catalog are separate;
+12. planned failover/failback is certified before automatic emergency failover;
+13. automatic failover requires independent witness/quorum plus safe fencing/exclusivity.
+
+CloudStack capabilities revalidated during research include:
+
+- B&R provider abstraction and NAS KVM provider;
+- selected old-backup restore/new-VM creation;
+- 4.22 cross-Zone create-from-NAS-backup use case;
+- KVM file-backed incremental snapshot mechanisms and documented VM/Volume snapshot safety limitations;
+- native LINSTOR primary storage;
+- 4.22.1.x NAS B&R support for LINSTOR primary storage;
+- backup scheduling is HOURLY/DAILY/WEEKLY/MONTHLY, so the 300-second framework sync interval is not a 5-minute backup SLA.
+
+Static/source verification:
+
+- comparison from prior branch checkpoint `ad80b8ba47450fe21501d4114cae2428fc4ac515` to `a9d9c906292e4df58f84076aaad9c12902b47a1f` was a fast-forward of five commits;
+- changed files were limited to `AGENTS.md`, `LAYERSENTRY_DRAAS_ARCHITECTURE.md`, new `LAYERSENTRY_KNOWLEDGE_GRAPH.md`, `LAYERSENTRY_SUPER_MASTER_CONTEXT.md`, and new DR revalidation evidence;
+- no CloudStack Java/API/DB/KVM-agent/UI runtime/infrastructure implementation was changed;
+- supplied temporary password values were deliberately not persisted; stable context records only authorized identities and runtime secret-reference names;
+- Support Cluster UUID remains `UNKNOWN / PENDING` until implemented/discovered from live evidence; no UUID was fabricated.
+
+Scope/status limits:
+
+- this checkpoint is `SOURCE_COMPLETE` for research/design/governance only;
+- no DR runtime implementation was deployed or mutated by this pass;
+- no architecture claim is promoted to `LIVE_VERIFIED`;
+- advanced DR implementation remains `PENDING`;
+- independent-site automatic failover/failback remains `NOT_TESTED`;
+- current lab still requires a second independent failure domain before production DR certification can be claimed.
+
+The previously documented `+5–7 engineering man-day` advanced-DR estimate is superseded. The current multi-backend advanced DR planning range after native two-Zone proof is approximately **36–57 engineering man-days**, excluding additional storage-family adapters/certification. This is planning effort, not a delivery promise.
 
 ### SOURCE_COMPLETE — canonical context governance v2 / context-cleanliness + production-engineering re-audit
 
@@ -91,19 +160,19 @@ Scope limit: this is `SOURCE_COMPLETE` documentation/governance work only. It ch
 
 ### PENDING — production source/release repository governance
 
-At the end of this context re-audit, GitHub branch metadata for `layersentry/4.22.1.1-ui` reports `protected=false`, and the latest documentation commit is reported as unsigned. This is a source-governance observation, not a product-runtime vulnerability and not evidence that artifact signing is implemented.
+Current branch metadata still reports the active LayerSentry integration branch as unprotected and current documentation commits as unsigned. This is source-governance state, not runtime product vulnerability and not evidence that artifact signing exists.
 
-Before treating this repository flow as a production stable-release control plane, establish an appropriate GitHub branch/ruleset and release-governance model, including as applicable:
+Before a production stable-release control plane, establish an appropriate branch/ruleset/release governance model including as applicable:
 
-- protected integration/stable release refs;
+- protected integration/stable refs;
 - required CI/status checks;
 - review requirements for release/security-sensitive changes;
 - restricted force-push/deletion;
 - least-privilege promotion/signing permissions;
-- a deliberate commit/tag-signing policy if used;
+- deliberate commit/tag-signing policy if used;
 - auditable stable-release approval/promotion.
 
-Production LayerSentry artifact signing/trust verification remains a separate PENDING release-engineering gate.
+Production LayerSentry artifact signing/trust verification remains a separate `PENDING` release-engineering gate.
 
 ### LIVE_VERIFIED — LayerSentry V1 DBaaS/APaaS placeholder removal on `sen`
 
@@ -228,28 +297,35 @@ This historical run has been superseded for the DBaaS/APaaS-removal scope by run
 - DR source-record retention/purge negative test;
 - two-zone cross-zone DR proof;
 - RPO/RTO measurement;
-- automated DR mapping;
+- DR Site pairing/inventory sync;
+- provider capability model;
+- Protection Plan + Recovery Point Catalog;
+- LINSTOR/DRBD provider certification;
+- NAS/libvirt incremental provider certification;
+- first enterprise SAN provider certification;
+- automated DR network/IP mapping;
+- old-checkpoint recovery;
 - Test Recovery;
-- planned/emergency failover;
-- failback;
-- 3-Management/2-LB/3-DB HA deployment and certification;
-- physical OOBM/fencing certification on actual supported hardware;
+- planned failover/failback;
+- witness/fencing/emergency automatic failover;
+- 3-Management/2-LB/3-DB HA deployment/certification;
+- physical OOBM/fencing certification on supported hardware;
 - rolling upgrade certification;
-- production release certification.
+- production release certification;
+- proprietary Support Cluster UUID implementation/live discovery.
 
 ## Exact next execution sequence
 
-1. Establish source/release repository governance suitable for stable releases (branch/ruleset/required-check/review/promotion policy) without disrupting the active integration workflow.
-2. Move UI compilation away from production management nodes to a CI-built immutable artifact with digest/signature verification and production source maps disabled by default.
-3. Implement the KVM-only product-profile visibility matrix with prerequisite/provider-aware feature gating.
-4. Implement role-aware Platform Admin / Department Admin / User dashboards using native CloudStack API/RBAC semantics.
-5. Simplify VM/Kubernetes/Bucket workflows without inventing unsupported CloudStack API parameters.
-6. Add the KVM snapshot-safety guard and CKS metadata-isolation/CSI requirements to relevant product/security tests.
-7. Build/deploy/role-test on `sen` and update this ledger per atomic gate.
-8. Add the second Rocky Linux 9 nested-KVM VM.
-9. Prove native two-zone NAS B&R cross-zone recovery, including source-record retention behavior, before advanced DR automation.
-10. Build the appliance package-lock/update/SELinux/security profile.
-11. Later certify the 3-Management/2-LB/3-DB production HA profile and supported upgrade path on sufficient infrastructure.
+1. Before runtime implementation, run fresh read-only discovery of the intended Rocky Linux 9/CloudStack target through the approved runner path and establish a secure non-mutating API/SSH credential injection method; do not reintroduce guest `authorized_keys` mutation for R0 discovery.
+2. Establish/obtain a second independent Rocky Linux 9/KVM DR failure domain with sufficient compute/storage/network capacity; a same-host nested lab can prove function only, not production site independence.
+3. Prove native CloudStack 4.22.1.1 NAS B&R two-Zone recovery first: backup, selected old backup, cross-Zone VM create, network mapping, data validation, source-record retention negative case and measured timings.
+4. Implement Site Pairing/capability sync and provider-neutral Protection Plan/Recovery Point Catalog outside CloudStack core.
+5. Certify the first real production storage path. Prefer LINSTOR/DRBD if building the LayerSentry HCI profile; otherwise certify the actual NAS/SAN backend required by the target deployment first.
+6. Implement/verify older-point recovery and isolated Test Recovery before failover automation.
+7. Implement and repeatedly test Planned Failover + reverse replication + Failback.
+8. Add witness/exclusive lease/fencing and only then test emergency automatic failover under R4 controls.
+9. Run security/RBAC, restart/idempotency, corruption/stale-point, performance/scale/soak and upgrade/rollback regression on Rocky Linux 9 for every certified provider.
+10. Continue separate V1 UI/appliance/release governance work without conflating those milestones with DR certification.
 
 ## Refresh-safe invariant
 
