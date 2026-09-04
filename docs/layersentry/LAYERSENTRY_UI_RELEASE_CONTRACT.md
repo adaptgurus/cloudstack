@@ -47,6 +47,17 @@ installer preflight, atomic promotion and rollback remain separate mandatory gat
   and its dependency install-time requirements have not been proven safe without
   scripts. Dependency lifecycle scripts therefore run only in the isolated build
   job, which has read-only repository permission and receives no release secrets.
+- The CloudStack 4.22 UI dependency graph uses Vue CLI 4 compatibility aliases
+  whose peer graph requires npm's legacy peer-resolution mode. `ui/.npmrc` records
+  that mode so lock generation and plain `npm ci` cannot silently diverge.
+- Although the current upstream UI README recommends Node 24 for development, the
+  existing CloudStack UI workflow uses Node 16 and this exact retained dependency
+  graph passed clean install, lint, unit and production build on pinned Node
+  16.20.2/npm 8.19.4. LayerSentry therefore retains that release-builder pin for
+  this baseline; moving to Node 24 is a separate dependency migration and CI gate.
+  Node 16 is end-of-life, so this compatibility pin is not itself acceptable as
+  final production supply-chain certification; a supported-builder migration or
+  explicit time-bounded security risk decision remains mandatory.
 - GitHub runner labels and action tags are not immutable builder digests; the exact
   Node version is pinned and builder strengthening remains pending.
 - The SBOM reflects lockfile components and is a valid foundation, not evidence of
