@@ -1,0 +1,54 @@
+name: LayerSentry UI release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Immutable LayerSentry release version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-unsigned-candidate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 16.20.2
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build production UI
+        env:
+          LAYERSENTRY_SUPPORT_BUILD: "0"
+        run: |
+          cd ui
+          npm install --no-audit --no-fund
+          npm run lint -- --no-fix
+          npm run test:unit
+          npm run build
+      - name: Build and validate unsigned release contract
+        env:
+          LAYERSENTRY_BUILDER_ID: github-actions/ubuntu-22.04
+          LAYERSENTRY_NODE_VERSION: 16.20.2
+          LAYERSENTRY_NPM_VERSION: 8.19.4
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          tools/layersentry-release/build-ui-release.sh \
+            --version "$RELEASE_VERSION" \
+            --source-commit "$GITHUB_SHA" \
+            --output-dir layersentry-release
+          python3 tools/layersentry-release/release_contract.py verify \
+            --bundle-dir layersentry-release \
+            --expected-source-commit "$GITHUB_SHA" \
+            --allow-unsigned
+      - name: Upload immutable candidate bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: layersentry-ui-${{ inputs.release_version }}-${{ github.sha }}
+          path: layersentry-release/
+          if-no-files-found: error
+          retention-days: 30
