@@ -6,6 +6,8 @@ This is the authoritative continuity and execution context for converting Apache
 
 This file is designed so that any new ChatGPT/Codex session can continue from the exact current point without re-discovering the project from scratch.
 
+**This context is also an anti-hallucination and completion-control document. A future AI session must never convert design intent, source changes, documentation claims, or partial test results into a false statement that the corresponding product capability is complete, live, healthy, production-ready, or certified.**
+
 ---
 
 ## 1. Non-negotiable product rule
@@ -65,11 +67,11 @@ Upstream immutable validation base:
 
 `71af23d73741cfeae854d2f1a6d36324307c32c4`
 
-Historical branch HEAD at this handoff:
+Historical branch HEAD before the master-context hardening update:
 
-`6452853f903d88e9ce4951d69bd9d3512334dcf9`
+`4d60e21778a4e89b9f69f0f13fe54d6b6cdee241`
 
-The branch is currently 38 commits ahead of the immutable upstream base and 0 behind.
+The branch was already ahead of the immutable upstream base before the master-context commits. **Do not rely on a stored ahead/behind count. Always calculate it again when it matters.**
 
 **Every new session must fetch the real branch HEAD before changing anything. Repository state overrides this historical SHA. Never force a branch backward.**
 
@@ -115,6 +117,8 @@ Historical live verification markers from this run:
 - runtime config/branding checks passed
 
 This run proved the existing branding/served-webapp mechanism, but it predates the new KVM-only private-cloud/self-service redesign requested in this context.
+
+**Do not reinterpret this successful UI deployment as proof that KVM product-profile simplification, self-service redesign, Kubernetes, buckets, appliance lockdown, HA topology, backup, or DR are complete. Those are separate gates.**
 
 ---
 
@@ -1154,7 +1158,7 @@ For every modified upstream file record:
 
 Prefer new LayerSentry wrapper/components and configuration over invasive edits to large upstream files.
 
-The current branch already has 38 commits over the immutable upstream base; future work should reduce unnecessary divergence rather than expand it casually.
+Future work should reduce unnecessary divergence rather than expand it casually.
 
 ---
 
@@ -1267,3 +1271,394 @@ Underneath:
 **Apache CloudStack 4.22.1.1 remains the mature orchestration engine.**
 
 Preserve the engine. Remove operational complexity from the customer experience. Reuse native functionality aggressively. Build only the missing product layer, automation, hardening and DR orchestration that is genuinely required.
+
+---
+
+## 36. Mandatory anti-AI-hallucination protocol
+
+This section overrides any temptation by an AI session to fill gaps with assumptions.
+
+### Evidence precedence
+
+When facts conflict, use this order:
+
+1. **Current live runtime evidence** collected from the actual target environment for state questions.
+2. **Current workflow/job logs and immutable evidence artifacts** for what automation actually executed.
+3. **Current repository branch source at the fetched HEAD** for what code/config currently says.
+4. **Official Apache CloudStack 4.22.1/4.22.1.1 documentation** for supported product behavior and requirements.
+5. **This master context and prior handoffs** for continuity only.
+6. **Model memory/inference** only as a clearly labeled hypothesis, never as project fact.
+
+For capability/support questions, official documentation and current source define supported intent; for current-state questions, live runtime evidence wins.
+
+### Mandatory rules
+
+An AI session must never invent or silently assume:
+
+- IP addresses, VLAN IDs, gateways, DNS servers, hostnames or credentials
+- Zone/Site, Pod, Cluster, Host, storage, network or System VM state
+- package versions or service status
+- CloudStack agent status
+- Kubernetes plugin/provider health
+- object-store health
+- backup success
+- DR recovery success
+- RPO/RTO
+- database replication state
+- load-balancer health
+- workflow/run/artifact IDs
+- commit SHAs
+- installer success
+- test coverage
+- user/role permissions not actually inspected
+
+If the fact cannot be verified, use **UNKNOWN**, **UNVERIFIED**, or **NOT TESTED** and state what evidence is required.
+
+### Documentation is not runtime proof
+
+Statements such as “CloudStack supports X” mean only that X is documented/supported. They do **not** mean the current LayerSentry environment has X enabled, configured, healthy, tested or production-certified.
+
+Examples:
+
+- CloudStack supports cross-zone recovery != LayerSentry DR is complete.
+- CloudStack supports KVM Host HA != fencing is configured and proven in this lab.
+- CloudStack supports multiple Management Servers != the current environment has three Management Servers.
+- CKS exists != Kubernetes is currently enabled or healthy.
+- Object Storage exists != a bucket provider is configured.
+
+### No hidden inference from weak signals
+
+- HTTP 200 proves only that the tested HTTP endpoint returned 200; it does not prove the cloud, KVM agent, storage, System VMs, DB HA or DR are healthy.
+- A successful build proves compilation, not runtime correctness.
+- A successful source commit proves source history, not deployment.
+- A successful deployment workflow proves only what its actual assertions/logs cover.
+- A screenshot proves only what is visible in that screenshot at that time.
+
+### Contradiction handling
+
+If source, documentation, workflow evidence and runtime disagree:
+
+1. stop the affected change;
+2. state the contradiction explicitly;
+3. collect the missing evidence;
+4. do not “resolve” it by assumption;
+5. update this master context if the authoritative understanding changes.
+
+### No fabricated certainty
+
+Never use wording such as `verified`, `fixed`, `healthy`, `production ready`, `HA`, `DR ready`, `air-gapped`, `immutable`, or `complete` unless the required evidence gate in this document has actually passed.
+
+---
+
+## 37. Mandatory status-label governance — prevent false “completed” claims
+
+Every material work item must use one of the following statuses. Do not invent softer labels that hide uncertainty.
+
+### Allowed statuses
+
+**DESIGN_DEFINED**
+
+Architecture/UX/implementation intent has been agreed or documented, but no source change is implied.
+
+**SOURCE_COMPLETE**
+
+Required source/config changes are committed at a known HEAD and static review passed. This does not imply build/deployment/runtime success.
+
+**CI_VERIFIED**
+
+Relevant build/static/automated CI checks have passed for the exact source commit. This does not imply live environment validation unless the CI job actually deploys and tests it.
+
+**LIVE_VERIFIED**
+
+The capability/change was deployed to the intended test environment and the defined functional assertions passed with evidence.
+
+**PRODUCTION_CERTIFIED**
+
+All applicable production gates, negative tests, failure tests, rollback/upgrade tests and scope-specific acceptance criteria have passed. This label must be rare.
+
+**PARTIAL**
+
+Some required subparts are complete or proven, but the overall work item is not complete.
+
+**PENDING**
+
+Work has not yet been implemented or validated to the required level.
+
+**BLOCKED**
+
+Progress requires a missing dependency, environment, credential, resource or decision.
+
+**UNKNOWN**
+
+Current state cannot be established from available evidence.
+
+**NOT_TESTED**
+
+Implementation may exist, but the required functional test has not been executed.
+
+### Use of the word COMPLETE
+
+Do not use an unqualified `COMPLETE` or `DONE` for a capability.
+
+Instead say exactly what is complete, for example:
+
+- `SOURCE_COMPLETE: KVM-only menu profile`
+- `LIVE_VERIFIED: LayerSentry branding on sen`
+- `PARTIAL: installer — fresh path updated, resume path stale`
+- `PENDING: two-zone DR recovery test`
+
+A source task can be `SOURCE_COMPLETE` while the product capability remains `PENDING` or `NOT_TESTED` at runtime.
+
+### Production-ready rule
+
+`Production ready` / `PRODUCTION_CERTIFIED` is forbidden until the applicable gates in Section 30 have passed and evidence exists for the exact release/artifact.
+
+A successful POC, documentation match, unit test, build or one-node live test is not production certification.
+
+### Status downgrade rule
+
+If new evidence reveals regression or missing coverage, immediately downgrade the status. Previous optimistic labels are not authoritative over newer evidence.
+
+### Status handoff rule
+
+Before ending a chat that changed source, runtime or project state, update the completion ledger below and include exact evidence. A future chat must not promote a status without new evidence.
+
+---
+
+## 38. UI terminology and wrong-label prevention protocol
+
+A polished UI is not allowed to achieve simplicity by showing technically incorrect labels.
+
+### Backend-to-customer label contract
+
+The customer terminology in Section 9 is a presentation mapping only. Backend identifiers and API semantics remain unchanged.
+
+Examples:
+
+- `Site` maps to CloudStack **Zone**, not Region.
+- `Infrastructure Group` maps to **Pod**, not Cluster or Domain.
+- `Compute Cluster` maps to **Cluster**.
+- `KVM Host` / `Compute Host` maps to **Host**.
+- `Compute Profile` maps to **Service Offering**.
+- `Storage Profile` maps to **Disk Offering** where that is the actual object; do not use the same label for a Primary Storage pool.
+- `OS Image` maps to **Template**; ISO remains ISO where boot/install-media semantics matter.
+- `VM Network` / `Workload Network` maps to the relevant guest/workload network; do not call a Physical Network a VM Network.
+
+### Label correctness rules
+
+1. Do not rename backend request/response fields merely to match the UI label.
+2. Do not use a friendly label if it changes the technical meaning.
+3. If one CloudStack term has multiple meanings depending on page/context, use context-specific customer text rather than one unsafe global replacement.
+4. Never show `Healthy`, `Protected`, `Ready`, `Replicated`, `HA`, `Encrypted`, `Backed up`, `DR ready`, or similar state labels unless a real probe/API result supports that state.
+5. Never show a feature button solely because a Vue route exists. Feature visibility requires backend/API/provider availability plus RBAC permission.
+6. A disabled placeholder is not a production service. DBaaS/APaaS placeholders must be removed from V1.
+7. Do not show non-KVM hypervisor names in Standard/Department/User modes.
+8. Platform/Support mode may expose upstream labels where accurate troubleshooting requires them.
+
+### Mandatory label audit before each UI milestone
+
+Search source and built/served bundles for:
+
+- stale Apache CloudStack customer branding
+- `Pod` in normal customer-facing contexts
+- VMware
+- XenServer
+- Hyper-V
+- Proxmox
+- MaaS
+- DBaaS/APaaS placeholders
+- wrong `Zone`/`Site` context
+- wrong `Storage`/`Storage Profile` context
+- dead or unsupported feature labels
+
+Do not blindly fail on legal/source text or Platform/Support-only diagnostics. The audit is scope-aware: customer-visible Standard/Department/User UI is the target.
+
+### Single source of terminology truth
+
+Keep the LayerSentry translation/terminology contract centralized and documented. If `ui/src/locales/index.js` remains the implementation point, changes to customer terminology must be reviewed against this section before deployment.
+
+---
+
+## 39. Authoritative completion ledger at this handoff
+
+This ledger exists specifically to prevent a future AI from saying “everything is completed” when only branding or source work has been completed.
+
+### LIVE_VERIFIED
+
+**LayerSentry served branding/customer terminology baseline on `sen`**
+
+Evidence:
+
+- workflow run `33856746145`
+- job `100971705863`
+- conclusion `success`
+- artifact `9930784385`
+- digest `sha256:6a6751c9c07723f73df36e02b9f66ee3a41cb3098ac2f2834945af4759e9a50b`
+- HTTP 200
+- served config `/etc/cloudstack/management/config.json`
+- logo/onboarding/customer terminology/runtime config checks passed
+
+Scope of this verification is branding/served-UI behavior tested by that workflow. It does not prove the later V1 self-service redesign.
+
+### SOURCE_COMPLETE
+
+**Master continuity context exists in repository**
+
+File:
+
+`docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md`
+
+This status means the continuity/anti-hallucination rules are stored in source. Each future session must still fetch the current version.
+
+### PARTIAL
+
+**LayerSentry customer terminology**
+
+A substantial Zone/Pod/network terminology layer exists and was present in the last live UI verification, but a full wrong-label/role-specific audit of every customer page has not yet been completed.
+
+**Installer**
+
+Fresh and served-UI repair mechanisms exist and have historical live success, but production installer work is incomplete because the fresh path, resume path, CI-built artifact strategy, SELinux-final-state policy, appliance lockdown and signed updates are not all complete/proven.
+
+**Self-service foundation**
+
+CloudStack already contains User/Domain Admin/API-discovery/UsageDashboard behavior that LayerSentry will reuse. The final LayerSentry Department Admin and User UX redesign is not yet implemented/proven.
+
+### PENDING / NOT_TESTED
+
+The following must not be described as completed at this handoff:
+
+- removal of DBaaS/APaaS V1 placeholder routes/checks
+- KVM-only `layersentry-kvm` product-profile visibility matrix
+- final Platform Admin dashboard redesign
+- final Department Admin self-service dashboard
+- final normal User self-service dashboard
+- simplified VM wizard
+- simplified Kubernetes wizard
+- simplified Bucket UX
+- final Site/Infrastructure onboarding simplification
+- fresh/resume installer parity
+- immutable/CI-built UI artifact deployment replacing production npm build
+- SELinux-enforcing final appliance validation
+- package/repository lockdown
+- controlled signed update mechanism
+- fully air-gapped CKS
+- live Kubernetes enablement/health in LayerSentry V1
+- live object-store provider/Bucket validation in LayerSentry V1
+- native NAS B&R backup proof in the current lab
+- two-zone cross-zone recovery proof
+- RPO/RTO measurement
+- automated DR mapping
+- Test Recovery orchestration
+- planned failover
+- emergency failover
+- failback
+- 3-Management/2-LB/3-DB production HA deployment
+- management-node reboot/no-outage certification
+- DB failover certification
+- rolling upgrade certification
+- final production security certification
+- production release certification
+
+### UNKNOWN — must be re-read from live environment before claims
+
+At this handoff, unless a later workflow/session has proven them, treat these as UNKNOWN:
+
+- current CloudStack agent active/inactive state
+- current Zone/Site inventory
+- current Pod/Infrastructure Group inventory
+- current Cluster/Host inventory
+- current primary/secondary/backup storage state
+- current System VM state
+- current workload network/public network state
+- current KVM Host HA/fencing configuration
+- current CKS enablement state
+- current object-store provider state
+- current NAS B&R provider/repository state
+
+### Completion preservation rule
+
+Do not redo a LIVE_VERIFIED item merely because a new chat lacks memory. First fetch the evidence/source. Rework only when:
+
+- scope changed;
+- the implementation is intentionally superseded;
+- a regression is observed;
+- a dependency changed;
+- or a later audit proves the earlier implementation insufficient.
+
+This avoids wasting time while still preventing false assumptions.
+
+---
+
+## 40. New-chat anti-hallucination startup checklist
+
+Every new ChatGPT/Codex session that continues LayerSentry must execute this sequence before proposing or changing implementation:
+
+1. Read the current `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md` from the active branch.
+2. Fetch the actual current HEAD of `adaptgurus/cloudstack` branch `layersentry/4.22.1.1-ui`.
+3. Fetch the actual current HEAD of `adaptgurus/cozystack` branch `ops/layersentry-hyperv-inventory` when runner work is relevant.
+4. Inspect the latest relevant workflow run/job/artifact rather than assuming the run IDs in this document are still latest.
+5. Compare the current completion ledger with source/runtime evidence.
+6. Do not reclassify any `PENDING`, `NOT_TESTED`, `UNKNOWN`, or `PARTIAL` item as complete without new evidence.
+7. Do not downgrade/rebuild `LIVE_VERIFIED` work without checking its evidence and current regression state.
+8. For any customer-facing terminology change, run the wrong-label protocol in Section 38.
+9. Before infrastructure mutation, inspect current live state and identify whether the action is read-only, reversible or destructive.
+10. Before ending the session, update the ledger when the authoritative status changed.
+
+Copy-paste starter for a new chat:
+
+`Continue LayerSentry from the current docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md in adaptgurus/cloudstack. Enforce Sections 36-40 anti-hallucination, status-label and wrong-label rules. First fetch actual current branch HEADs, latest relevant workflow evidence and live state. Do not call anything complete unless its required evidence gate passed; do not redo LIVE_VERIFIED work without regression evidence.`
+
+---
+
+## 41. Required status record for each changed task
+
+For every material task changed by an AI session, add or maintain a record containing:
+
+- Task name
+- Current status from Section 37
+- Source repository/branch
+- Exact source commit
+- Files changed
+- Static/build checks executed
+- Workflow run/job ID if any
+- Artifact ID/digest if any
+- Live target used
+- Live functional assertions executed
+- Failure/negative tests executed
+- Known limitations
+- Next required gate
+
+A task record with missing evidence must not be promoted to a stronger status.
+
+Example:
+
+`Task: Remove DBaaS/APaaS placeholders`
+
+`Status: SOURCE_COMPLETE`
+
+`Commit: <exact sha>`
+
+`Build: PASS`
+
+`Live deployment: NOT TESTED`
+
+`Next gate: deploy exact artifact to sen and verify routes/menu/bundle/runtime installer checks`
+
+This structure is mandatory for handoffs because it distinguishes coding progress from product completion.
+
+---
+
+## 42. Final anti-hallucination principle
+
+**Never optimize for sounding finished. Optimize for being correct, evidenced and resumable.**
+
+A future AI should say:
+
+- `I do not know yet` when state is unknown;
+- `source complete, live test pending` when that is the truth;
+- `CloudStack documents support, but LayerSentry has not yet validated it` when documentation is the only evidence;
+- `LIVE_VERIFIED` only when the defined live assertions passed;
+- `PRODUCTION_CERTIFIED` only after all applicable production gates passed.
+
+The LayerSentry project must move quickly by reusing proven CloudStack functionality and preserving completed work, **not by converting assumptions into false completion claims**.
