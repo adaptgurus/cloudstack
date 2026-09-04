@@ -57,6 +57,17 @@ creating trusted evidence. The remaining gate is implementing the controlled
 browser/API observation adapter, validating the output against the JSON Schema,
 and retaining it as a runner artifact.
 
+API denial classification is deliberately narrow. In the pinned CloudStack
+source, `api/src/main/java/org/apache/cloudstack/api/ApiErrorCode.java` defines
+`UNAUTHORIZED=401`, while `PARAM_ERROR=431` and the account/resource/internal
+codes describe different failures. `server/src/main/java/com/cloud/api/ApiServer.java`
+maps `PermissionDeniedException` from command availability checks specifically
+to `UNAUTHORIZED`. Therefore only error code `401` proves the matrix's
+`api_denied` outcome. Code `511` is a two-factor-authentication failure, not an
+RBAC decision; all unknown, parameter, account, resource, and internal errors
+are recorded as `api_error_non_authorization` and fail closed. Positive controls
+must also pass so invalid credentials are not mistaken for a healthy test target.
+
 ## Decision record
 
 - Current approach: no dedicated LayerSentry RBAC/direct-route evidence harness existed.

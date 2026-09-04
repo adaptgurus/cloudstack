@@ -35,7 +35,7 @@ class ObservationTests(unittest.TestCase):
             elif test["expect"] == "api_denied_or_empty":
                 item["result_count"] = 0
             else:
-                item["cloudstack_error_code"] = 531
+                item["cloudstack_error_code"] = 401
             self.observations["results"].append(item)
 
     def test_passed_evidence_contains_no_url_or_body(self):
@@ -90,6 +90,26 @@ class ObservationTests(unittest.TestCase):
         api_result["cloudstack_error_code"] = "secret-looking free text"
         with self.assertRaises(MODULE.ObservationError):
             MODULE.build_evidence(self.matrix, changed, "CI_VERIFIED")
+
+    def test_parameter_error_cannot_prove_authorization_denial(self):
+        changed = copy.deepcopy(self.observations)
+        api_result = next(result for result in changed["results"] if result.get("cloudstack_error_code") == 401)
+        api_result["cloudstack_error_code"] = 431
+        evidence = MODULE.build_evidence(self.matrix, changed, "LIVE_VERIFIED")
+        evaluated = next(result for result in evidence["results"] if result["id"] == api_result["id"])
+        self.assertEqual(evaluated["actual"], "api_error_non_authorization")
+        self.assertFalse(evaluated["passed"])
+        self.assertEqual(evidence["status"], "PARTIAL")
+
+    def test_only_source_backed_unauthorized_code_proves_denial(self):
+        self.assertEqual(MODULE.AUTHORIZATION_DENIAL_CODES, {401})
+        changed = copy.deepcopy(self.observations)
+        api_result = next(result for result in changed["results"] if result.get("cloudstack_error_code") == 401)
+        api_result["cloudstack_error_code"] = "401"
+        evidence = MODULE.build_evidence(self.matrix, changed, "CI_VERIFIED")
+        evaluated = next(result for result in evidence["results"] if result["id"] == api_result["id"])
+        self.assertEqual(evaluated["actual"], "api_denied")
+        self.assertTrue(evaluated["passed"])
 
     def test_timestamps_require_timezone_and_forward_order(self):
         changed = copy.deepcopy(self.observations)

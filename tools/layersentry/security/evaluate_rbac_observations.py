@@ -22,6 +22,10 @@ MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_BODY_CHARS = 1024 * 1024
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 SECRET_KEY = re.compile(r"(authorization|cookie|password|secret|session|token|apikey|signature)", re.I)
+# CloudStack 4.22.1.1 maps PermissionDeniedException during command
+# availability checks to ApiErrorCode.UNAUTHORIZED (401). Do not broaden this
+# set to parameter/account/resource/internal errors: those do not prove RBAC.
+AUTHORIZATION_DENIAL_CODES = {401}
 
 
 class ObservationError(ValueError):
@@ -87,8 +91,11 @@ def evaluate_one(test: dict[str, Any], observed: dict[str, Any]) -> dict[str, An
         count = observed.get("result_count")
         if count is not None and (isinstance(count, bool) or not isinstance(count, int) or count < 0):
             raise ObservationError(f"{test_id}: result_count must be a non-negative integer")
-        if error_code is not None:
+        normalized_error_code = int(error_code) if error_code is not None else None
+        if normalized_error_code in AUTHORIZATION_DENIAL_CODES:
             actual = "api_denied"
+        elif normalized_error_code is not None:
+            actual = "api_error_non_authorization"
         elif count == 0 and test["kind"] == "api_object":
             actual = "api_denied_or_empty"
         else:
@@ -96,7 +103,7 @@ def evaluate_one(test: dict[str, Any], observed: dict[str, Any]) -> dict[str, An
         expected = test["expect"]
         result["actual"] = actual
         result["passed"] = actual == expected or (expected == "api_denied_or_empty" and actual == "api_denied")
-        result["cloudstack_error_code"] = error_code
+        result["cloudstack_error_code"] = normalized_error_code
     return result
 
 
