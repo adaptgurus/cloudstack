@@ -49,6 +49,52 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE — 2026-09-05 integrated release/UI/security/R0 foundation
+
+The integration lead fetched the authoritative repositories, created isolated worktrees, reviewed each workstream, and integrated the source batches in dependency order B -> A -> C -> D. No live runtime mutation was performed by this integration batch.
+
+Integrated CloudStack branch commits, based on fetched integration head `26a5e4b092b37ff0693c6b3154a2090171440bd6`:
+
+- release-contract foundation: `f8d5cccea6`;
+- lockfile-strict release workflow correction: `d8bf0dd72b`;
+- KVM-only LayerSentry UI product-profile foundation: `05d82af2c1`;
+- RBAC/direct-route/direct-API evidence contract: `45a3d98a03`;
+- control-plane database/R0 evidence decision: `0080e12477`.
+
+Integrated cozystack runner commit, based on fetched runner head `605866aa1b3736e52357cc9aff52272c73cb2ded`:
+
+- dispatch-only authenticated read-only CloudStack API inventory: `16234a1e2`.
+
+Latest live R0 evidence inspected:
+
+- workflow run `33913985331`;
+- job `101156784267`, conclusion `success`;
+- artifact `9952447606`, `layersentry-dr-r0-live-inventory-33913985331`;
+- runner/host `TESTSER`, one running nested-virtualization VM `sen`, Hyper-V VMMS running, one internal LayerSentry switch, no VM checkpoints;
+- CloudStack UI probe HTTP 200 and unauthenticated `listCapabilities` HTTP 401;
+- artifact states `MUTATION_PERFORMED=false`.
+
+The evidence proves only the listed R0 host/VM/reachability assertions. It does not prove authenticated CloudStack inventory, a second Site, independent failure domains, B&R, DR, DB/LB/Management HA, upgrade, fencing, or production certification.
+
+Exact Apache CloudStack documentation tag `4.22.1.1` contains conflicting database statements: the compatibility matrix lists MySQL 8.4 or equivalent, while the installation guide says MySQL 8.0 was tested. Therefore the LayerSentry database version/topology remains a measured compatibility decision; neither version is promoted as the HA baseline until the required Rocky Linux 9 matrix passes.
+
+#### Evidence-backed module readiness matrix
+
+| Module | Current status | Evidence in this checkpoint | First unmet gate |
+| --- | --- | --- | --- |
+| Release artifact contract | `SOURCE_COMPLETE` | deterministic archive foundation, manifest, SHA-256, CycloneDX SBOM, provenance, source-map rejection, six passing contract tests | execute real Node/Vue CI build; implement signature/trust, installer consumption, atomic deployment and rollback |
+| KVM-only customer profile | `SOURCE_COMPLETE` | explicit `layersentry-kvm` config and shared KVM filtering on five provisioning surfaces; source unit specification | execute UI unit/lint/build, deploy exact artifact, Chrome/Firefox Rocky Linux 9 workflows and no-KVM empty/error behavior |
+| RBAC/negative validation | `SOURCE_COMPLETE` | four-role/11-case matrix, direct route/API/object-ID negatives, fail-closed linter, redacted evidence schema, six passing tests | add runner/browser/API adapters and execute with scoped role credentials and authorized foreign-object fixtures |
+| Hyper-V/Rocky reachability discovery | `LIVE_VERIFIED` | run `33913985331` and artifact `9952447606` for the exact assertions above | authenticated CloudStack inventory through the new no-guest-mutation workflow |
+| Authenticated CloudStack inventory | `BLOCKED` | dispatch-only R0 workflow integrated; repository currently exposes no configured LayerSentry API secret names | provision scoped `LAYERSENTRY_CLOUDSTACK_API_KEY` and `LAYERSENTRY_CLOUDSTACK_SECRET_KEY`, dispatch, review artifact |
+| Native NAS B&R/two-Zone recovery | `BLOCKED` | current live inventory has one VM on one Hyper-V host; no B&R evidence | authenticated inventory plus approved second Rocky Linux 9/KVM target and disposable workload |
+| DB HA/version selection | `PENDING` / `NOT_TESTED` | exact 4.22.1.1 documentation conflict recorded; no DB topology deployed | compare/test 8.0 and 8.4 candidates, routing, failover, quorum, backup/PITR, restore and upgrade |
+| 3 Management / 3 DB / 2 LB HA | `NOT_TESTED` | no matching live topology exists in current evidence | provision independent failure domains and execute the complete failure/recovery matrix |
+| Advanced DR/failover/failback/fencing | `NOT_TESTED` | architecture remains `DESIGN_DEFINED`; no provider implementation/runtime proof | complete native recovery first, then provider/Test Recovery/planned failover/failback before automatic failover |
+| Production certification | `PENDING` | mandatory Rocky Linux 9 release gates are incomplete | all release-specific functional, security, HA, DR, upgrade, recovery, performance and soak gates |
+
+Combined source verification for this checkpoint is recorded in the final integration commit and command evidence. Runtime-affecting claims remain below `LIVE_VERIFIED` until exact artifacts are exercised on Rocky Linux 9.
+
 ### SOURCE_COMPLETE — DR architecture revalidation + Super Master Context v3 + knowledge graph
 
 Before advanced DR implementation, the existing LayerSentry DR direction was revalidated against CloudStack 4.22.1.1 source/documentation plus current public libvirt/QEMU, Ceph, LINSTOR/DRBD and Nutanix DR architecture material.
