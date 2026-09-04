@@ -25,21 +25,38 @@ body:not(.dark-mode) .sider.light .ant-menu-light,
 body:not(.dark-mode) .sider.light .ant-menu-light .ant-menu-sub,
 body:not(.dark-mode) .sider.light .ant-menu-submenu > .ant-menu {
   background: var(--ls-nav) !important;
-  color: rgba(255, 255, 255, 0.82) !important;
+  color: rgba(255, 255, 255, 0.86) !important;
 }
 
+/* Ant Design renders parent items and leaf/router-link items differently. Force
+ * the same readable text/icon treatment for both so leaf entries never inherit
+ * the light-menu black text seen in the upstream shell. */
 body:not(.dark-mode) .sider.light .ant-menu-item,
 body:not(.dark-mode) .sider.light .ant-menu-submenu-title,
 body:not(.dark-mode) .sider.light .ant-menu-item > a,
+body:not(.dark-mode) .sider.light .ant-menu-item > a > span,
+body:not(.dark-mode) .sider.light .ant-menu-item .ant-menu-title-content,
+body:not(.dark-mode) .sider.light .ant-menu-item .ant-menu-title-content > a,
+body:not(.dark-mode) .sider.light .ant-menu-item .ant-menu-title-content span,
 body:not(.dark-mode) .sider.light .ant-menu-submenu-title > span,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title > span > span,
 body:not(.dark-mode) .sider.light .ant-menu-item .anticon,
 body:not(.dark-mode) .sider.light .ant-menu-submenu-title .anticon {
-  color: rgba(255, 255, 255, 0.82) !important;
+  color: rgba(255, 255, 255, 0.86) !important;
+}
+
+/* CloudStack applies an inline light-mode colour to some FontAwesome leaf
+ * icons. Override that inline declaration only inside the Layersentry sider. */
+body:not(.dark-mode) .sider.light .ant-menu-item svg,
+body:not(.dark-mode) .sider.light .ant-menu-item svg *,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title svg,
+body:not(.dark-mode) .sider.light .ant-menu-submenu-title svg * {
+  color: rgba(255, 255, 255, 0.86) !important;
 }
 
 body:not(.dark-mode) .sider.light .ant-menu-item .custom-icon path,
 body:not(.dark-mode) .sider.light .ant-menu-submenu-title .custom-icon path {
-  fill: rgba(255, 255, 255, 0.82) !important;
+  fill: rgba(255, 255, 255, 0.86) !important;
 }
 
 body:not(.dark-mode) .sider.light .ant-menu-item:hover,
@@ -51,6 +68,8 @@ body:not(.dark-mode) .sider.light .ant-menu-submenu-active > .ant-menu-submenu-t
 }
 
 body:not(.dark-mode) .sider.light .ant-menu-item:hover > a,
+body:not(.dark-mode) .sider.light .ant-menu-item:hover > a > span,
+body:not(.dark-mode) .sider.light .ant-menu-item:hover .ant-menu-title-content,
 body:not(.dark-mode) .sider.light .ant-menu-item:hover .anticon,
 body:not(.dark-mode) .sider.light .ant-menu-submenu-title:hover,
 body:not(.dark-mode) .sider.light .ant-menu-submenu-title:hover .anticon {
@@ -69,6 +88,8 @@ body:not(.dark-mode) .sider.light .ant-menu:not(.ant-menu-horizontal) .ant-menu-
 }
 
 body:not(.dark-mode) .sider.light .ant-menu-item-selected > a,
+body:not(.dark-mode) .sider.light .ant-menu-item-selected > a > span,
+body:not(.dark-mode) .sider.light .ant-menu-item-selected .ant-menu-title-content,
 body:not(.dark-mode) .sider.light .ant-menu-item-selected > a:hover,
 body:not(.dark-mode) .sider.light .ant-menu-item-selected .anticon {
   color: #ffffff !important;
@@ -82,12 +103,13 @@ body:not(.dark-mode) .sider.light .ant-menu-item-selected .custom-icon path {
 body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light > .ant-menu,
 body:not(.dark-mode) .ant-menu-submenu-popup .ant-menu-light {
   background: var(--ls-nav) !important;
-  color: rgba(255, 255, 255, 0.82) !important;
+  color: rgba(255, 255, 255, 0.86) !important;
 }
 
 body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item,
-body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item > a {
-  color: rgba(255, 255, 255, 0.82) !important;
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item > a,
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item > a > span {
+  color: rgba(255, 255, 255, 0.86) !important;
 }
 
 body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item:hover,
@@ -96,6 +118,8 @@ body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item-selec
 }
 
 body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item:hover > a,
-body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item-selected > a {
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item:hover > a > span,
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item-selected > a,
+body:not(.dark-mode) .ant-menu-submenu-popup.ant-menu-light .ant-menu-item-selected > a > span {
   color: #ffffff !important;
 }
