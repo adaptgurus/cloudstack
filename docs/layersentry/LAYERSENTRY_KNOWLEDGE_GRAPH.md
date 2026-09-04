@@ -340,6 +340,11 @@ New CloudStack/LayerSentry Release
   -> production promotion
 ```
 
+`LAYERSENTRY_UI_RELEASE_CONTRACT.md` defines the first transport-neutral UI
+artifact contract and links a CI build to its manifest, CycloneDX SBOM,
+provenance, SHA-256 integrity checks, production source-map policy and future
+installer/signature gates.
+
 Schema/database rollback is not equivalent to simple package downgrade. Follow `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`.
 
 ## 14. Support identity graph
