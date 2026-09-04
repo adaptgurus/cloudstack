@@ -12,10 +12,10 @@ umask 077
 
 readonly FULL_INSTALLER_COMMIT='83e77eb1ed7fa2e18f5cdfdc3c5e9148247a447f'
 readonly FULL_INSTALLER_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${FULL_INSTALLER_COMMIT}/install-layersentry-rocky9.sh"
-readonly UI_COMMIT='72b76a30f3dadf0dbe9e333ade073034c1afc514'
+readonly UI_COMMIT='b448226098ff3e53163445eadfb9483d58eb02fa'
 readonly RECOVERY_COMMIT='5d6897079fae9d3680b6319b658307831d4cd578'
 readonly RECOVERY_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${RECOVERY_COMMIT}/install-layersentry-rocky9-resume-v3.sh"
-readonly SERVED_BRANDING_COMMIT='7a500324ffec725012bcd089fae5f54c0e56de5e'
+readonly SERVED_BRANDING_COMMIT='27ce0193f8cb82bf4b02a4e0365e53ef762b68e7'
 readonly SERVED_BRANDING_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${SERVED_BRANDING_COMMIT}/install-layersentry-rocky9-served-ui-repair.sh"
 readonly EXPECTED_VERSION='4.22.1.1-1'
 
@@ -38,7 +38,8 @@ Options:
 Pinned customer UI source: ${UI_COMMIT}
 CloudStack: 4.22.1.1; Java 17; UI build runtime: Node.js 16.
 The final step verifies Layersentry branding from the actually served management
-webapp, including logo, V1.0 runtime config, DBaaS, APaaS and onboarding.
+webapp, including logo, V1.0 runtime config, customer-friendly setup terminology,
+DBaaS, APaaS and onboarding.
 USAGE
 }
 
