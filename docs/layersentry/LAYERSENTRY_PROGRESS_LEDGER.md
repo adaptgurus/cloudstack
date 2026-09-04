@@ -4,7 +4,7 @@
 
 This file is the frequently updated, Git-backed operational checkpoint for LayerSentry work. It exists so that browser refreshes, reconnects, tab closes, ChatGPT/Codex session loss, context exhaustion, model retries, or transient tool failures do **not** erase already completed work or cause verified work to be repeated.
 
-The architecture, rules, evidence hierarchy, status governance, and anti-hallucination policy remain authoritative in `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md`. The version-specific corrections in `docs/layersentry/LAYERSENTRY_MASTER_CONTEXT_REAUDIT_2026-09-04.md` are an authoritative companion and override conflicting or less-specific wording until folded directly into the master context. This ledger records the latest execution state.
+The architecture, rules, evidence hierarchy, status governance, and anti-hallucination policy remain authoritative in `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md`. The version-specific corrections in `docs/layersentry/LAYERSENTRY_MASTER_CONTEXT_REAUDIT_2026-09-04.md` are an authoritative companion and override conflicting or less-specific wording until folded directly into the master context. Upgrade/IP-protection/stability requirements are defined in `docs/layersentry/LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`. This ledger records the latest execution state.
 
 ## Mandatory checkpoint rule
 
@@ -26,17 +26,18 @@ Before changing anything:
 
 1. Read `LAYERSENTRY_SUPER_MASTER_CONTEXT.md`.
 2. Read `LAYERSENTRY_MASTER_CONTEXT_REAUDIT_2026-09-04.md`.
-3. Read this progress ledger.
-4. Fetch the actual current HEAD of `adaptgurus/cloudstack` branch `layersentry/4.22.1.1-ui`.
-5. Fetch the runner branch HEAD when relevant.
-6. Inspect the latest relevant workflow/run/artifact.
-7. If the previous action may still be running, check its actual state before retrying.
-8. Do not repeat destructive or non-idempotent actions merely because the prior assistant message disappeared.
-9. Resume from the first unmet evidence gate.
+3. Read `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`.
+4. Read this progress ledger.
+5. Fetch the actual current HEAD of `adaptgurus/cloudstack` branch `layersentry/4.22.1.1-ui`.
+6. Fetch the runner branch HEAD when relevant.
+7. Inspect the latest relevant workflow/run/artifact.
+8. If the previous action may still be running, check its actual state before retrying.
+9. Do not repeat destructive or non-idempotent actions merely because the prior assistant message disappeared.
+10. Resume from the first unmet evidence gate.
 
 ## Current checkpoint
 
-### LIVE_VERIFIED — served LayerSentry branding/customer terminology baseline on `sen`
+### LIVE_VERIFIED — historical served LayerSentry branding/customer terminology baseline on `sen`
 
 Evidence:
 
@@ -48,82 +49,113 @@ Evidence:
 - HTTP 200
 - served config: `/etc/cloudstack/management/config.json`
 
-Scope is only what that workflow asserted. It does not prove the pending V1 redesign, KVM profile, Kubernetes, object storage, appliance lockdown, HA topology, backup, or DR.
+Scope is only what that historical workflow asserted. It does not prove the pending V1 KVM profile, self-service redesign, Kubernetes, object storage, appliance lockdown, HA topology, backup, or DR.
 
-### SOURCE_COMPLETE — continuity/anti-hallucination documentation
+### SOURCE_COMPLETE — continuity / re-audit / upgradeability guardrails
 
-- `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md` exists in the LayerSentry branch.
+- `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md` exists.
+- `docs/layersentry/LAYERSENTRY_MASTER_CONTEXT_REAUDIT_2026-09-04.md` exists.
+- `docs/layersentry/LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md` exists; creation commit `aa3163d108b1b602b18fe8409c77da35bffa96e4`.
 - This progress ledger is the refresh-safe operational checkpoint.
-- `docs/layersentry/LAYERSENTRY_MASTER_CONTEXT_REAUDIT_2026-09-04.md` records the deep 4.22.1 re-audit corrections.
-- Current re-audit source commit: `16ea815745fddcdc3241332da6ef0997a0fd6e07`.
-- No production/runtime capability was promoted by this documentation-only audit.
 
-### RE-AUDIT FINDINGS — SOURCE_COMPLETE, RUNTIME UNCHANGED
+Upgrade/IP protection policy now explicitly requires minimal upstream diff, versioned release manifests, deterministic signed CI artifacts, upgrade compatibility gates, schema-aware CloudStack upgrade sequencing, staged/canary testing, rollback classification, SBOM/support bundles, server-side placement of proprietary logic, and no production source maps by default when implemented.
 
-The master architecture remains valid, but these corrections/guardrails are now authoritative:
+Important anti-hallucination/IP statement: it is **not technically possible to guarantee that customer-delivered software cannot be reverse engineered**, particularly open-source CloudStack core and browser JavaScript. The product objective is to minimize exposed LayerSentry-specific logic, keep proprietary orchestration server-side, raise the cost of analysis, sign artifacts, reduce shell/source exposure, and never rely on obscurity for security.
 
-- use version-pinned CloudStack 4.22.1.x docs; do not rely on `/latest/` alone;
-- standardize the 4.22.1 database compatibility baseline on MySQL 8.4/equivalent;
-- account for the EL `ipmitool` OOBM caveat before certifying KVM Host HA/fencing;
-- use the full current KVM/libvirt security guidance, not insecure old quick-install TCP examples;
-- treat SELinux enforcing as policy engineering/testing, not a mode toggle;
-- `firewalld enabled` is a LayerSentry hardening deviation from the reference KVM guide and requires its own traffic/forwarding/migration/storage/B&R/CKS validation matrix;
-- when delegated Department Admin manages subordinate teams/accounts, map Department to Domain and teams/workloads to Accounts; Users in one Account are not isolated;
-- feature visibility requires permission plus real provider/prerequisite/configuration state, not API presence alone;
-- a Create-VM Backup Policy selector must orchestrate supported B&R APIs after VM deployment rather than pretending it is a native deploy field;
-- native CKS CSI integration is enabled during cluster creation and Disk Offerings sync to Kubernetes Storage Classes; do not invent an unsupported native storage-class parameter;
-- block CKS pod access to underlying VM metadata/user-data by default unless explicitly required and tested;
-- account for the B&R dependency on retaining the original/unmanaged/expunged instance DB entry;
-- guard the known KVM VM-snapshot/Volume-snapshot coexistence issue;
-- a two-VM DR POC on one Hyper-V host proves functional cross-zone recovery only, not physical site independence.
+### SOURCE_COMPLETE — DBaaS/APaaS placeholder removal
+
+Customer-facing V1 DBaaS/APaaS placeholder implementation has been removed from the LayerSentry UI source.
+
+Exact reviewed UI commit:
+
+`9ad724eb76843d40d6a883c0a0ab47a75ceed449`
+
+Compared with the prior audited branch point `44b93e1bf6bc742c1c1a0c66e6319d25a6c47dda`, the exact UI delta is:
+
+- `ui/src/config/router.js`: only 4 deletions — DBaaS/APaaS imports and route registration;
+- `ui/src/config/section/dbaas.js`: removed;
+- `ui/src/config/section/apaas.js`: removed;
+- `ui/src/views/layersentry/ServiceCatalog.vue`: removed.
+
+No CloudStack backend/API/database/core functionality was changed for this task.
+
+### SOURCE_COMPLETE — V1 served-UI verification and installer pin alignment
+
+- served-UI repair commit: `49dbbeafe6e02c0797dac8d675e89ec440e44437`
+  - pins UI commit `9ad724...`;
+  - fails if DBaaS/APaaS strings are present in the built/served JavaScript;
+  - emits `V1_PLACEHOLDERS=ABSENT` on success.
+- resume path commit: `8b9999a98af0d410d051e851578d31008cb5383f`
+  - pins the same V1 UI and served-UI repair.
+- main installer alignment commit: `c8ee0cc76d1646810c1e4fb597af9fbdf1d96cb4`
+  - UI pin: `9ad724...`;
+  - resume pin: `8b9999...`;
+  - served repair pin: `49dbbe...`.
+
+This is **source-level pin parity for the current V1 placeholder-removal change**. It does not mean the overall production installer is complete; CI-built artifact deployment, SELinux enforcing policy, package lockdown and signed updates remain pending.
+
+### CI/LIVE IN PROGRESS — DBaaS/APaaS removal deployment
+
+Runner repository: `adaptgurus/cozystack`
+
+- workflow updated for exact new UI/repair pins: commit `eea046ae31669d56d4c86738950227c214a99510`;
+- deployment request commit: `32b7dfdb43061457d322410a31697bd0a0cce313`;
+- workflow run: `33877641094`;
+- job: `101038334940`;
+- last observed state at this checkpoint: `Deploy customer-friendly Layersentry UI` **in progress**.
+
+The next session/action must inspect run `33877641094` first. Do **not** submit a duplicate deployment request while this run is still active or before reading its final result.
 
 ### PARTIAL
 
 - customer terminology: substantial work exists, but full role/context wrong-label audit remains pending.
-- installer: working historical paths exist, but fresh/resume parity, CI-built UI artifact, SELinux final state/policy, firewall-policy validation, lockdown, and signed update controls remain incomplete.
+- installer: current V1 UI/resume/served-repair pins are aligned, but CI-built UI artifact, SELinux final state/policy, firewall-policy validation, appliance lockdown and signed update controls remain incomplete.
 - self-service foundation: upstream CloudStack components exist, but final LayerSentry Department Admin/User UX is not yet implemented/live-proven.
+- IP protection: architecture/policy is defined, but production source-map policy, compiled proprietary components (if needed), signed release channel and appliance-access controls are not yet implemented/certified.
 
 ### PENDING / NOT_TESTED
 
-- remove DBaaS/APaaS placeholder routes/checks
-- KVM-only `layersentry-kvm` product profile
-- Platform Admin dashboard redesign
-- Department Admin self-service dashboard
-- normal User self-service dashboard
-- simplified VM wizard
-- simplified Kubernetes wizard
-- simplified Bucket UX
-- final Site/Infrastructure onboarding simplification
-- fresh/resume installer parity
-- CI-built immutable UI artifact deployment
-- SELinux-enforcing appliance policy/modules and live validation
-- firewalld-enabled LayerSentry KVM traffic/security validation
-- package/repository lockdown
-- controlled signed update mechanism
-- full air-gap CKS
-- CKS metadata-isolation NetworkPolicy live validation
-- CKS CSI integration live validation for the selected Kubernetes ISO/profile
-- live Kubernetes validation
-- live object-store/Bucket validation
-- KVM snapshot-conflict guard implementation/test
-- native NAS B&R proof
-- DR source-record retention/purge negative test
-- two-zone cross-zone DR proof
-- RPO/RTO measurement
-- automated DR mapping
-- Test Recovery
-- planned/emergency failover
-- failback
-- 3-Management/2-LB/3-DB HA deployment and certification
-- physical OOBM/fencing certification on actual supported hardware
-- rolling upgrade certification
-- production release certification
+- live verification of DBaaS/APaaS placeholder removal — workflow `33877641094` currently in progress at checkpoint time;
+- KVM-only `layersentry-kvm` product profile;
+- Platform Admin dashboard redesign;
+- Department Admin self-service dashboard;
+- normal User self-service dashboard;
+- simplified VM wizard;
+- simplified Kubernetes wizard;
+- simplified Bucket UX;
+- final Site/Infrastructure onboarding simplification;
+- CI-built immutable UI artifact deployment;
+- production source-map suppression/support-build strategy implementation;
+- signed release manifest/artifact/update channel;
+- N-1 -> N LayerSentry upgrade test automation;
+- CloudStack schema-aware upgrade orchestration/rollback evidence;
+- SELinux-enforcing appliance policy/modules and live validation;
+- firewalld-enabled LayerSentry KVM traffic/security validation;
+- package/repository lockdown;
+- full air-gap CKS;
+- CKS metadata-isolation NetworkPolicy live validation;
+- CKS CSI integration live validation for the selected Kubernetes ISO/profile;
+- live Kubernetes validation;
+- live object-store/Bucket validation;
+- KVM snapshot-conflict guard implementation/test;
+- native NAS B&R proof;
+- DR source-record retention/purge negative test;
+- two-zone cross-zone DR proof;
+- RPO/RTO measurement;
+- automated DR mapping;
+- Test Recovery;
+- planned/emergency failover;
+- failback;
+- 3-Management/2-LB/3-DB HA deployment and certification;
+- physical OOBM/fencing certification on actual supported hardware;
+- rolling upgrade certification;
+- production release certification.
 
 ## Exact next execution sequence
 
-1. Re-read current repository HEADs, the re-audit companion, and latest workflow evidence.
-2. Remove DBaaS/APaaS V1 placeholders and installer checks.
-3. Fix fresh/resume installer parity.
+1. Inspect workflow `33877641094` and job `101038334940`; capture logs/artifact/final live assertions.
+2. If the run passes, promote DBaaS/APaaS placeholder removal to `LIVE_VERIFIED` for the exact assertions and update this ledger.
+3. If it fails, diagnose from the exact logs; do not submit a duplicate run blindly.
 4. Move UI compilation away from production management nodes to a CI-built immutable artifact.
 5. Implement the KVM-only product-profile visibility matrix with prerequisite/provider-aware feature gating.
 6. Implement role-aware dashboards and simplified VM/Kubernetes/Bucket UX using the corrected Department/Account model.
