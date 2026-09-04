@@ -132,6 +132,23 @@ Before R3/R4 operations such as network/storage/DB/firewall/topology/reboot/upgr
 
 If an operation may already be in flight after a timeout/refresh, inspect that exact operation before retrying. Never duplicate deployment, VM creation, backup, recovery, network/storage mutation or upgrade blindly.
 
+## Mandatory live validation path
+
+For every LayerSentry **source, configuration, installer, workflow or automation change that can affect runtime behavior**, source/CI validation is necessary but not sufficient. Before the change can be labeled `LIVE_VERIFIED`, it must be exercised against the authorized LayerSentry test VM/environment using the `adaptgurus/cozystack` GitHub runner/integration path and the exact source/artifact being claimed.
+
+Required rules:
+
+- fetch the actual current `adaptgurus/cozystack` integration branch and inspect conflicting/in-flight workflows before any live mutation;
+- use a versioned runner workflow or otherwise durable runner evidence for deployment/test execution;
+- record exact source commit, workflow/run/job/artifact identifiers, target scope, assertions, mutations and rollback state;
+- direct SSH access to an authorized test VM may be used from the controlled runner/operator path for read-only discovery, deployment, diagnostics and bounded validation when appropriate; SSH is a transport, not permission to bypass R0-R4 safeguards;
+- SSH credentials/private keys must come from approved runtime secret injection or existing authorized access and must never be committed, printed in logs, embedded in artifacts or copied into browser code;
+- validate behavior through the product/API plus host/guest evidence where relevant rather than relying only on process state or HTTP 200;
+- if live validation is blocked or unavailable, keep the result at `SOURCE_COMPLETE`, `CI_VERIFIED`, `NOT_TESTED` or another truthful lower status; never infer `LIVE_VERIFIED`;
+- documentation-only changes do not require a meaningless VM mutation, but any runtime procedure or product behavior introduced by documentation must be live-tested when its implementation is claimed.
+
+For Backup/DR/storage changes, live validation must additionally prove the exact storage/provider path being claimed. Where point-in-time recovery is supported, test at least the latest recovery point and an older retained checkpoint on disposable/approved data, verify expected data and network mapping, and exercise a relevant negative/retry case before stronger certification.
+
 ## V1 product invariants
 
 - Customer experience is KVM-only; non-KVM upstream implementations remain in CloudStack core.
