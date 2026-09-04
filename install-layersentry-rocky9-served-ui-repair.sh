@@ -17,7 +17,7 @@ readonly PRODUCT='Layersentry'
 readonly CLOUDSTACK_VERSION='4.22.1.1'
 readonly CLOUDSTACK_RELEASE='1'
 readonly UI_REPOSITORY='https://github.com/adaptgurus/cloudstack.git'
-readonly UI_COMMIT='9ad724eb76843d40d6a883c0a0ab47a75ceed449'
+readonly UI_COMMIT='6ce76d6c241629086ffcad794093dbdd5f2dd5ba'
 readonly STAGED_UI='/usr/share/cloudstack-ui'
 readonly SERVED_UI='/usr/share/cloudstack-management/webapp'
 readonly SERVED_CONFIG='/etc/cloudstack/management/config.json'
@@ -92,12 +92,22 @@ assert all(checks.values())
 PY
 }
 
+fail_if_placeholder_present(){
+  local root="$1" label="$2" term="$3" matches
+  matches="$(grep -RIl --include='*.js' -- "$term" "$root" 2>/dev/null || true)"
+  if [[ -n "$matches" ]]; then
+    log "ERROR: obsolete $term placeholder marker found in $label JavaScript:"
+    log "$matches"
+    die "Obsolete $term placeholder is present in $label."
+  fi
+}
+
 validate_ui_tree(){
   local root="$1" label="$2"
   [[ -f "$root/index.html" && -f "$root/config.json" ]] || die "$label is missing index.html/config.json at $root."
   validate_config_file "$root/config.json" "${label}_CONFIG_CHECKS"
-  if grep -Rqs --include='*.js' 'DBaaS' "$root"; then die "Obsolete DBaaS placeholder is present in $label."; fi
-  if grep -Rqs --include='*.js' 'APaaS' "$root"; then die "Obsolete APaaS placeholder is present in $label."; fi
+  fail_if_placeholder_present "$root" "$label" 'DBaaS'
+  fail_if_placeholder_present "$root" "$label" 'APaaS'
   grep -Rqs --include='*.js' 'Secure cloud infrastructure management' "$root" || die "Layersentry onboarding is absent from $label."
   grep -Rqs --include='*.js' 'Infrastructure group name' "$root" || die "Customer-friendly infrastructure terminology is absent from $label."
   grep -Rqs --include='*.js' 'Datacenter site' "$root" || die "Customer-friendly site terminology is absent from $label."
@@ -130,9 +140,6 @@ prepare_build_runtime(){
     node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
   fi
 
-  # Reuse the already-proven Node 16 runtime when present. Rocky AppStream
-  # metadata on long-lived/offline-ish hosts may no longer expose nodejs:16 even
-  # though the working Node 16 + npm toolchain is already installed.
   if [[ "$node_major" == '16' ]] && command -v npm >/dev/null 2>&1; then
     info "Reusing existing UI build runtime: Node.js $(node --version), npm $(npm --version)."
     return 0
@@ -224,8 +231,8 @@ verify_runtime(){
     code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "${HTTP_URL}assets/${asset}")"
     [[ "$code" == '200' ]] || die "Served asset $asset returned HTTP $code."
   done
-  if grep -Rqs --include='*.js' 'DBaaS' "$SERVED_UI"; then die 'Obsolete DBaaS placeholder is present in the served webapp.'; fi
-  if grep -Rqs --include='*.js' 'APaaS' "$SERVED_UI"; then die 'Obsolete APaaS placeholder is present in the served webapp.'; fi
+  fail_if_placeholder_present "$SERVED_UI" 'served webapp' 'DBaaS'
+  fail_if_placeholder_present "$SERVED_UI" 'served webapp' 'APaaS'
   grep -Rqs --include='*.js' 'Secure cloud infrastructure management' "$SERVED_UI" || die 'Layersentry onboarding is absent from the served webapp.'
   grep -Rqs --include='*.js' 'Infrastructure group name' "$SERVED_UI" || die 'Customer-friendly infrastructure terminology is absent from the served webapp.'
   grep -Rqs --include='*.js' 'Datacenter site' "$SERVED_UI" || die 'Customer-friendly site terminology is absent from the served webapp.'
