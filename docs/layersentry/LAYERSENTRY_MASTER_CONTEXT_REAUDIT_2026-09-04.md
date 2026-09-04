@@ -56,8 +56,8 @@ The production KVM configuration must follow the full CloudStack 4.22.1 KVM inst
 For the LayerSentry production profile:
 
 - do not deliberately expose insecure unauthenticated libvirt TCP;
-- use the current CloudStack secure/certificate-based host configuration and the documented live-migration TLS path;
-- validate required KVM/libvirt migration ports and certificates;
+- follow the current full KVM guide that disables insecure TCP and allows CloudStack to establish its required host security/certificate configuration;
+- validate the current documented KVM/libvirt migration ports and certificate behavior on Rocky Linux 9;
 - keep host configuration homogeneous across every Compute Cluster;
 - never weaken libvirt security merely to make the nested lab easier.
 
@@ -278,7 +278,7 @@ The most important corrections are:
 1. pin documentation to 4.22.1.x rather than relying on `latest`;
 2. standardize DB compatibility on MySQL 8.4/equivalent for 4.22.1;
 3. explicitly model delegated Department Admin as Domain-based when subordinate Accounts are required;
-4. use secure KVM/libvirt migration configuration;
+4. use the full secure KVM/libvirt guidance rather than old insecure quick-install examples;
 5. treat SELinux enforcing as policy engineering/testing, not a mode toggle;
 6. gate features on real prerequisites/provider state, not API presence alone;
 7. treat VM-wizard Backup Policy as supported post-deploy B&R orchestration;
@@ -288,3 +288,27 @@ The most important corrections are:
 11. keep the two-VM same-host DR lab clearly scoped as functional proof only.
 
 No runtime change or product capability is marked complete by this documentation audit alone.
+
+---
+
+## 15. Additional re-audit correction — firewalld is a LayerSentry divergence
+
+The LayerSentry master context currently targets `firewalld enabled` for the Rocky Linux 9 appliance. The full CloudStack 4.22.1 KVM installation guide, however, recommends disabling firewalld on EL/SUSE in its reference KVM firewall procedure and provides iptables-style rules for required ports.
+
+Therefore `firewalld enabled` must **not** be described as an upstream CloudStack default or automatically assumed safe merely because the relevant ports were opened.
+
+LayerSentry may intentionally keep firewalld enabled as a hardening/product choice, but that becomes a tested LayerSentry deviation. Before certification it must prove at least:
+
+- Management Server to KVM agent communication;
+- KVM-to-KVM live migration traffic;
+- libvirt/CloudStack certificate/security flows;
+- VNC/console paths where applicable;
+- guest/System VM bridge forwarding;
+- VLAN/isolated/shared network forwarding;
+- NFS/Ceph/CIFS/multipath storage paths used by the selected profile;
+- NAS B&R repository mounts and recovery traffic;
+- CKS and CSI traffic;
+- reboot persistence of the rules;
+- no unintended public exposure of management/agent/libvirt ports.
+
+Until this matrix passes with `firewalld` enabled, mark the appliance firewall policy **DESIGN_DEFINED / NOT TESTED**, not `verified` or `production certified`.
