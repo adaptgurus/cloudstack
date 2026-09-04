@@ -41,8 +41,6 @@ import config from '@/config/section/config'
 import extension from '@/config/section/extension'
 import customaction from '@/config/section/extension/customaction'
 import tools from '@/config/section/tools'
-import dbaas from '@/config/section/dbaas'
-import apaas from '@/config/section/apaas'
 import quota from '@/config/section/plugin/quota'
 import cloudian from '@/config/section/plugin/cloudian'
 
@@ -228,8 +226,6 @@ export function asyncRouterMap () {
       generateRouterMap(extension),
       generateRouterMap(customaction),
       generateRouterMap(tools),
-      generateRouterMap(dbaas),
-      generateRouterMap(apaas),
       generateRouterMap(quota),
       generateRouterMap(cloudian),
       {
@@ -304,17 +300,17 @@ export const constantRouterMap = [
     hidden: true,
     children: [
       {
-        path: 'login',
+        path: '/user/login',
         name: 'login',
         component: () => import(/* webpackChunkName: "auth" */ '@/views/auth/Login')
       },
       {
-        path: 'forgotPassword',
+        path: '/user/forgotPassword',
         name: 'forgotPassword',
         component: () => import(/* webpackChunkName: "auth" */ '@/views/auth/ForgotPassword')
       },
       {
-        path: 'resetPassword',
+        path: '/user/resetPassword',
         name: 'resetPassword',
         component: () => import(/* webpackChunkName: "auth" */ '@/views/auth/ResetPassword')
       }
