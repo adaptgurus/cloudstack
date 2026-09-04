@@ -58,17 +58,26 @@ Source commits in this documentation-only context-governance update:
 - `CODEX_MASTER_CONTEXT.md` converted to concise execution index: `3e2a787908aa1cf4bbe99e45aab11180fc9078c1`;
 - multi-agent master deduplicated: `63d2f4230e365c6bc4e09325523481b87d9fdb9f`;
 - four-agent runbook authority/startup flow simplified: `0af02405d8094ca3353407877d9b462a3e706406`;
-- upgrade/supply-chain/IP policy converted to stable-only production policy: `6fa3ff7aa24ed84584325e311a8d38a5cc9ecec1`.
+- upgrade/supply-chain/IP policy converted to stable-only production policy: `6fa3ff7aa24ed84584325e311a8d38a5cc9ecec1`;
+- historical WSL/Codex handoff archived: `f759377e299d33caa42b9e21f0731d285d2157a3`;
+- Workstream A aligned to canonical model: `33a89352a9a6b1b7620b5036b83fe1f4fac6e89a`;
+- Workstream B aligned to release/supply-chain model: `2c9d26002b4f4bd255a8920db4f2f69c0fb3d240`;
+- Workstream C aligned to security/evidence model: `6dd96eeb0d54cbb5096d184e038c0441457b52fe`;
+- Workstream D aligned to governed statuses/R0-R4 safety: `adf720404be86cad2d3c8275146d11ffc5e732f2`;
+- Codex startup README reduced to a minimal workstream index: `179134a9168c342e4c43d47a35a0ed471274bdc9`;
+- Windows/WSL setup made stable/non-duplicative: `13ea3926b736818749b1f9011d7b7c7bb39535b2`.
 
 Key governance changes:
 
 - volatile HEADs/run IDs/artifact IDs/live IPs/current statuses removed from the Super Master Context;
 - current execution state now lives only in this progress ledger plus underlying evidence;
-- historical re-audit is no longer mandatory startup context;
+- historical re-audit/handoff files are no longer mandatory startup context;
 - mandatory Codex startup reduced to `AGENTS.md` + canonical Super Master Context + progress ledger + assigned workstream;
 - specialist documents are loaded on demand;
-- explicit instruction-injection isolation added for logs/issues/web/customer-controlled content;
-- R0-R4 change-risk classification added;
+- duplicate Codex/multi-agent/host-setup instructions were reduced to indexes/runbooks with one source of truth per concern;
+- explicit instruction-injection isolation added for logs/issues/web/API/customer-controlled content;
+- R0-R4 change-risk classification added and propagated to workstreams;
+- one stray non-governed DR pseudo-status (`FUNCTIONAL_POC`) was removed; functional POC is now scope narrative under a governed status such as `LIVE_VERIFIED`, never a separate status;
 - production certification gates expanded to cover supply chain, installation/recovery, RBAC, appliance security, optional integrations, HA, upgrade and reliability/performance evidence;
 - release policy now explicitly covers trust/signing, SBOM/provenance, dependency/secret scanning, key rotation/revocation and rollback classes;
 - effort arithmetic corrected: historical component ranges sum to **20–29 engineering man-days**, not 20–27.
