@@ -9,6 +9,7 @@
   ],
   "docBase": "https://docs.cloudstack.apache.org/en/4.22.1.1",
   "appTitle": "Layersentry",
+  "brandLocked": true,
   "footer": "Layersentry V1.0",
   "loginTitle": "Layersentry",
   "loginFavicon": "assets/layersentry-icon.svg",
