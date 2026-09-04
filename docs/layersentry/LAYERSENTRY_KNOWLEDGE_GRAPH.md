@@ -347,6 +347,27 @@ installer/signature gates.
 
 Schema/database rollback is not equivalent to simple package downgrade. Follow `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`.
 
+## 13a. Security-validation evidence graph
+
+```text
+RBAC validation matrix
+  DEFINES -> Platform/Department/User/Read-only role cases
+  REQUIRES -> direct-route negative checks
+  REQUIRES -> direct CloudStack API negative checks
+  REQUIRES -> cross-tenant object-ID tampering checks
+  RESTRICTS_R1_BASELINE_TO -> read-only API commands
+  EMITS -> secret-redacted evidence schema
+
+Secret-redacted evidence
+  RECORDS -> exact source + governed status + expected/actual result
+  HASHES -> target URL + raw response body
+  NEVER_RECORDS -> role credentials/session cookies/API secrets
+```
+
+Source contract and decision record: `tools/layersentry/security/` and
+`docs/layersentry/evidence/security/README.md`. Live behavior remains at the
+status proven by current runner/Rocky Linux 9 evidence.
+
 ## 14. Support identity graph
 
 LayerSentry requires a proprietary installation/cluster support UUID so support cases can identify the exact installed product environment without exposing credentials.
