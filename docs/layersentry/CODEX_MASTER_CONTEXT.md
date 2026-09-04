@@ -15,6 +15,7 @@ Read specialist files only when relevant:
 
 - troubleshooting/root-cause/regression -> `LAYERSENTRY_DEBUGGING_RUNBOOK.md`
 - secure implementation/trust-boundary review -> `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
+- control-plane HA/XaaS/failure-domain/future-version review -> `LAYERSENTRY_CONTROL_PLANE_XAAS_AND_FUTURE_UPGRADE_POLICY.md`
 - release/installer/upgrade/IP -> `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`
 - upstream/core-delta review -> `LAYERSENTRY_UPSTREAM_DIFF.md`
 - local four-agent setup -> `CODEX_4_AGENT_RUNBOOK.md`.
@@ -43,6 +44,8 @@ Preserve CloudStack APIs, DB schema, RBAC, scheduler, VM lifecycle, storage/netw
 
 V1 includes self-service VMs, native CKS, native object-store workflows, backup/recovery/DR foundation, role-aware administration, appliance/bootstrap and controlled releases/updates. DBaaS/APaaS are excluded from V1.
 
+Native CloudStack KVM remains the primary orchestration path. XaaS is used selectively only where an external system/lifecycle extension is genuinely required. The virtualized production control plane may use 3 Management VMs, 3 DB VMs and 2 LB VMs without dedicated physical Management/DB servers, but only with certified failure-domain placement, quorum, N+1 capacity, redundant dependencies and an independent rescue path.
+
 ## Workstreams
 
 ### A — UI / Self-service
@@ -57,6 +60,8 @@ File: `docs/layersentry/codex/WORKSTREAM_B_RELEASE_INSTALLER.md`
 
 Owns CI-built immutable UI artifacts, pinned build tooling, production source-map policy, manifest/SBOM/provenance/digest/signature, installer fresh/resume parity, idempotency, atomic deployment and rollback/recovery structure.
 
+Future-version handling must not hardcode a `4.x.x.x`-only CloudStack version format; compatibility is driven by explicit release manifests/matrices and exact upstream documentation.
+
 ### C — Security / Validation
 
 File: `docs/layersentry/codex/WORKSTREAM_C_SECURITY_VALIDATION.md`
@@ -68,6 +73,8 @@ Owns RBAC/direct-URL negative tests, feature-prerequisite validation, SELinux/fi
 File: `docs/layersentry/codex/WORKSTREAM_D_DR_HA_UPGRADE.md`
 
 Owns runner/Hyper-V discovery and safe proof automation, native two-Zone NAS B&R recovery evidence, later HA failure tests and supported upgrade/resume/rollback validation. Do not build a custom DR controller before native recovery is proven.
+
+For the VM-based production control plane, D must explicitly test one Management VM loss, one DB VM loss, one LB VM loss, one physical failure-domain loss, DB primary/quorum behavior, all-Management outage recovery and the independent rescue/bootstrap path. Do not call an undefined set of "all worst cases" supported.
 
 ## Shared Codex rules
 
