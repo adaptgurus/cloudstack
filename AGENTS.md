@@ -25,6 +25,7 @@ Read specialist documents only when the task requires them:
 
 - troubleshooting/regression/root-cause work: `docs/layersentry/LAYERSENTRY_DEBUGGING_RUNBOOK.md`
 - secure coding/trust-boundary/security-sensitive implementation: `docs/layersentry/LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
+- control-plane HA/XaaS/failure-domain/future-version work: `docs/layersentry/LAYERSENTRY_CONTROL_PLANE_XAAS_AND_FUTURE_UPGRADE_POLICY.md`
 - release/upgrade/IP/supply-chain work: `docs/layersentry/LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`
 - upstream/core-delta/rebase review: `docs/layersentry/LAYERSENTRY_UPSTREAM_DIFF.md`
 - four-agent local operation: `docs/layersentry/CODEX_4_AGENT_RUNBOOK.md`
@@ -134,6 +135,7 @@ If an operation may already be in flight after a timeout/refresh, inspect that e
 ## V1 product invariants
 
 - Customer experience is KVM-only; non-KVM upstream implementations remain in CloudStack core.
+- Native CloudStack KVM remains the primary VM/network/storage orchestration path; XaaS is selective for genuinely external systems/lifecycle extensions, not a replacement for native KVM.
 - DBaaS/APaaS are excluded from V1; do not recreate placeholders.
 - Future DBaaS belongs above Kubernetes rather than in CloudStack core.
 - UI hiding is UX only; CloudStack RBAC is the server-side security boundary.
@@ -141,6 +143,10 @@ If an operation may already be in flight after a timeout/refresh, inspect that e
 - Customer terminology is presentation only; backend names/API semantics remain unchanged.
 - Production management nodes must consume CI-built verified UI artifacts rather than compile Vue locally.
 - Production target is appliance-locked Rocky Linux 9 with tested SELinux/firewall/update controls.
+- 3 Management VMs + 3 DB VMs + 2 LB VMs are an HA topology only when failure-domain placement, quorum, N+1 capacity, redundant network/storage and independent recovery are actually designed and tested.
+- Do not claim survival of "all worst cases"; define and test the exact failure envelope. A three-member DB quorum cannot guarantee survival of arbitrary two-member/failure-domain loss.
+- If the LayerSentry control plane is virtualized on the estate it manages, it requires an out-of-band/rescue recovery path that does not depend on a healthy CloudStack API.
+- Future-version tooling must not assume CloudStack versions always start with `4.` or always have four numeric components; the announced post-4.23 line uses `24.0.0` naming.
 - Do not claim full air-gap CKS until the internal-registry/bootstrap path is implemented and proven.
 - NAS VM-level B&R is not the primary protection mechanism for CKS nodes.
 - KVM Instance/VM-snapshot and Volume-snapshot safety limitations must be guarded and tested.
