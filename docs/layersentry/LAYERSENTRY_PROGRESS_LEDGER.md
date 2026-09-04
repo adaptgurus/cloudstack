@@ -55,7 +55,7 @@ Scope is only what that workflow asserted. It does not prove the pending V1 rede
 - `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md` exists in the LayerSentry branch.
 - This progress ledger is the refresh-safe operational checkpoint.
 - `docs/layersentry/LAYERSENTRY_MASTER_CONTEXT_REAUDIT_2026-09-04.md` records the deep 4.22.1 re-audit corrections.
-- Re-audit source commit: `8ce30d973f547fbb799b3a2107fa796cfee50ebe`.
+- Current re-audit source commit: `16ea815745fddcdc3241332da6ef0997a0fd6e07`.
 - No production/runtime capability was promoted by this documentation-only audit.
 
 ### RE-AUDIT FINDINGS — SOURCE_COMPLETE, RUNTIME UNCHANGED
@@ -65,8 +65,9 @@ The master architecture remains valid, but these corrections/guardrails are now 
 - use version-pinned CloudStack 4.22.1.x docs; do not rely on `/latest/` alone;
 - standardize the 4.22.1 database compatibility baseline on MySQL 8.4/equivalent;
 - account for the EL `ipmitool` OOBM caveat before certifying KVM Host HA/fencing;
-- use secure current KVM/libvirt migration guidance, not insecure old quick-install TCP examples;
+- use the full current KVM/libvirt security guidance, not insecure old quick-install TCP examples;
 - treat SELinux enforcing as policy engineering/testing, not a mode toggle;
+- `firewalld enabled` is a LayerSentry hardening deviation from the reference KVM guide and requires its own traffic/forwarding/migration/storage/B&R/CKS validation matrix;
 - when delegated Department Admin manages subordinate teams/accounts, map Department to Domain and teams/workloads to Accounts; Users in one Account are not isolated;
 - feature visibility requires permission plus real provider/prerequisite/configuration state, not API presence alone;
 - a Create-VM Backup Policy selector must orchestrate supported B&R APIs after VM deployment rather than pretending it is a native deploy field;
@@ -79,7 +80,7 @@ The master architecture remains valid, but these corrections/guardrails are now 
 ### PARTIAL
 
 - customer terminology: substantial work exists, but full role/context wrong-label audit remains pending.
-- installer: working historical paths exist, but fresh/resume parity, CI-built UI artifact, SELinux final state/policy, lockdown, and signed update controls remain incomplete.
+- installer: working historical paths exist, but fresh/resume parity, CI-built UI artifact, SELinux final state/policy, firewall-policy validation, lockdown, and signed update controls remain incomplete.
 - self-service foundation: upstream CloudStack components exist, but final LayerSentry Department Admin/User UX is not yet implemented/live-proven.
 
 ### PENDING / NOT_TESTED
@@ -96,6 +97,7 @@ The master architecture remains valid, but these corrections/guardrails are now 
 - fresh/resume installer parity
 - CI-built immutable UI artifact deployment
 - SELinux-enforcing appliance policy/modules and live validation
+- firewalld-enabled LayerSentry KVM traffic/security validation
 - package/repository lockdown
 - controlled signed update mechanism
 - full air-gap CKS
