@@ -23,7 +23,7 @@
       <h1>Secure cloud infrastructure management</h1>
       <p class="hero-copy">
         Layersentry provides one operational plane for compute, storage, networking,
-        images, projects, identity, infrastructure and service catalogs.
+        images, projects, identity, infrastructure, Kubernetes and backup services.
       </p>
     </div>
 
@@ -31,7 +31,7 @@
       <div class="capability-card">
         <div class="capability-kicker">INFRASTRUCTURE</div>
         <h3>Unified operations</h3>
-        <p>Manage virtual infrastructure, service offerings and cloud resources from one console.</p>
+        <p>Manage virtual infrastructure, resource profiles and cloud resources from one console.</p>
       </div>
       <div class="capability-card">
         <div class="capability-kicker">SECURITY</div>
@@ -40,8 +40,8 @@
       </div>
       <div class="capability-card">
         <div class="capability-kicker">SERVICES</div>
-        <h3>Extensible service catalog</h3>
-        <p>DBaaS and APaaS catalogs are available in the navigation and ready for backend integration.</p>
+        <h3>Private-cloud services</h3>
+        <p>Use Kubernetes, object storage buckets and backup services when their required providers are configured.</p>
       </div>
     </div>
 
