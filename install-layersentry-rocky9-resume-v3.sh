@@ -12,8 +12,8 @@ umask 077
 
 readonly V2_COMMIT='6617de6ee417c8970d9085431a8aa62de9698b2d'
 readonly V2_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${V2_COMMIT}/install-layersentry-rocky9-resume-v2.sh"
-readonly UI_COMMIT='72b76a30f3dadf0dbe9e333ade073034c1afc514'
-readonly SERVED_BRANDING_COMMIT='7a500324ffec725012bcd089fae5f54c0e56de5e'
+readonly UI_COMMIT='9ad724eb76843d40d6a883c0a0ab47a75ceed449'
+readonly SERVED_BRANDING_COMMIT='49dbbeafe6e02c0797dac8d675e89ec440e44437'
 readonly SERVED_BRANDING_URL="https://raw.githubusercontent.com/adaptgurus/cloudstack/${SERVED_BRANDING_COMMIT}/install-layersentry-rocky9-served-ui-repair.sh"
 readonly PATCHED='/root/install-layersentry-rocky9-resume-v3-runtime.sh'
 readonly BRANDING='/root/install-layersentry-rocky9-served-ui-repair.sh'
