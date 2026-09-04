@@ -34,6 +34,8 @@ Current repository + workflow evidence + live target
 
 Conflict precedence remains: live runtime -> workflow/artifact -> current source -> version-pinned upstream documentation -> stable project contracts -> historical handoffs.
 
+The optional accelerated schedule is `LAYERSENTRY_25_DAY_ACCELERATED_ACCEPTANCE_PLAN.md`. It links the existing release, UI, security, control-plane and DR contracts into a 25-calendar-day critical path with infrastructure deadlines and de-scope rules. Its schedule is `DESIGN_DEFINED`; it never overrides evidence gates or proves runtime readiness.
+
 ## 2. Product graph
 
 ```text
