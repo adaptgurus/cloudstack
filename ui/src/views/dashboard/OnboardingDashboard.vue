@@ -17,31 +17,47 @@
 
 <template>
   <div class="onboarding">
-    <div class="head">
-      <h2>{{ $t('label.installwizard.title') }}</h2>
-      <h3>{{ $t('label.installwizard.subtitle') }}</h3>
+    <div class="hero">
+      <img class="brand-logo" src="assets/layersentry-logo.svg" alt="Layersentry">
+      <div class="release-badge">V1.0</div>
+      <h1>Secure cloud infrastructure management</h1>
+      <p class="hero-copy">
+        Layersentry provides one operational plane for compute, storage, networking,
+        images, projects, identity, infrastructure and service catalogs.
+      </p>
     </div>
-    <div class="body">
-      <div class="intro">
-        <div class="title">{{ $t('label.what.is.cloudstack') }}</div>
-        <div class="subtitle">{{ $t('label.introduction.to.cloudstack') }}</div>
-        <p>{{ $t('message.installwizard.copy.whatiscloudstack') }}</p>
-        <img class="center" src="assets/bg-what-is-cloudstack.png">
-        <pre>{{ $t('message.installwizard.cloudstack.helptext.header') }}</pre>
-        <pre>{{ $t('message.installwizard.cloudstack.helptext.website') }}<a href="https://cloudstack.apache.org" target="_blank">https://cloudstack.apache.org</a></pre>
-        <pre>{{ $t('message.installwizard.cloudstack.helptext.document') }}<a :href="'https://docs.cloudstack.apache.org/en/' + cloudstackminorversion" target="_blank">https://docs.cloudstack.apache.org/en/{{ cloudstackminorversion }}</a></pre>
-        <pre>{{ $t('message.installwizard.cloudstack.helptext.releasenotes') }}<a :href="'https://docs.cloudstack.apache.org/en/' + cloudstackminorversion + '/releasenotes/'" target="_blank">https://docs.cloudstack.apache.org/en/{{ cloudstackminorversion }}/releasenotes/</a></pre>
 
-        <pre>{{ $t('message.installwizard.cloudstack.helptext.mailinglists') }}<a href="https://cloudstack.apache.org/mailing-lists.html" target="_blank">https://cloudstack.apache.org/mailing-lists.html</a></pre>
-        <pre>{{ $t('message.installwizard.cloudstack.helptext.survey') }}<a href="https://cloudstack.apache.org/survey.html" target="_blank">https://cloudstack.apache.org/survey.html</a></pre>
-        <pre>{{ $t('message.installwizard.cloudstack.helptext.issues') }}<a href="https://github.com/apache/cloudstack/issues/new" target="_blank">https://github.com/apache/cloudstack/issues/new</a></pre>
-
-        <a-button @click="() => { step = 1 }" type="primary">
-          {{ $t('label.continue.install') }}
-          <double-right-outlined />
-        </a-button>
+    <div class="capabilities">
+      <div class="capability-card">
+        <div class="capability-kicker">INFRASTRUCTURE</div>
+        <h3>Unified operations</h3>
+        <p>Manage virtual infrastructure, service offerings and cloud resources from one console.</p>
+      </div>
+      <div class="capability-card">
+        <div class="capability-kicker">SECURITY</div>
+        <h3>Controlled administration</h3>
+        <p>Use projects, accounts, domains, roles and platform controls to govern administrative access.</p>
+      </div>
+      <div class="capability-card">
+        <div class="capability-kicker">SERVICES</div>
+        <h3>Extensible service catalog</h3>
+        <p>DBaaS and APaaS catalogs are available in the navigation and ready for backend integration.</p>
       </div>
     </div>
+
+    <div class="setup-panel">
+      <div>
+        <div class="setup-title">Complete infrastructure setup</div>
+        <div class="setup-copy">
+          Continue to change the initial administrator password and configure the first infrastructure zone.
+        </div>
+      </div>
+      <a-button @click="() => { step = 1 }" type="primary" size="large">
+        Continue with installation
+        <double-right-outlined />
+      </a-button>
+    </div>
+
     <a-modal
       :title="$t('message.change.password')"
       :visible="step === 1"
@@ -57,7 +73,7 @@
         @refresh-data="() => { step = 2 }" />
     </a-modal>
     <a-modal
-      :title="$t('label.installwizard.addzoneintro.title')"
+      title="Add infrastructure zone"
       :visible="step === 2"
       :closable="true"
       :maskClosable="false"
@@ -86,7 +102,6 @@ export default {
   data () {
     return {
       step: 0,
-      cloudstackminorversion: this.$store.getters.features.cloudstackversion.split('-')[0],
       resource: {
         id: this.$store.getters.userInfo.id,
         username: this.$store.getters.userInfo.username
@@ -102,68 +117,141 @@ export default {
 </script>
 
 <style scoped lang="scss">
-
 .onboarding {
-  font-family: sans-serif;
-  padding: 20px 10px 50px 10px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
-  @media (min-width: 760px) {
-    padding: 20px 10% 50px 10%;
-  }
+  min-height: calc(100vh - 170px);
+  padding: 42px;
+  background:
+    radial-gradient(circle at 85% 0%, rgba(15, 118, 110, 0.10), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(16, 24, 40, 0.08);
 }
 
-.head {
+.hero {
+  max-width: 920px;
+  margin: 0 auto;
   text-align: center;
 }
 
-h2 {
-  font-size: 28px;
-}
-
-h3 {
-  font-size: 20px;
-}
-
-.body {
-  padding: 56px 20px 20px 20px;
-}
-
-.title {
-  margin: auto auto 30px;
-  font-size: 22px;
-}
-
-.subtitle {
-  font-size: 12px;
-  font-weight: bold;
-}
-
-p {
-  font-family: sans-serif;
-  text-align: justify;
-  font-size: 15px;
-  line-height: 23px;
-  white-space: pre-line;
-}
-
-pre {
-  font-family: sans-serif;
-  text-align: justify;
-  font-size: 15px;
-  white-space: pre-wrap;
-  margin: 0px 0px;
-}
-
-.center {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
+.brand-logo {
+  width: 280px;
+  max-width: 78vw;
+  height: auto;
   margin-bottom: 10px;
-  text-align: center;
 }
 
-button {
-  float: right;
+.release-badge {
+  display: inline-block;
+  margin: 0 0 18px;
+  padding: 5px 12px;
+  color: #0f766e;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+h1 {
+  margin: 0;
+  color: #101828;
+  font-size: 34px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.hero-copy {
+  max-width: 760px;
+  margin: 18px auto 0;
+  color: #667085;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.capabilities {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1100px;
+  margin: 42px auto 0;
+}
+
+.capability-card {
+  min-height: 170px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.05);
+}
+
+.capability-kicker {
+  margin-bottom: 12px;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.capability-card h3 {
+  margin: 0 0 10px;
+  color: #1f2933;
+  font-size: 18px;
+}
+
+.capability-card p {
+  margin: 0;
+  color: #667085;
+  line-height: 1.6;
+}
+
+.setup-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  max-width: 1100px;
+  margin: 24px auto 0;
+  padding: 24px 26px;
+  background: #1f2933;
+  border-radius: 10px;
+}
+
+.setup-title {
+  margin-bottom: 5px;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.setup-copy {
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
+}
+
+.setup-panel :deep(.ant-btn-primary) {
+  flex: 0 0 auto;
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
+@media (max-width: 900px) {
+  .onboarding {
+    padding: 28px 18px;
+  }
+
+  .capabilities {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  h1 {
+    font-size: 28px;
+  }
 }
 </style>
