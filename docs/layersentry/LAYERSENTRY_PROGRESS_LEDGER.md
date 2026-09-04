@@ -10,6 +10,7 @@ Stable architecture, safety, evidence/status governance and production-certifica
 
 Specialist stable policy:
 
+- secure implementation/trust boundaries: `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
 - upgrade/supply-chain/IP protection: `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`
 - upstream/fork deltas: `LAYERSENTRY_UPSTREAM_DIFF.md`
 
@@ -41,14 +42,14 @@ Before changing anything:
 6. Fetch the `adaptgurus/cozystack` runner integration branch when relevant.
 7. Inspect the latest relevant workflow/run/artifact.
 8. If the previous action may still be running, inspect its exact state before retrying.
-9. Read specialist upgrade/delta/runbook documents only if the current task needs them.
+9. Read specialist secure-engineering/upgrade/delta/runbook documents only if the current task needs them.
 10. Resume from the first unmet evidence gate.
 
 ## Current checkpoint
 
-### SOURCE_COMPLETE — canonical context governance v2 / context-cleanliness re-audit
+### SOURCE_COMPLETE — canonical context governance v2 / context-cleanliness + production-engineering re-audit
 
-The LayerSentry AI/Codex context stack was re-audited and normalized so stable policy and volatile execution state no longer compete with one another.
+The LayerSentry AI/Codex context stack was re-audited and normalized so stable policy and volatile execution state no longer compete with one another, while production/security controls are carried in focused stable specialist policies rather than duplicated across every context file.
 
 Source commits in this documentation-only context-governance update:
 
@@ -65,7 +66,10 @@ Source commits in this documentation-only context-governance update:
 - Workstream C aligned to security/evidence model: `6dd96eeb0d54cbb5096d184e038c0441457b52fe`;
 - Workstream D aligned to governed statuses/R0-R4 safety: `adf720404be86cad2d3c8275146d11ffc5e732f2`;
 - Codex startup README reduced to a minimal workstream index: `179134a9168c342e4c43d47a35a0ed471274bdc9`;
-- Windows/WSL setup made stable/non-duplicative: `13ea3926b736818749b1f9011d7b7c7bb39535b2`.
+- Windows/WSL setup made stable/non-duplicative: `13ea3926b736818749b1f9011d7b7c7bb39535b2`;
+- secure engineering specialist policy added: `0e288f3d05f4730ac5404e88c06af1635c7039bd`;
+- root `AGENTS.md` linked/enforced secure-engineering baseline: `581cfd2c4c82a7c580491e78cac6d37d3ee0da5d`;
+- Codex execution index linked secure-engineering policy: `85e2a1082f998b147d5ad0c49e3884ece58fb996`.
 
 Key governance changes:
 
@@ -79,10 +83,27 @@ Key governance changes:
 - R0-R4 change-risk classification added and propagated to workstreams;
 - one stray non-governed DR pseudo-status (`FUNCTIONAL_POC`) was removed; functional POC is now scope narrative under a governed status such as `LIVE_VERIFIED`, never a separate status;
 - production certification gates expanded to cover supply chain, installation/recovery, RBAC, appliance security, optional integrations, HA, upgrade and reliability/performance evidence;
-- release policy now explicitly covers trust/signing, SBOM/provenance, dependency/secret scanning, key rotation/revocation and rollback classes;
+- release policy explicitly covers trust/signing, SBOM/provenance, dependency/secret scanning, key rotation/revocation and rollback classes;
+- secure-engineering policy now covers threat modeling, untrusted input, authorization/confused-deputy prevention, browser security, command/path/archive/SSRF/SQL/parser safety, cryptography/TLS, CI signing-secret boundaries, dependency build-script risk, privacy/redaction, resource-exhaustion/retry safety, source governance, incident response and production documentation gates;
 - effort arithmetic corrected: historical component ranges sum to **20–29 engineering man-days**, not 20–27.
 
 Scope limit: this is `SOURCE_COMPLETE` documentation/governance work only. It changes no CloudStack Java/API/DB/KVM-agent/orchestration code and performs no live runtime mutation. It does not promote any product capability to a stronger runtime status.
+
+### PENDING — production source/release repository governance
+
+At the end of this context re-audit, GitHub branch metadata for `layersentry/4.22.1.1-ui` reports `protected=false`, and the latest documentation commit is reported as unsigned. This is a source-governance observation, not a product-runtime vulnerability and not evidence that artifact signing is implemented.
+
+Before treating this repository flow as a production stable-release control plane, establish an appropriate GitHub branch/ruleset and release-governance model, including as applicable:
+
+- protected integration/stable release refs;
+- required CI/status checks;
+- review requirements for release/security-sensitive changes;
+- restricted force-push/deletion;
+- least-privilege promotion/signing permissions;
+- a deliberate commit/tag-signing policy if used;
+- auditable stable-release approval/promotion.
+
+Production LayerSentry artifact signing/trust verification remains a separate PENDING release-engineering gate.
 
 ### LIVE_VERIFIED — LayerSentry V1 DBaaS/APaaS placeholder removal on `sen`
 
@@ -218,16 +239,17 @@ This historical run has been superseded for the DBaaS/APaaS-removal scope by run
 
 ## Exact next execution sequence
 
-1. Move UI compilation away from production management nodes to a CI-built immutable artifact with digest/signature verification and production source maps disabled by default.
-2. Implement the KVM-only product-profile visibility matrix with prerequisite/provider-aware feature gating.
-3. Implement role-aware Platform Admin / Department Admin / User dashboards using native CloudStack API/RBAC semantics.
-4. Simplify VM/Kubernetes/Bucket workflows without inventing unsupported CloudStack API parameters.
-5. Add the KVM snapshot-safety guard and CKS metadata-isolation/CSI requirements to relevant product/security tests.
-6. Build/deploy/role-test on `sen` and update this ledger per atomic gate.
-7. Add the second Rocky Linux 9 nested-KVM VM.
-8. Prove native two-zone NAS B&R cross-zone recovery, including source-record retention behavior, before advanced DR automation.
-9. Build the appliance package-lock/update/SELinux/security profile.
-10. Later certify the 3-Management/2-LB/3-DB production HA profile and supported upgrade path on sufficient infrastructure.
+1. Establish source/release repository governance suitable for stable releases (branch/ruleset/required-check/review/promotion policy) without disrupting the active integration workflow.
+2. Move UI compilation away from production management nodes to a CI-built immutable artifact with digest/signature verification and production source maps disabled by default.
+3. Implement the KVM-only product-profile visibility matrix with prerequisite/provider-aware feature gating.
+4. Implement role-aware Platform Admin / Department Admin / User dashboards using native CloudStack API/RBAC semantics.
+5. Simplify VM/Kubernetes/Bucket workflows without inventing unsupported CloudStack API parameters.
+6. Add the KVM snapshot-safety guard and CKS metadata-isolation/CSI requirements to relevant product/security tests.
+7. Build/deploy/role-test on `sen` and update this ledger per atomic gate.
+8. Add the second Rocky Linux 9 nested-KVM VM.
+9. Prove native two-zone NAS B&R cross-zone recovery, including source-record retention behavior, before advanced DR automation.
+10. Build the appliance package-lock/update/SELinux/security profile.
+11. Later certify the 3-Management/2-LB/3-DB production HA profile and supported upgrade path on sufficient infrastructure.
 
 ## Refresh-safe invariant
 
