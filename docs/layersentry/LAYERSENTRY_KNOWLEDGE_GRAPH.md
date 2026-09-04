@@ -370,6 +370,28 @@ Source contract and decision record: `tools/layersentry/security/` and
 `docs/layersentry/evidence/security/README.md`. Live behavior remains at the
 status proven by current runner/Rocky Linux 9 evidence.
 
+## 13b. Locked-host relationship
+
+```text
+Verified LayerSentry release transaction
+  -> signed allowlisted repositories and exact package transaction
+  -> staged Rocky Linux 9 host policy
+  -> SELinux/firewalld/fapolicyd enforcement plus audit/AIDE evidence
+  -> narrow CloudStack-agent/libvirt/iSCSI/multipath mutable state
+
+Root SSH restriction
+  REQUIRES -> tested non-root key administrator + sudo
+  REQUIRES -> independently tested OOB break-glass path
+
+eBPF
+  PROVIDES -> optional detection telemetry
+  DOES_NOT_PROVIDE -> package/change prevention or authorization
+```
+
+Implementation and limitations: `LAYERSENTRY_LOCKED_HOST_PROFILE.md` and
+`tools/layersentry/appliance/`. Percona remains evidence-gated rather than an
+assumed CloudStack 4.22.1.1 database choice.
+
 ## 14. Support identity graph
 
 LayerSentry requires a proprietary installation/cluster support UUID so support cases can identify the exact installed product environment without exposing credentials.
