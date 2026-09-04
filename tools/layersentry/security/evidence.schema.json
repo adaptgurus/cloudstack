@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://layersentry.invalid/schemas/security-evidence-v1.json",
+  "title": "LayerSentry security validation evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "suite_id", "source_commit", "target", "started_at", "finished_at", "status", "results", "cleanup"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "suite_id": {"type": "string", "minLength": 1},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "base_url_sha256"],
+      "properties": {
+        "environment": {"type": "string", "minLength": 1},
+        "base_url_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["CI_VERIFIED", "LIVE_VERIFIED", "PARTIAL", "BLOCKED", "UNKNOWN", "NOT_TESTED"]},
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "role", "expected", "actual", "passed", "response_sha256"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "kind": {"enum": ["direct_url", "api", "api_object"]},
+          "role": {"enum": ["platform_admin", "department_admin", "department_user", "read_only"]},
+          "expected": {"type": "string", "minLength": 1},
+          "actual": {"type": "string", "minLength": 1},
+          "passed": {"type": "boolean"},
+          "http_status": {"type": "integer", "minimum": 100, "maximum": 599},
+          "cloudstack_error_code": {"type": ["integer", "string", "null"]},
+          "response_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "cleanup": {"enum": ["not_required_read_only", "complete", "incomplete", "unknown"]}
+  }
+}
