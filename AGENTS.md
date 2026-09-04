@@ -10,6 +10,8 @@ Before changing code, read only the core context needed for every task:
 2. `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`
 3. the assigned file under `docs/layersentry/codex/` when working in a scoped workstream.
 
+For cross-cutting architecture/continuity work, use `docs/layersentry/LAYERSENTRY_KNOWLEDGE_GRAPH.md` to locate the authoritative related architecture, environment, policy and evidence sources. Do not treat the knowledge graph as a replacement for current live/source evidence.
+
 Then fetch the actual current refs and inspect the worktree:
 
 ```bash
@@ -28,11 +30,76 @@ Read specialist documents only when the task requires them:
 - control-plane HA/XaaS/failure-domain/future-version work: `docs/layersentry/LAYERSENTRY_CONTROL_PLANE_XAAS_AND_FUTURE_UPGRADE_POLICY.md`
 - release/upgrade/IP/supply-chain work: `docs/layersentry/LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`
 - upstream/core-delta/rebase review: `docs/layersentry/LAYERSENTRY_UPSTREAM_DIFF.md`
+- DR architecture: `docs/layersentry/LAYERSENTRY_DRAAS_ARCHITECTURE.md`
 - four-agent local operation: `docs/layersentry/CODEX_4_AGENT_RUNBOOK.md`
 
 Historical re-audits and next-chat handoffs are not mandatory startup context after their findings have been incorporated into the canonical Super Master Context.
 
 Repository/workflow/live evidence overrides historical text. Never use a SHA from documentation as permission to reset a branch.
+
+## Research-first change gate
+
+Before implementing a **significant** architecture, infrastructure, backend, UI/UX, integration, storage, DR, security, installer, release or automation change:
+
+1. identify and validate the current approach and current source/runtime state;
+2. verify the relevant version-pinned official documentation/source;
+3. research credible alternatives;
+4. compare reliability, maintainability, performance, security, scalability, operational simplicity and long-term supportability;
+5. retain the established approach unless a proposed change has a clearly defensible improvement;
+6. record the decision/rationale and its evidence before implementation.
+
+Do not refactor or replace an established design merely to make it different. The burden of proof is on the proposed optimization.
+
+For significant decisions, record:
+
+1. existing approach;
+2. advantages/disadvantages;
+3. alternatives researched;
+4. recommended approach;
+5. why it is superior;
+6. implementation impact;
+7. risks/mitigations;
+8. testing/validation performed;
+9. rollback/recovery procedure;
+10. final production-readiness status.
+
+## Mandatory engineering lifecycle
+
+For every meaningful change, follow this lifecycle unless a step is genuinely not applicable and the evidence record says why:
+
+```text
+Research
+ -> Design Review
+ -> Implementation
+ -> Testing
+ -> Failure / Edge-Case Validation
+ -> Optimization Review
+ -> Documentation
+ -> Knowledge-Graph Update
+ -> Super Master Context / AGENTS.md update when stable policy changed
+ -> Git Commit
+ -> Final Verification
+```
+
+A change is not complete merely because source compiles or the implementation looks correct.
+
+Required test coverage is proportional to the affected surface and includes, where applicable:
+
+- functional and regression testing;
+- GUI/UI/UX and browser validation;
+- backend/API validation;
+- authentication/authorization and direct-API negative tests;
+- install/deploy and idempotent rerun/resume;
+- service start/stop/restart/recovery;
+- error/edge cases;
+- performance/resource-efficiency checks;
+- security configuration and trust-boundary tests;
+- upgrade and rollback/recovery;
+- backup/restore/DR;
+- cross-component integration;
+- CloudStack browser workflow validation;
+- Rocky Linux 9 compatibility;
+- revalidation of affected existing functionality after significant changes.
 
 ## Non-negotiable architecture
 
@@ -109,11 +176,36 @@ At minimum:
 - add regression coverage and live validation at the correct evidence gate;
 - keep unresolved root cause as `UNKNOWN`/`SUPPORTED` rather than fabricating certainty.
 
-## Secrets
+## Secrets and temporary development credentials
 
-Never commit, echo into logs, or put into browser code passwords, tokens, API secrets, signing/license private keys, reusable SSH private keys, DB credentials or customer credentials.
+Never commit, echo into logs, put into browser code, or persist in documentation plaintext passwords, tokens, API secrets, signing/license private keys, reusable SSH private keys, DB credentials or customer credentials.
 
-Use approved secret stores/runtime injection/ephemeral credentials. If a secret is exposed, treat it as compromised and rotate it.
+Temporary development credentials supplied by the authorized operator are valid for the current test lifecycle, but their **values remain runtime-only**. The repository may document identities and logical secret references, not the plaintext values.
+
+Current development identities/secret references are:
+
+```text
+WSL Ubuntu 22.04 user: opc
+  secret reference: LAYERSENTRY_DEV_WSL_PASSWORD
+
+Rocky Linux 9 acceptance VM user: root
+  secret reference: LAYERSENTRY_DEV_ROCKY_ROOT_PASSWORD
+
+CloudStack development browser/API user: admin
+  secret reference: LAYERSENTRY_DEV_CLOUDSTACK_ADMIN_PASSWORD
+```
+
+Use approved secret stores/runtime injection/ephemeral credentials. If a secret is exposed beyond its authorized channel, treat it as compromised and rotate it.
+
+## Rocky Linux 9 acceptance environment
+
+Rocky Linux 9 is the **primary final acceptance environment** for LayerSentry V1 runtime changes.
+
+WSL Ubuntu 22.04 and other environments may be used for source development, tooling or preliminary tests, but they cannot by themselves promote a runtime-affecting change to `LIVE_VERIFIED`.
+
+Final acceptance must exercise the applicable real behavior on the authorized Rocky Linux 9 LayerSentry environment, including relevant application functionality, dependencies, services, APIs, installation/deployment, browser UI/UX, integration, restart/recovery, backup/DR, security and upgrade/rollback behavior.
+
+For browser-facing changes, test the actual served LayerSentry/CloudStack UI with the release acceptance browser matrix. At minimum include current supported Chrome and Firefox unless a documented release exception applies.
 
 ## Change-risk and runtime mutation
 
@@ -134,7 +226,7 @@ If an operation may already be in flight after a timeout/refresh, inspect that e
 
 ## Mandatory live validation path
 
-For every LayerSentry **source, configuration, installer, workflow or automation change that can affect runtime behavior**, source/CI validation is necessary but not sufficient. Before the change can be labeled `LIVE_VERIFIED`, it must be exercised against the authorized LayerSentry test VM/environment using the `adaptgurus/cozystack` GitHub runner/integration path and the exact source/artifact being claimed.
+For every LayerSentry **source, configuration, installer, workflow or automation change that can affect runtime behavior**, source/CI validation is necessary but not sufficient. Before the change can be labeled `LIVE_VERIFIED`, it must be exercised against the authorized LayerSentry Rocky Linux 9 test VM/environment using the `adaptgurus/cozystack` GitHub runner/integration path and the exact source/artifact being claimed, unless another durable validation path is explicitly approved.
 
 Required rules:
 
@@ -142,12 +234,37 @@ Required rules:
 - use a versioned runner workflow or otherwise durable runner evidence for deployment/test execution;
 - record exact source commit, workflow/run/job/artifact identifiers, target scope, assertions, mutations and rollback state;
 - direct SSH access to an authorized test VM may be used from the controlled runner/operator path for read-only discovery, deployment, diagnostics and bounded validation when appropriate; SSH is a transport, not permission to bypass R0-R4 safeguards;
-- SSH credentials/private keys must come from approved runtime secret injection or existing authorized access and must never be committed, printed in logs, embedded in artifacts or copied into browser code;
+- SSH credentials/private keys/passwords must come from approved runtime secret injection or existing authorized access and must never be committed, printed in logs, embedded in artifacts or copied into browser code;
 - validate behavior through the product/API plus host/guest evidence where relevant rather than relying only on process state or HTTP 200;
 - if live validation is blocked or unavailable, keep the result at `SOURCE_COMPLETE`, `CI_VERIFIED`, `NOT_TESTED` or another truthful lower status; never infer `LIVE_VERIFIED`;
 - documentation-only changes do not require a meaningless VM mutation, but any runtime procedure or product behavior introduced by documentation must be live-tested when its implementation is claimed.
 
-For Backup/DR/storage changes, live validation must additionally prove the exact storage/provider path being claimed. Where point-in-time recovery is supported, test at least the latest recovery point and an older retained checkpoint on disposable/approved data, verify expected data and network mapping, and exercise a relevant negative/retry case before stronger certification.
+For Backup/DR/storage changes, live validation must additionally prove the exact storage/provider path being claimed. Where point-in-time recovery is supported, test at least the latest recovery point and an older retained checkpoint on disposable/approved data, verify expected data and network mapping, and exercise a relevant negative/retry/idempotency case before stronger certification.
+
+## DR architecture invariant
+
+The current selected DR direction is documented in `LAYERSENTRY_DRAAS_ARCHITECTURE.md` and its revalidation evidence.
+
+Key rules:
+
+- one LayerSentry provider-neutral Protection Plan and Recovery Point experience;
+- prefer supported CloudStack-native operations when they meet the exact requirement;
+- prefer certified storage-native replication for low-RPO DR (for example LINSTOR/DRBD, Ceph RBD or enterprise-array replication);
+- use libvirt backup/checkpoint APIs as the generic QCOW2/file-backed KVM fallback rather than making a raw QMP/NBD protocol the LayerSentry product boundary;
+- keep CloudStack NAS B&R as baseline/fallback/long-retention recovery;
+- no `rsync` primary running-VM replication engine;
+- hot replica and historical PITR catalog are separate;
+- no automatic failover without witness/quorum and safe fencing/exclusivity;
+- planned failover/failback is certified before emergency automatic failover;
+- provider/topology capability determines which RPO tiers the UI may offer.
+
+## Support Cluster UUID
+
+LayerSentry requires a durable proprietary Support Cluster UUID for installation/support identity. It is an identifier, not an authentication secret.
+
+Do not invent or change it casually. The installer/support feature must generate/store/expose it through the defined product path, it must survive normal reboot/update, and the current value must be established from live evidence before being used in a support case.
+
+Until it is implemented/discovered on the current lab, report it as `UNKNOWN`/`PENDING`; never fabricate a UUID from a VM/CloudStack identifier.
 
 ## V1 product invariants
 
@@ -183,6 +300,16 @@ Agents do not merge themselves into the shared integration branch unless explici
 
 Do not run four heavy builds or conflicting live mutations simultaneously on the same Hyper-V/runner target.
 
+## Knowledge-graph maintenance
+
+`docs/layersentry/LAYERSENTRY_KNOWLEDGE_GRAPH.md` is the stable relationship/navigation layer.
+
+After a meaningful change, update the graph when the change creates or changes an important durable relationship among product components, environments, repositories, architecture, dependencies, evidence, operations or support flows.
+
+Do not put volatile HEADs, workflow IDs, passwords, live IPs or transient blockers into the graph. Point to the progress ledger/evidence instead.
+
+Troubleshooting findings that become reusable operating knowledge should connect symptom -> evidence -> confirmed/UNKNOWN root cause -> fix -> regression test -> live revalidation -> runbook/documentation.
+
 ## Validation and handoff
 
 Prefer small atomic commits. Run narrow checks first, then broader relevant checks. Do not weaken tests/security merely to make a build pass.
@@ -192,10 +319,12 @@ Every workstream handoff states:
 - repository/branch/base/final commit;
 - files changed;
 - CloudStack-core impact;
+- research/design decision when significant;
 - tests/checks actually run and their real results;
 - any runtime mutation and exact target;
 - known limitations/blockers;
 - rollback/retry state where applicable;
+- knowledge-graph/context update when applicable;
 - next evidence gate.
 
 Leave the worktree clean or explain remaining uncommitted files.
@@ -204,4 +333,4 @@ Leave the worktree clean or explain remaining uncommitted files.
 
 Do not copy volatile state into the Super Master Context. Current HEADs, workflow/artifact IDs, live addresses, blockers and completion evidence belong in `LAYERSENTRY_PROGRESS_LEDGER.md`.
 
-Update the Super Master Context only when a stable product, architecture, security, evidence or engineering policy changes.
+Update the Super Master Context only when a stable product, architecture, security, evidence, acceptance or engineering policy changes.
