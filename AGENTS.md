@@ -42,26 +42,31 @@ Repository/workflow/live evidence overrides historical text. Never use a SHA fro
 Before implementing a **significant** architecture, infrastructure, backend, UI/UX, integration, storage, DR, security, installer, release or automation change:
 
 1. identify and validate the current approach and current source/runtime state;
-2. verify the relevant version-pinned official documentation/source;
-3. research credible alternatives;
-4. compare reliability, maintainability, performance, security, scalability, operational simplicity and long-term supportability;
-5. retain the established approach unless a proposed change has a clearly defensible improvement;
-6. record the decision/rationale and its evidence before implementation.
+2. verify exact Apache CloudStack **4.22.1.1** source plus relevant version-pinned official documentation/API/release notes;
+3. identify the native CloudStack API/plugin/provider path first;
+4. evaluate XaaS only where exact 4.22.1.1 source/docs show it is available/applicable and beneficial for an external capability;
+5. research credible alternatives;
+6. for major work, comprehensively search materially relevant CloudStack open/closed GitHub issues, PRs, GitHub Discussions when available, Apache CloudStack user/developer community archives, release-note bug references, and relevant provider/dependency issue/forum history;
+7. compare reliability, maintainability, performance, security, scalability, operational simplicity, upgrade/rebase impact and long-term supportability;
+8. retain the established approach unless a proposed change has a clearly defensible improvement; if evidence shows a materially better approach, change the design rather than defending the existing one;
+9. record the decision/rationale and its evidence before implementation.
 
-Do not refactor or replace an established design merely to make it different. The burden of proof is on the proposed optimization.
+For major decisions, use the documentation/architecture-challenge and coverage-matrix requirements in the Super Master Context. Do not infer exact-version support from silence, moving `/latest/` docs, or a later CloudStack release.
 
 For significant decisions, record:
 
 1. existing approach;
 2. advantages/disadvantages;
 3. alternatives researched;
-4. recommended approach;
-5. why it is superior;
-6. implementation impact;
-7. risks/mitigations;
-8. testing/validation performed;
-9. rollback/recovery procedure;
-10. final production-readiness status.
+4. native API/plugin/XaaS assessment;
+5. documentation/issues/discussion coverage summary;
+6. recommended approach;
+7. why it is superior;
+8. implementation impact;
+9. risks/mitigations;
+10. testing/validation performed;
+11. rollback/recovery procedure;
+12. final production-readiness status.
 
 ## Mandatory engineering lifecycle
 
@@ -107,7 +112,18 @@ Default decision: **do not rewrite CloudStack core**.
 
 Do not change CloudStack Java backend APIs/contracts, database schema, KVM agent/core orchestration, RBAC enforcement semantics, async-job semantics, internal Zone/Pod/Cluster/Host model, storage/network orchestration, upstream hypervisor implementations or upgrade model merely to simplify LayerSentry development.
 
-Prefer LayerSentry UI/product-profile changes, configuration, supported CloudStack APIs, LayerSentry-specific services/controllers, installers, CI, tests and validation tooling.
+After the research gate, prefer in order:
+
+1. LayerSentry UI/product-profile behavior;
+2. CloudStack configuration;
+3. native CloudStack 4.22.1.1 APIs;
+4. supported CloudStack plugin/provider/extension contracts;
+5. XaaS where exact 4.22.1.1 support and the external-resource lifecycle make it the better fit;
+6. LayerSentry-specific BFF/controller/orchestration using supported APIs/contracts;
+7. installer/bootstrap automation;
+8. narrow core/upstream change only when the above cannot satisfy the requirement.
+
+Never use XaaS or a custom LayerSentry service to create a second VM scheduler, RBAC/tenancy authority, quota authority or conflicting copy of CloudStack resource state.
 
 Any unavoidable core change requires the exception gate defined in the Super Master Context and an upstream-delta record.
 
@@ -209,20 +225,22 @@ For browser-facing changes, test the actual served LayerSentry/CloudStack UI wit
 
 ## Change-risk and runtime mutation
 
-Use the R0-R4 risk classes defined in the Super Master Context.
+Use the R0-R4 risk classes and the **standing disposable-test authorization** defined in the Super Master Context.
 
-Before R3/R4 operations such as network/storage/DB/firewall/topology/reboot/upgrade/DR/fencing/destructive changes:
+The owner has explicitly designated the LayerSentry development/acceptance lab as disposable and has granted ChatGPT/Codex standing authorization for R0-R4 work within that clearly identified test scope. This includes destructive VM/network/storage/DB/CloudStack/DR/fencing/upgrade/rebuild tests. Do **not** ask for repeated confirmation solely because a lab test is destructive.
 
-1. inspect current live state;
-2. verify the exact target;
-3. create a durable pre-action checkpoint;
-4. record rollback/recovery method;
-5. determine idempotency/deduplication behavior;
-6. ensure the current task scope authorizes the mutation;
-7. execute serially where conflicting actions could overlap;
-8. checkpoint the result immediately.
+Inside confirmed disposable LayerSentry test scope:
 
-If an operation may already be in flight after a timeout/refresh, inspect that exact operation before retrying. Never duplicate deployment, VM creation, backup, recovery, network/storage mutation or upgrade blindly.
+1. verify the exact target/environment boundary;
+2. inspect conflicting/in-flight operations when duplication could corrupt the test result;
+3. preserve enough source/workflow/evidence identifiers for reproducibility;
+4. use a checkpoint when useful, but it may be omitted under the Super Master Context's `DISPOSABLE_NO_CHECKPOINT` rule when loss is acceptable and deterministic recreation exists;
+5. execute the fastest defensible path, including rebuild/reset/reinstall when faster than repair;
+6. checkpoint the result/evidence after material milestones.
+
+This standing authorization satisfies the prior requirement for explicit task authorization for R3/R4 operations in the designated test environment. It does **not** authorize mutation of an unconfirmed customer/third-party/production target. If target scope is ambiguous, establish the boundary before mutating it.
+
+If an operation may already be in flight after a timeout/refresh, inspect that exact operation before retrying when duplicate execution could distort or corrupt the test.
 
 ## Mandatory live validation path
 
@@ -232,8 +250,8 @@ Required rules:
 
 - fetch the actual current `adaptgurus/cozystack` integration branch and inspect conflicting/in-flight workflows before any live mutation;
 - use a versioned runner workflow or otherwise durable runner evidence for deployment/test execution;
-- record exact source commit, workflow/run/job/artifact identifiers, target scope, assertions, mutations and rollback state;
-- direct SSH access to an authorized test VM may be used from the controlled runner/operator path for read-only discovery, deployment, diagnostics and bounded validation when appropriate; SSH is a transport, not permission to bypass R0-R4 safeguards;
+- record exact source commit, workflow/run/job/artifact identifiers, target scope, assertions, mutations and rollback/rebuild state;
+- direct SSH access to an authorized test VM may be used from the controlled runner/operator path for discovery, deployment, diagnostics and validation; SSH is a transport, not permission to cross the designated test-scope boundary;
 - SSH credentials/private keys/passwords must come from approved runtime secret injection or existing authorized access and must never be committed, printed in logs, embedded in artifacts or copied into browser code;
 - validate behavior through the product/API plus host/guest evidence where relevant rather than relying only on process state or HTTP 200;
 - if live validation is blocked or unavailable, keep the result at `SOURCE_COMPLETE`, `CI_VERIFIED`, `NOT_TESTED` or another truthful lower status; never infer `LIVE_VERIFIED`;
@@ -298,7 +316,7 @@ Default ownership:
 
 Agents do not merge themselves into the shared integration branch unless explicitly assigned integration responsibility. Only the integration/lead path updates the shared progress ledger by default.
 
-Do not run four heavy builds or conflicting live mutations simultaneously on the same Hyper-V/runner target.
+Parallelize independent research/source/CI work aggressively for speed. Serialize only heavy builds or lab mutations that actually conflict on the same target.
 
 ## Knowledge-graph maintenance
 
@@ -323,7 +341,7 @@ Every workstream handoff states:
 - tests/checks actually run and their real results;
 - any runtime mutation and exact target;
 - known limitations/blockers;
-- rollback/retry state where applicable;
+- rollback/retry/rebuild state where applicable;
 - knowledge-graph/context update when applicable;
 - next evidence gate.
 
