@@ -320,8 +320,10 @@ This historical run has been superseded for the DBaaS/APaaS-removal scope by run
 
 - full LayerSentry UI experience: the page/section/persona contract is now
   `DESIGN_DEFINED` in `LAYERSENTRY_UI_EXPERIENCE_SPEC.md`; shared token
-  unification and a Node 24 release-builder change are implementation work in
-  progress and require exact-commit CI/browser evidence before promotion;
+  unification is implemented and the Node 24 release builder is `CI_VERIFIED`
+  at UI source `840029fb7a6a352c163c3702a6dbf8911c069b3b` by workflow run
+  `33992024189` (artifact `9976970441`); exact-artifact Rocky deployment and
+  four-persona Chrome/Firefox evidence remain required before live promotion;
 - customer terminology: substantial work exists and current onboarding terminology passed live verification, but full role/context wrong-label audit remains pending;
 - installer: current V1 UI/resume/served-repair pins are aligned for the placeholder-removal scope, but CI-built UI artifact deployment, SELinux final state/policy, firewall-policy validation, appliance lockdown and signed update controls remain incomplete;
 - self-service foundation: upstream CloudStack components exist, but final LayerSentry Department Admin/User UX is not yet implemented/live-proven;
