@@ -229,13 +229,15 @@ def defaults_file(path, host, user, password, ca=None):
 
 def initialize_insecure_mysql_datadir(datadir=Path('/var/lib/mysql')):
     """Initialize only a demonstrably blank local datadir for immediate password rotation."""
+    require(not datadir.is_symlink(), 'MySQL datadir must not be a symlink')
     if (datadir / 'mysql').is_dir():
         return False
     entries = {entry.name for entry in datadir.iterdir()} if datadir.exists() else set()
-    require(entries <= {'lost+found'},
+    require(not entries,
             'MySQL datadir is neither initialized nor empty; inspect it before recovery')
     run(['install', '-d', '-o', 'mysql', '-g', 'mysql', '-m', '0750', str(datadir)])
-    run(['mysqld', '--initialize-insecure', '--user=mysql', '--datadir=' + str(datadir)])
+    run(['mysqld', '--no-defaults', '--initialize-insecure', '--user=mysql',
+         '--datadir=' + str(datadir)])
     require((datadir / 'mysql').is_dir(), 'MySQL insecure initialization did not create system schema')
     return True
 
@@ -311,15 +313,38 @@ class Installer:
         with tempfile.TemporaryDirectory(prefix='layersentry-db-', dir='/run') as temporary:
             auth = Path(temporary) / 'client.cnf'
             if self.c['mode'] == 'combined':
-                write_private('/etc/my.cnf.d/layersentry.cnf', '[mysqld]\n'
-                              'bind-address=127.0.0.1\ninnodb_rollback_on_timeout=1\n'
-                              'innodb_lock_wait_timeout=600\nmax_connections='
-                              + str(350 * self.c.get('management_nodes', 1))
-                              + '\nlog_bin=mysql-bin\nbinlog_format=ROW\nserver_id=1\n'
-                              'binlog_expire_logs_seconds=604800\ndefault-time-zone=+00:00\n', 0o644)
-                initialize_insecure_mysql_datadir()
-                run(['systemctl', 'enable', '--now', 'mysqld'])
-                run(['systemctl', 'restart', 'mysqld'])
+                mysql_config = ('[mysqld]\nbind-address=127.0.0.1\n'
+                                'innodb_rollback_on_timeout=1\ninnodb_lock_wait_timeout=600\nmax_connections='
+                                + str(350 * self.c.get('management_nodes', 1))
+                                + '\nlog_bin=mysql-bin\nbinlog_format=ROW\nserver_id=1\n'
+                                'binlog_expire_logs_seconds=604800\ndefault-time-zone=+00:00\n')
+                fresh = initialize_insecure_mysql_datadir()
+                bootstrap = Path('/run/layersentry-mysql-bootstrap.sql')
+                if fresh:
+                    write_private(bootstrap, "ALTER USER 'root'@'localhost' IDENTIFIED BY '"
+                                  + self.s['db_admin_password'] + "';\n")
+                    run(['chown', 'mysql:mysql', str(bootstrap)])
+                    write_private('/etc/my.cnf.d/layersentry.cnf', mysql_config
+                                  + 'skip_networking=ON\nmysqlx=OFF\ninit_file=' + str(bootstrap) + '\n', 0o644)
+                else:
+                    write_private('/etc/my.cnf.d/layersentry.cnf', mysql_config, 0o644)
+                try:
+                    run(['systemctl', 'enable', '--now', 'mysqld'])
+                    run(['systemctl', 'restart', 'mysqld'])
+                    if fresh:
+                        defaults_file(auth, 'localhost', 'root', self.s['db_admin_password'])
+                        require(mysql(auth, 'SELECT 1;') == '1', 'fresh database password verification failed')
+                except Exception:
+                    if fresh:
+                        subprocess.run(['systemctl', 'disable', '--now', 'mysqld'],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+                    raise
+                finally:
+                    if fresh:
+                        bootstrap.unlink(missing_ok=True)
+                if fresh:
+                    write_private('/etc/my.cnf.d/layersentry.cnf', mysql_config, 0o644)
+                    run(['systemctl', 'restart', 'mysqld'])
             defaults_file(auth, self.c['db_host'], 'root', self.s['db_admin_password'])
             try:
                 version = mysql(auth, 'SELECT VERSION();')

@@ -55,7 +55,7 @@ class InstallerTests(unittest.TestCase):
 
         with patch.object(installer, 'run', side_effect=command) as run:
             self.assertTrue(installer.initialize_insecure_mysql_datadir(datadir))
-        self.assertIn(['mysqld', '--initialize-insecure', '--user=mysql',
+        self.assertIn(['mysqld', '--no-defaults', '--initialize-insecure', '--user=mysql',
                        '--datadir=' + str(datadir)], [call.args[0] for call in run.call_args_list])
         with patch.object(installer, 'run') as run:
             self.assertFalse(installer.initialize_insecure_mysql_datadir(datadir))
@@ -68,6 +68,17 @@ class InstallerTests(unittest.TestCase):
         with patch.object(installer, 'run') as run, self.assertRaisesRegex(ValueError, 'neither initialized nor empty'):
             installer.initialize_insecure_mysql_datadir(datadir)
         run.assert_not_called()
+
+    def test_lost_found_and_symlink_mysql_datadirs_are_never_initialized(self):
+        datadir = self.root / 'mysql-with-lost-found'
+        (datadir / 'lost+found').mkdir(parents=True)
+        link = self.root / 'mysql-link'
+        link.symlink_to(datadir, target_is_directory=True)
+        for candidate in (datadir, link):
+            with self.subTest(candidate=candidate), patch.object(installer, 'run') as run, \
+                    self.assertRaises(ValueError):
+                installer.initialize_insecure_mysql_datadir(candidate)
+            run.assert_not_called()
 
     def test_exact_version_and_series_rejection(self):
         for key, value in [('management_package', 'cloudstack-management'), ('mysql_series', '8.4'), ('mysql_client_package', 'mysql-8.0.46.x86_64')]:
