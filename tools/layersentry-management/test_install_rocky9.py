@@ -44,6 +44,31 @@ class InstallerTests(unittest.TestCase):
     def test_combined_configuration(self):
         installer.validate(self.config, self.secrets)
 
+    def test_blank_mysql_datadir_is_initialized_insecurely_for_immediate_rotation(self):
+        datadir = self.root / 'mysql'
+        datadir.mkdir()
+
+        def command(argv, **_kwargs):
+            if argv[0] == 'mysqld':
+                (datadir / 'mysql').mkdir()
+            return ''
+
+        with patch.object(installer, 'run', side_effect=command) as run:
+            self.assertTrue(installer.initialize_insecure_mysql_datadir(datadir))
+        self.assertIn(['mysqld', '--initialize-insecure', '--user=mysql',
+                       '--datadir=' + str(datadir)], [call.args[0] for call in run.call_args_list])
+        with patch.object(installer, 'run') as run:
+            self.assertFalse(installer.initialize_insecure_mysql_datadir(datadir))
+            run.assert_not_called()
+
+    def test_ambiguous_mysql_datadir_is_never_initialized(self):
+        datadir = self.root / 'mysql-ambiguous'
+        datadir.mkdir()
+        (datadir / 'auto.cnf').write_text('server-uuid')
+        with patch.object(installer, 'run') as run, self.assertRaisesRegex(ValueError, 'neither initialized nor empty'):
+            installer.initialize_insecure_mysql_datadir(datadir)
+        run.assert_not_called()
+
     def test_exact_version_and_series_rejection(self):
         for key, value in [('management_package', 'cloudstack-management'), ('mysql_series', '8.4'), ('mysql_client_package', 'mysql-8.0.46.x86_64')]:
             with self.subTest(key=key), self.assertRaises(ValueError):

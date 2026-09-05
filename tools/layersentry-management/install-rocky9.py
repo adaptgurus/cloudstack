@@ -227,6 +227,19 @@ def defaults_file(path, host, user, password, ca=None):
                   + ('ssl-mode=VERIFY_IDENTITY\nssl-ca=' + ca + '\n' if ca else ''))
 
 
+def initialize_insecure_mysql_datadir(datadir=Path('/var/lib/mysql')):
+    """Initialize only a demonstrably blank local datadir for immediate password rotation."""
+    if (datadir / 'mysql').is_dir():
+        return False
+    entries = {entry.name for entry in datadir.iterdir()} if datadir.exists() else set()
+    require(entries <= {'lost+found'},
+            'MySQL datadir is neither initialized nor empty; inspect it before recovery')
+    run(['install', '-d', '-o', 'mysql', '-g', 'mysql', '-m', '0750', str(datadir)])
+    run(['mysqld', '--initialize-insecure', '--user=mysql', '--datadir=' + str(datadir)])
+    require((datadir / 'mysql').is_dir(), 'MySQL insecure initialization did not create system schema')
+    return True
+
+
 class Installer:
     def __init__(self, config, secrets):
         self.c, self.s = config, secrets
@@ -304,6 +317,7 @@ class Installer:
                               + str(350 * self.c.get('management_nodes', 1))
                               + '\nlog_bin=mysql-bin\nbinlog_format=ROW\nserver_id=1\n'
                               'binlog_expire_logs_seconds=604800\ndefault-time-zone=+00:00\n', 0o644)
+                initialize_insecure_mysql_datadir()
                 run(['systemctl', 'enable', '--now', 'mysqld'])
                 run(['systemctl', 'restart', 'mysqld'])
             defaults_file(auth, self.c['db_host'], 'root', self.s['db_admin_password'])
