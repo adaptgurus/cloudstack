@@ -88,6 +88,44 @@ class InstallerTests(unittest.TestCase):
                 installer.initialize_insecure_mysql_datadir(candidate)
             run.assert_not_called()
 
+    def recovery_installer(self):
+        state = installer.Installer.__new__(installer.Installer)
+        state.c = self.config
+        state.s = self.secrets
+        state.journal = {'stages': {'checkpoint': 'applied', 'packages': 'applied',
+                                    'database': 'in_progress'}}
+        return state
+
+    def test_database_bootstrap_recovery_requires_empty_cloudstack_schemas(self):
+        datadir = self.root / 'mysql-recovery'
+        (datadir / 'mysql').mkdir(parents=True)
+        (datadir / 'auto.cnf').write_text('server_uuid=test')
+        state = self.recovery_installer()
+        stopped = type('Result', (), {'returncode': 3})()
+        with patch.object(installer, 'MYSQL_DATADIR', datadir), \
+                patch.object(installer, 'MYSQL_BOOTSTRAP', self.root / 'absent.sql'), \
+                patch.object(installer, 'RUNTIME_DIR', self.root), \
+                patch.object(installer, 'write_private'), patch.object(installer, 'run'), \
+                patch.object(installer, 'mysql', side_effect=['1', '0']), \
+                patch.object(installer.subprocess, 'run', return_value=stopped), \
+                patch.object(state, 'save') as save:
+            state.recover_database_bootstrap()
+        self.assertNotIn('database', state.journal['stages'])
+        save.assert_called_once()
+
+        state = self.recovery_installer()
+        with patch.object(installer, 'MYSQL_DATADIR', datadir), \
+                patch.object(installer, 'MYSQL_BOOTSTRAP', self.root / 'absent.sql'), \
+                patch.object(installer, 'RUNTIME_DIR', self.root), \
+                patch.object(installer, 'write_private'), patch.object(installer, 'run'), \
+                patch.object(installer, 'mysql', side_effect=['1', '1']), \
+                patch.object(installer.subprocess, 'run', return_value=stopped) as systemctl, \
+                patch.object(state, 'save') as save, self.assertRaisesRegex(ValueError, 'schema exists'):
+            state.recover_database_bootstrap()
+        self.assertEqual('in_progress', state.journal['stages']['database'])
+        save.assert_not_called()
+        self.assertGreaterEqual(systemctl.call_count, 2)
+
     def test_exact_version_and_series_rejection(self):
         for key, value in [('management_package', 'cloudstack-management'), ('mysql_series', '8.4'), ('mysql_client_package', 'mysql-8.0.46.x86_64')]:
             with self.subTest(key=key), self.assertRaises(ValueError):

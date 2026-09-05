@@ -19,6 +19,9 @@ from urllib.parse import parse_qsl
 
 STATE = Path('/var/lib/layersentry/installation')
 SCRIPT_DIR = Path(__file__).resolve().parent
+MYSQL_DATADIR = Path('/var/lib/mysql')
+MYSQL_BOOTSTRAP = Path('/run/layersentry-mysql-bootstrap.sql')
+RUNTIME_DIR = Path('/run')
 
 
 def require(condition, message):
@@ -227,8 +230,9 @@ def defaults_file(path, host, user, password, ca=None):
                   + ('ssl-mode=VERIFY_IDENTITY\nssl-ca=' + ca + '\n' if ca else ''))
 
 
-def initialize_insecure_mysql_datadir(datadir=Path('/var/lib/mysql')):
+def initialize_insecure_mysql_datadir(datadir=None):
     """Initialize only a demonstrably blank local datadir for immediate password rotation."""
+    datadir = MYSQL_DATADIR if datadir is None else Path(datadir)
     require(not datadir.is_symlink(), 'MySQL datadir must not be a symlink')
     if (datadir / 'mysql').is_dir():
         return False
@@ -240,6 +244,14 @@ def initialize_insecure_mysql_datadir(datadir=Path('/var/lib/mysql')):
          '--datadir=' + str(datadir)])
     require((datadir / 'mysql').is_dir(), 'MySQL insecure initialization did not create system schema')
     return True
+
+
+def combined_mysql_configuration(config):
+    return ('[mysqld]\nbind-address=127.0.0.1\n'
+            'innodb_rollback_on_timeout=1\ninnodb_lock_wait_timeout=600\nmax_connections='
+            + str(350 * config.get('management_nodes', 1))
+            + '\nlog_bin=mysql-bin\nbinlog_format=ROW\nserver_id=1\n'
+            'binlog_expire_logs_seconds=604800\ndefault-time-zone=+00:00\n')
 
 
 class Installer:
@@ -316,13 +328,9 @@ class Installer:
         with tempfile.TemporaryDirectory(prefix='layersentry-db-', dir='/run') as temporary:
             auth = Path(temporary) / 'client.cnf'
             if self.c['mode'] == 'combined':
-                mysql_config = ('[mysqld]\nbind-address=127.0.0.1\n'
-                                'innodb_rollback_on_timeout=1\ninnodb_lock_wait_timeout=600\nmax_connections='
-                                + str(350 * self.c.get('management_nodes', 1))
-                                + '\nlog_bin=mysql-bin\nbinlog_format=ROW\nserver_id=1\n'
-                                'binlog_expire_logs_seconds=604800\ndefault-time-zone=+00:00\n')
+                mysql_config = combined_mysql_configuration(self.c)
                 fresh = initialize_insecure_mysql_datadir()
-                bootstrap = Path('/run/layersentry-mysql-bootstrap.sql')
+                bootstrap = MYSQL_BOOTSTRAP
                 if fresh:
                     write_private(bootstrap, "ALTER USER 'root'@'localhost' IDENTIFIED BY '"
                                   + self.s['db_admin_password'] + "';\n")
@@ -374,6 +382,37 @@ class Installer:
                        '-i', self.c['management_ip']]}
             run([sys.executable, '-c', 'import json,runpy,sys; p=json.load(sys.stdin); sys.argv=[p["path"]]+p["args"]; runpy.run_path(p["path"],run_name="__main__")'],
                 data=json.dumps(payload), env=env)
+
+    def recover_database_bootstrap(self):
+        require(self.c['mode'] == 'combined' and self.c['initialize_database'],
+                'bootstrap recovery is only valid for a combined fresh database')
+        require(self.journal['stages'].get('checkpoint') == 'applied'
+                and self.journal['stages'].get('packages') == 'applied'
+                and self.journal['stages'].get('database') == 'in_progress',
+                'journal is not at the guarded database bootstrap recovery point')
+        require((MYSQL_DATADIR / 'mysql').is_dir()
+                and (MYSQL_DATADIR / 'auto.cnf').is_file(),
+                'initialized MySQL identity is incomplete')
+        require(not MYSQL_BOOTSTRAP.exists(),
+                'temporary bootstrap input still exists; stop for protected inspection')
+        active = subprocess.run(['systemctl', 'is-active', '--quiet', 'mysqld'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+        require(active.returncode != 0, 'database service must be stopped before bootstrap recovery')
+        write_private('/etc/my.cnf.d/layersentry.cnf', combined_mysql_configuration(self.c), 0o644)
+        try:
+            run(['systemctl', 'enable', '--now', 'mysqld'])
+            with tempfile.TemporaryDirectory(prefix='layersentry-db-recovery-', dir=RUNTIME_DIR) as temporary:
+                auth = Path(temporary) / 'client.cnf'
+                defaults_file(auth, 'localhost', 'root', self.s['db_admin_password'])
+                require(mysql(auth, 'SELECT 1;') == '1', 'database administrator authentication failed')
+                require(mysql(auth, "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name IN ('cloud','cloud_usage');") == '0',
+                        'CloudStack schema exists; bootstrap recovery will not clear the journal')
+        except Exception:
+            subprocess.run(['systemctl', 'disable', '--now', 'mysqld'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            raise
+        del self.journal['stages']['database']
+        self.save()
 
     def management(self):
         with tempfile.TemporaryDirectory(prefix='layersentry-config-', dir='/run') as temporary:
@@ -466,7 +505,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
     parser.add_argument('--secrets', required=True)
-    parser.add_argument('--action', choices=['preflight', 'apply', 'resume', 'repair', 'status'], default='preflight')
+    parser.add_argument('--action', choices=['preflight', 'apply', 'resume', 'repair', 'status',
+                                             'recover-database-bootstrap'], default='preflight')
     args = parser.parse_args()
     os.umask(0o077)
     config = json.loads(private_file(args.config).read_text())
@@ -482,6 +522,11 @@ def main():
         installer = Installer(config, secrets)
         if args.action == 'status':
             print(json.dumps(installer.journal))
+        elif args.action == 'recover-database-bootstrap':
+            installer.preflight()
+            installer.recover_database_bootstrap()
+            print(json.dumps({'status': 'PARTIAL', 'recovery': 'database_bootstrap_recovered',
+                              'acceptance': 'normal installer resume and full acceptance still required'}))
         else:
             installer.preflight()
             installer.apply(repair=args.action == 'repair')
