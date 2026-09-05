@@ -318,6 +318,10 @@ This historical run has been superseded for the DBaaS/APaaS-removal scope by run
 
 ### PARTIAL
 
+- full LayerSentry UI experience: the page/section/persona contract is now
+  `DESIGN_DEFINED` in `LAYERSENTRY_UI_EXPERIENCE_SPEC.md`; shared token
+  unification and a Node 24 release-builder change are implementation work in
+  progress and require exact-commit CI/browser evidence before promotion;
 - customer terminology: substantial work exists and current onboarding terminology passed live verification, but full role/context wrong-label audit remains pending;
 - installer: current V1 UI/resume/served-repair pins are aligned for the placeholder-removal scope, but CI-built UI artifact deployment, SELinux final state/policy, firewall-policy validation, appliance lockdown and signed update controls remain incomplete;
 - self-service foundation: upstream CloudStack components exist, but final LayerSentry Department Admin/User UX is not yet implemented/live-proven;

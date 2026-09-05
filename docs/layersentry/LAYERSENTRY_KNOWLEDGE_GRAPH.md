@@ -449,7 +449,30 @@ New ChatGPT/Codex Session
 
 Never reconstruct volatile project status from this graph alone; follow its links to current source/evidence.
 
-## 17. Rocky installation and database recovery tooling
+## 17. Customer experience graph
+
+`LAYERSENTRY_UI_EXPERIENCE_SPEC.md` is the page-by-page presentation and
+information-architecture contract for the LayerSentry customer interface.
+
+```text
+CloudStack APIs + RBAC + resources
+  REMAIN_AUTHORITATIVE_FOR -> authorization and lifecycle
+  PRESENTED_BY -> LayerSentry role-aware navigation
+  RENDERED_THROUGH -> shared shell, tokens, page states and action patterns
+  COMPOSED_BY -> Quick Provision only where multiple supported operations apply
+  VALIDATED_BY -> exact-artifact four-persona Chrome/Firefox Rocky gate
+
+LayerSentry UI experience
+  INCLUDES -> authentication, dashboards, compute, storage, network, images
+  INCLUDES -> Kubernetes, object storage, infrastructure, protection, activity
+  INCLUDES -> identity, administration, support and exception states
+  EXCLUDES_FROM_V1 -> DBaaS and APaaS
+```
+
+Visual hiding never grants or removes authority. Optional feature visibility
+depends on permission plus real configuration, provider and prerequisite state.
+
+## 18. Rocky installation and database recovery tooling
 
 `tools/layersentry-management/install-rocky9.py` connects first-node combined
 DB/management provisioning or an external initialized DB join to the packaged

@@ -18,7 +18,7 @@
 <template>
   <div v-if="collapsed && $config.minilogo">
     <img
-      alt="Layersentry"
+      alt="LayerSentry"
       :style="{
         width: $config.theme['@mini-logo-width'],
         height: $config.theme['@mini-logo-height']
@@ -27,7 +27,7 @@
   </div>
   <div v-else-if="$config.logo">
     <img
-      alt="Layersentry"
+      alt="LayerSentry"
       :style="{
         width: $config.theme['@logo-width'],
         height: $config.theme['@logo-height']
@@ -45,7 +45,7 @@ export default {
   props: {
     title: {
       type: String,
-      default: 'Layersentry',
+      default: 'LayerSentry',
       required: false
     },
     showTitle: {
