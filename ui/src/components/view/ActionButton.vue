@@ -64,16 +64,17 @@
           )"
         :disabled="'disabled' in action ? action.disabled(resource, $store.getters) : false" >
         <a-button
-          :type="(primaryIconList.includes(action.icon) ? 'primary' : 'default')"
-          :shape="!dataView && ['PlusOutlined', 'plus-outlined'].includes(action.icon) ? 'round' : 'circle'"
-          :danger="dangerIconList.includes(action.icon)"
+          :aria-label="$t(action.hoverLabel || action.label)"
+          :type="(primaryIconList.includes(actionIcon(action)) ? 'primary' : 'default')"
+          :shape="!dataView && ['PlusOutlined', 'plus-outlined'].includes(actionIcon(action)) ? 'round' : 'circle'"
+          :danger="isDangerous(action)"
           style="margin-left: 5px"
           :size="size"
           @click="execAction(action)">
-          <span v-if="!dataView && ['PlusOutlined', 'plus-outlined'].includes(action.icon)">
+          <span v-if="!dataView && ['PlusOutlined', 'plus-outlined'].includes(actionIcon(action))">
             {{ $t(action.label) }}
           </span>
-          <render-icon v-if="(typeof action.icon === 'string')" :icon="action.icon" />
+          <render-icon v-if="(typeof actionIcon(action) === 'string')" :icon="actionIcon(action)" />
           <font-awesome-icon v-else :icon="action.icon" />
         </a-button>
       </a-badge>
@@ -84,16 +85,17 @@
             (dataView && action.dataView && ('show' in action ? action.show(resource, $store.getters) : true))
           )"
         :disabled="'disabled' in action ? action.disabled(resource, $store.getters) : false"
-        :type="(primaryIconList.includes(action.icon) ? 'primary' : 'default')"
-        :danger="dangerIconList.includes(action.icon)"
-        :shape="!dataView && ['PlusOutlined', 'plus-outlined', 'UserAddOutlined', 'user-add-outlined'].includes(action.icon) ? 'round' : 'circle'"
+        :aria-label="$t(action.hoverLabel || action.label)"
+        :type="(primaryIconList.includes(actionIcon(action)) ? 'primary' : 'default')"
+        :danger="isDangerous(action)"
+        :shape="!dataView && ['PlusOutlined', 'plus-outlined', 'UserAddOutlined', 'user-add-outlined'].includes(actionIcon(action)) ? 'round' : 'circle'"
         style="margin-left: 5px"
         :size="size"
         @click="execAction(action)">
-        <span v-if="!dataView && ['PlusOutlined', 'plus-outlined', 'UserAddOutlined', 'user-add-outlined'].includes(action.icon)">
+        <span v-if="!dataView && ['PlusOutlined', 'plus-outlined', 'UserAddOutlined', 'user-add-outlined'].includes(actionIcon(action))">
           {{ $t(action.label) }}
         </span>
-        <render-icon v-if="(typeof action.icon === 'string')" :icon="action.icon" />
+        <render-icon v-if="(typeof actionIcon(action) === 'string')" :icon="actionIcon(action)" />
         <font-awesome-icon v-else :icon="action.icon" />
       </a-button>
     </a-tooltip>
@@ -103,6 +105,7 @@
 <script>
 import { postAPI } from '@/api'
 import Console from '@/components/widgets/Console'
+import { isDestructiveAction, resolveActionIcon } from '@/config/actionPresentation'
 
 export default {
   name: 'ActionButton',
@@ -175,6 +178,12 @@ export default {
     }
   },
   methods: {
+    actionIcon (action) {
+      return resolveActionIcon(action)
+    },
+    isDangerous (action) {
+      return isDestructiveAction(action) || this.dangerIconList.includes(this.actionIcon(action))
+    },
     execAction (action) {
       action.resource = this.resource
       if (action.docHelp) {

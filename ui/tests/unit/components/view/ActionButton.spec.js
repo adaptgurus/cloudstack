@@ -94,6 +94,29 @@ describe('Components > View > ActionButton.vue', () => {
       expect(received).toContain(expected)
     })
 
+    it('keeps the API-backed action and payload while applying semantic presentation', async () => {
+      const action = {
+        label: 'label.action',
+        api: 'deleteTestResource',
+        showBadge: false,
+        icon: 'close-outlined',
+        dataView: false,
+        listView: true
+      }
+      const wrapper = factory({
+        props: { actions: [action], dataView: false, listView: true }
+      })
+
+      const button = wrapper.find('button')
+      expect(button.exists()).toBe(true)
+      expect(button.attributes('aria-label')).toBeTruthy()
+      expect(wrapper.html()).toContain('anticon-delete')
+      await button.trigger('click')
+      expect(wrapper.emitted('exec-action')[0][0]).toBe(action)
+      expect(action.api).toBe('deleteTestResource')
+      expect(action.icon).toBe('close-outlined')
+    })
+
     it('The action button badge  is displayed', (done) => {
       mockAxios.mockImplementation(() => Promise.resolve({
         testapinameresponse: {
