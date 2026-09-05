@@ -45,7 +45,7 @@ export function getDashboardRole (userInfo = {}, apis = {}, showProject = false)
 export function getDashboardQuickActions (apis = {}) {
   const actions = []
   if (hasApi(apis, 'deployVirtualMachine')) {
-    actions.push({ key: 'instance', label: 'label.vm.add', path: '/action/deployVirtualMachine' })
+    actions.push({ key: 'instance', label: 'label.layersentry.quick.provision', path: '/quick-provision' })
   }
   return actions
 }

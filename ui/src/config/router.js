@@ -214,7 +214,7 @@ export function asyncRouterMap () {
         name: 'quickProvision',
         hidden: !isLayersentryKvmProfile(),
         meta: {
-          title: 'Quick Provision',
+          title: 'label.layersentry.quick.provision',
           icon: 'RocketOutlined',
           permission: ['deployVirtualMachine']
         },

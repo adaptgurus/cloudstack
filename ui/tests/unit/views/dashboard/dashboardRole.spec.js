@@ -37,7 +37,7 @@ describe('LayerSentry dashboard roles', () => {
       deployVirtualMachine: {},
       createBucket: {}
     })).toEqual([
-      { key: 'instance', label: 'label.vm.add', path: '/action/deployVirtualMachine' }
+      { key: 'instance', label: 'label.layersentry.quick.provision', path: '/quick-provision' }
     ])
   })
 

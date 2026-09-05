@@ -27,6 +27,7 @@ const messages = {}
 // group. The zone wizard separately calls the Pod networking step Management
 // network because that is what the customer is configuring there.
 const layersentryEnglishTerminology = {
+  'label.layersentry.quick.provision': 'Quick Provision',
   'message.layersentry.kvm.select.site': 'Select a Site to check KVM availability.',
   'message.layersentry.kvm.checking': 'Checking KVM availability for the selected Site…',
   'message.layersentry.kvm.unavailable': 'The selected Site does not report KVM capability. Choose another Site or ask your administrator to configure KVM.',
