@@ -1,6 +1,6 @@
 # LayerSentry V1 — Super Master Context
 
-**Context schema:** 3.0  
+**Context schema:** 3.1  
 **Role:** canonical stable product, architecture, safety, validation and production-engineering contract  
 **Product baseline:** Apache CloudStack 4.22.1.1 with a LayerSentry KVM-first product layer
 
@@ -26,12 +26,14 @@ Use one source of truth for each kind of fact.
 | What are upgrade/IP/supply-chain rules? | `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md` |
 | What differs from upstream CloudStack? | `LAYERSENTRY_UPSTREAM_DIFF.md`, regenerated when required |
 | What is the DR target architecture? | `LAYERSENTRY_DRAAS_ARCHITECTURE.md` + current DR decision/evidence records |
-| What does CloudStack 4.22.1.x support? | exact source + version-pinned official Apache CloudStack documentation/release notes |
+| What does CloudStack 4.22.1.1 support? | exact 4.22.1.1 source + version-pinned official Apache CloudStack documentation/API docs/release notes, corroborated by relevant upstream issue/PR/discussion history |
 | What does one Codex workstream own? | assigned file under `docs/layersentry/codex/` |
 
 ### Conflict rule
 
 Do not average or guess. Resolve conflicts according to the table and gather fresher evidence. Repository/workflow/live evidence overrides historical handoffs.
+
+Official documentation/source defines documented support; GitHub issues, PRs, discussions, Apache mailing-list/community evidence and provider forums are mandatory diagnostic/decision inputs for major work but do not silently override the exact release source or official support contract.
 
 ### Historical-document rule
 
@@ -212,25 +214,96 @@ Before implementing a significant architecture, infrastructure, backend, storage
 
 1. establish the current source/runtime approach;
 2. verify version-pinned official documentation/source;
-3. research credible alternatives;
-4. compare reliability, maintainability, performance, security, scalability, operational simplicity and long-term supportability;
-5. keep the established approach unless an alternative provides a defensible improvement;
-6. document the decision before implementation.
+3. inspect the exact Apache CloudStack **4.22.1.1** source/API behavior relevant to the feature;
+4. identify the native CloudStack API/plugin/provider path and determine whether it already satisfies the requirement;
+5. evaluate XaaS only where it is actually available/applicable in the 4.22.1.1 source/contract and where the capability is genuinely external or native APIs are insufficient;
+6. research credible alternatives;
+7. search materially relevant upstream issues, PRs, discussions and community/operator evidence for known defects, limitations, regressions and proven operational patterns;
+8. compare reliability, maintainability, performance, security, scalability, operational simplicity, upgrade/rebase impact and long-term supportability;
+9. keep the established approach unless an alternative provides a defensible improvement;
+10. document the decision before implementation.
 
-Do not change an established approach merely for novelty or because it is easier to code.
+Do not change an established approach merely for novelty or because it is easier to code. Conversely, do not preserve the current LayerSentry design merely because it is already written: if research and evidence show a materially better approach, select the better approach and update the architecture/context before implementation.
+
+### 5.1 Mandatory documentation and architecture challenge gate
+
+For a **major** decision or change, research must cover all materially relevant authoritative documentation families, not only one convenient page. At minimum, as applicable, inspect:
+
+- exact Apache CloudStack 4.22.1.1 source and tests for the affected API/service/plugin/provider path;
+- 4.22.1.1 release notes and patch-specific fixes;
+- version-pinned 4.22.1.x installation, administration, concepts, API, developer, plugin/extension, upgrade, security and compatibility documentation;
+- known limitations and release-specific behavioral notes;
+- KVM/QEMU/libvirt documentation for affected hypervisor behavior;
+- Rocky/RHEL 9, SELinux and firewalld documentation for host/appliance behavior;
+- database documentation for the exact selected DB/version/topology;
+- storage/network/provider documentation for the exact product/protocol/driver/version being certified;
+- Kubernetes/CKS/CSI/CNI documentation for Kubernetes-facing behavior;
+- backup/DR/LB/WAF/ADC/provider documentation when those integrations are affected;
+- CI/build/signing/SBOM/provenance documentation when release engineering is affected.
+
+Do not infer support from silence. If the exact version/path is not documented or source-confirmed, record `UNKNOWN`, `PENDING` or an explicit experimental scope until tested.
+
+### 5.2 Native API vs XaaS vs LayerSentry controller decision gate
+
+For each major customer capability, explicitly answer in this order:
+
+1. **Can CloudStack 4.22.1.1 native APIs implement it correctly?** If yes, prefer the native path.
+2. **Is there an existing supported CloudStack plugin/provider/extension contract?** If yes, prefer it over a parallel LayerSentry engine when it meets requirements.
+3. **Is XaaS available and suitable in the exact 4.22.1.1 source/version for this external resource/lifecycle requirement?** Use it only when it improves separation/supportability without duplicating CloudStack authority.
+4. **Does LayerSentry need a BFF/controller/orchestration service?** Use one for multi-step/composite workflows, policy, provider abstraction, retries/idempotency, evidence and external integrations while keeping CloudStack authoritative.
+5. **Is a core CloudStack modification unavoidable?** Only then use the core-change exception gate.
+
+Never choose XaaS merely because it is easier to code. Never use XaaS or a LayerSentry controller to create a second VM scheduler, second tenancy/RBAC system, second quota/accounting authority or conflicting copy of CloudStack resource state.
+
+### 5.3 GitHub issues, PRs, discussions and community evidence for major work
+
+For major architectural, storage, network, HA, DR, security, upgrade, release, API, CKS or provider decisions, perform a comprehensive relevance search across the available upstream/community history. Search with feature names, API names, classes/plugins, provider names, version numbers and failure symptoms as appropriate.
+
+Review, where available and relevant:
+
+- Apache CloudStack GitHub **open and closed issues**;
+- merged, closed and open CloudStack pull requests touching the capability;
+- GitHub Discussions when enabled/available;
+- Apache CloudStack developer/user mailing-list archives and project community discussions;
+- release notes/changelogs and referenced bugs;
+- provider/dependency issue trackers and official forums for the exact integration;
+- credible operator reports only as secondary evidence.
+
+For major decisions, do not stop at the first matching issue. Review the materially relevant history sufficiently to identify recurring defects, rejected approaches, fixed regressions and version-specific caveats. Record the search scope/queries, review date, high-signal findings and unresolved conflicts. If a discussion source is unavailable, record that fact rather than pretending it was checked.
+
+Community evidence helps expose real-world failure modes but is not proof of official support; source/docs plus live tests remain authoritative for capability claims.
+
+### 5.4 Documentation coverage matrix
+
+Every major architecture decision should maintain, in the decision/evidence record or linked specialist document, a compact coverage matrix with at least:
+
+| Field | Requirement |
+| --- | --- |
+| source/document | exact URL/repository/path or document identifier |
+| version/date | exact version/tag/commit/date where available |
+| relevance | why it applies to the decision |
+| native API/plugin/XaaS finding | what supported mechanism exists |
+| limitations/bugs | relevant restrictions/issues/PRs/discussions |
+| alternative | credible competing design/product/path |
+| decision impact | keep/change/reject/defer and why |
+| evidence status | source-only/CI/live/unknown |
+
+The purpose is completeness of **materially relevant** evidence, not reading unrelated documentation. Research depth is proportional to blast radius: major architecture and production-certification decisions require the broadest review; small local changes may use a narrow evidence set.
 
 Every significant decision record includes:
 
 1. existing approach;
 2. advantages/disadvantages;
 3. alternatives researched;
-4. recommended approach;
-5. why it is superior;
-6. implementation impact;
-7. risks/mitigations;
-8. testing/validation performed;
-9. rollback/recovery procedure;
-10. production-readiness status.
+4. native API/plugin/XaaS assessment;
+5. documentation/issues/discussion coverage summary;
+6. recommended approach;
+7. why it is superior;
+8. implementation impact;
+9. risks/mitigations;
+10. testing/validation performed;
+11. rollback/recovery procedure;
+12. production-readiness status.
 
 ---
 
@@ -293,14 +366,16 @@ Do not change without a documented exception:
 - upstream hypervisor implementations;
 - upstream upgrade model.
 
-Prefer in order:
+Prefer in order, after the research gate:
 
 1. LayerSentry UI/product-profile behavior;
-2. configuration;
-3. supported CloudStack APIs;
-4. LayerSentry-specific controller/service;
-5. installer/bootstrap automation;
-6. narrow upstream patch only when alternatives cannot satisfy the requirement.
+2. CloudStack configuration;
+3. **native CloudStack 4.22.1.1 APIs**;
+4. supported CloudStack plugin/provider/extension contracts;
+5. **XaaS when exact 4.22.1.1 source/docs show it is applicable and superior for the external capability**;
+6. LayerSentry-specific BFF/controller/orchestration using supported APIs/contracts;
+7. installer/bootstrap automation;
+8. narrow upstream/core patch only when the alternatives cannot satisfy the requirement.
 
 Any core-change exception requires exact need, evidence supported interfaces are insufficient, affected subsystem/files, compatibility/security consequences, upgrade/rebase risk, regression tests, rollback/removal strategy and upstream-delta update.
 
@@ -308,15 +383,19 @@ Any core-change exception requires exact need, evidence supported interfaces are
 
 ## 8. Version and upstream-documentation discipline
 
-LayerSentry V1 targets **Apache CloudStack 4.22.1.1**.
+LayerSentry V1 targets **Apache CloudStack 4.22.1.1**. Do not silently design against `/latest/`, 4.23.x or the post-4.23 version line and then assume the feature exists in 4.22.1.1.
 
 For capability claims:
 
-1. prefer exact current source;
-2. use 4.22.1.1 release notes for patch-specific fixes;
-3. use version-pinned 4.22.1.x documentation;
-4. where exact 4.22.1.1 docs are unavailable, use closest 4.22.1.x page and cross-check source/release notes;
-5. never use moving `/latest/` documentation as sole authority.
+1. prefer exact 4.22.1.1 current source/tag/branch behavior;
+2. inspect the exact native API and implementation path before adding a LayerSentry abstraction;
+3. inspect exact plugin/provider/XaaS support in 4.22.1.1 before relying on it;
+4. use 4.22.1.1 release notes for patch-specific fixes;
+5. use version-pinned 4.22.1.x documentation;
+6. where exact 4.22.1.1 docs are unavailable, use closest 4.22.1.x page and cross-check source/release notes/tests;
+7. for major work, search relevant open/closed GitHub issues, PRs, discussions/community archives and provider issue history;
+8. never use moving `/latest/` documentation as sole authority;
+9. never backport a later-version capability merely because later docs describe it; treat any backport as an explicit engineering decision with source, test and upgrade/rebase implications.
 
 Stable product profile:
 
@@ -727,8 +806,9 @@ Evidence precedence:
 3. current source;
 4. version-pinned official source/docs;
 5. stable project contracts;
-6. historical handoffs;
-7. model inference only as labeled hypothesis.
+6. relevant upstream issue/PR/discussion/community evidence as corroboration;
+7. historical handoffs;
+8. model inference only as labeled hypothesis.
 
 Never invent:
 
@@ -772,8 +852,8 @@ Before live mutation:
 - inspect in-flight/conflicting workflows;
 - verify exact target/resource IDs;
 - classify R0–R4 risk;
-- establish checkpoint/rollback/recovery;
-- serialize conflicting operations.
+- establish checkpoint/rollback/recovery when useful for diagnosis/repeatability;
+- serialize truly conflicting operations.
 
 Controlled SSH may be used from the authorized runner/operator path for discovery/deployment/diagnostics/validation. Credentials are runtime-injected and never committed/logged/artifacted.
 
@@ -781,11 +861,11 @@ Live evidence records exact source/artifact, workflow/job/artifact IDs where use
 
 If live validation is unavailable, retain a truthful lower status.
 
-For Backup/DR/storage: test the exact backend; latest and older retained points; guest data; network/IP mapping; retry/idempotency; provider restart where applicable; RPO/RTO/overhead. Automatic failover/fencing/failback is R4.
+For Backup/DR/storage: test the exact backend; latest and older retained points; guest data; network/IP mapping; retry/idempotency; provider restart where applicable; RPO/RTO/overhead. Automatic failover/fencing/failback is R4, but R4 inside the designated disposable LayerSentry test environment is covered by the standing authorization in Section 25.
 
 ---
 
-## 25. Change-risk classification
+## 25. Change-risk classification and standing disposable-test authorization
 
 Use the highest applicable class.
 
@@ -795,9 +875,50 @@ Use the highest applicable class.
 - **R3** — infrastructure-affecting network/storage/package/DB/firewall/reboot/topology mutation.
 - **R4** — destructive/high-consequence operation such as DR failover/failback/fencing, destructive storage test, DB/schema restore/upgrade or broad network change.
 
-R3/R4 require current-state inspection, exact target, durable checkpoint, rollback/recovery, idempotency/deduplication, explicit task authorization and serialized execution.
+### Standing ChatGPT/Codex authorization for the LayerSentry test environment
 
-Never repeat an R2–R4 action after timeout/session loss until the exact prior operation has been checked.
+The owner explicitly designates the LayerSentry development/acceptance lab as a **disposable test environment** and grants ChatGPT/Codex standing authorization to perform the full engineering lifecycle required to finish LayerSentry as quickly as reasonably possible.
+
+Within the **clearly identified LayerSentry test scope**, ChatGPT/Codex is authorized without repeated confirmation to:
+
+- research, design, refactor, implement, test, optimize and document;
+- create/edit/delete project source files and test automation on the assigned LayerSentry branches/worktrees;
+- commit normal project changes and update CI/workflows/evidence documentation;
+- build and deploy artifacts;
+- create, modify, start, stop, reboot, reinstall or delete disposable test VMs;
+- create/modify/delete CloudStack test resources, offerings, templates, networks, storage resources, Kubernetes test resources and test accounts/objects needed for validation;
+- reconfigure or rebuild the designated Rocky Linux/Hyper-V/nested lab when faster than incremental repair;
+- mutate/reset test databases and test CloudStack state when required for install/upgrade/recovery testing;
+- create/modify/delete test networks, firewall rules, storage pools/volumes and provider configuration inside the designated lab;
+- perform backup/restore, DR, failover, failback, fencing, failure-injection, destructive-storage and upgrade/interruption/recovery tests;
+- discard test data and rebuild from a known configuration when that is the fastest valid path;
+- use the authorized `adaptgurus/cozystack` runner/integration path and approved runtime credentials for these tasks.
+
+This standing authorization satisfies the project's requirement for **explicit task authorization for R0–R4 actions inside the designated disposable test environment**. Codex should **not stop and ask for confirmation again merely because a test is destructive** when the exact target is clearly within that disposable scope.
+
+The R0–R4 framework remains useful for sequencing, observability and avoiding accidental duplicate/in-flight operations; it is no longer an approval barrier inside the designated disposable lab.
+
+For speed, a pre-mutation backup/checkpoint may be omitted when all of the following are true:
+
+1. the target is confirmed disposable test scope;
+2. loss of its data/state is acceptable;
+3. a deterministic recreation/reinstall path exists or the test explicitly intends destruction;
+4. skipping the checkpoint does not invalidate the result being tested.
+
+In that case record `DISPOSABLE_NO_CHECKPOINT` (or equivalent evidence note) and continue.
+
+Still required before destructive actions:
+
+- verify the exact target and environment boundary;
+- inspect whether the same mutation is already in flight when duplicate execution could corrupt the test result;
+- avoid leaking/committing secrets;
+- preserve enough source/workflow/evidence identifiers to reproduce or diagnose the result.
+
+**Authorization boundary:** this standing permission applies only to the clearly designated LayerSentry test/development/acceptance environment and assigned project repositories/branches. It does not silently authorize mutation of customer, third-party or production systems that have not been explicitly designated as disposable LayerSentry test scope.
+
+If a target cannot be confidently classified as test vs production/customer scope, stop that mutation and establish scope rather than guessing.
+
+Never repeat an R2–R4 action after timeout/session loss until the exact prior operation has been checked when duplication could distort or corrupt the test.
 
 ---
 
@@ -812,7 +933,7 @@ Default ownership:
 - C — Security/Validation;
 - D — DR/HA/Upgrade and runner automation.
 
-Agents do not self-merge into the shared integration branch unless explicitly assigned integration authority. Serialize heavy builds and conflicting live lab mutations.
+Agents do not self-merge into the shared integration branch unless explicitly assigned integration authority. Serialize heavy builds and conflicting live lab mutations, but parallelize independent research, source work, CI and non-conflicting tests to minimize calendar time.
 
 Every handoff records repository/branch/base/final commit, files changed, core impact, design decision, tests/evidence, runtime mutations, limitations, rollback state, knowledge/context updates and next gate.
 
@@ -915,6 +1036,7 @@ Durable project state is:
 - immutable evidence artifacts;
 - verified live state;
 - architecture/policy decisions;
+- research/documentation coverage records for major decisions;
 - knowledge graph.
 
 After meaningful work persist enough to resume from the first unmet gate.
@@ -940,7 +1062,7 @@ The prior `+5–7 man-day` advanced-DR placeholder is **superseded and must not 
 
 Current advanced multi-backend DR planning after native two-Zone proof is approximately **36–57 engineering man-days** for NAS/file-backed DR, LINSTOR/DRBD, a first enterprise-SAN family, PITR catalog, Test Recovery, recovery groups, planned/automatic failover, witness/fencing, failback, security and scale/failure testing. Additional storage families/providers add separate adapter/certification effort.
 
-Calendar duration can be shorter with safe parallelism, but production certification is constrained by integration, physical lab/failure-domain availability, destructive tests, performance/soak and evidence.
+Calendar duration can be shorter with safe parallelism. The disposable-test standing authorization should be used to remove unnecessary confirmation delays and to rebuild/reset the lab whenever that is faster, but production certification remains constrained by integration, physical lab/failure-domain availability, destructive tests, performance/soak and evidence.
 
 Re-estimate from current evidence at major milestones.
 
@@ -952,13 +1074,13 @@ This Super Master Context changes only when a **stable** product, architecture, 
 
 Do not duplicate the same rule across many files when a reference is sufficient. Keep detailed specialist content in specialist docs and use the knowledge graph for navigation.
 
-When CloudStack target version changes, repeat source/document compatibility research and provider validation before carrying forward capability claims.
+When CloudStack target version changes, repeat source/document/API/plugin/XaaS compatibility research and provider validation before carrying forward capability claims.
 
 ### Continuation instruction
 
 For a new ChatGPT/Codex session:
 
-> Continue LayerSentry from repository/workflow/live evidence, not memory. Read `AGENTS.md`, the Super Master Context, the Progress Ledger and assigned workstream. Use the Knowledge Graph to locate related decisions. Fetch actual CloudStack and cozystack refs before editing. Research significant alternatives before implementation, preserve CloudStack core, validate runtime-affecting work on Rocky Linux 9, never persist plaintext credentials, and never promote status beyond its evidence gate.
+> Continue LayerSentry from repository/workflow/live evidence, not memory. Read `AGENTS.md`, the Super Master Context, the Progress Ledger and assigned workstream. Use the Knowledge Graph to locate related decisions. Fetch actual CloudStack and cozystack refs before editing. For major work, verify exact Apache CloudStack 4.22.1.1 source/docs/APIs, check native APIs and supported plugins before XaaS or custom orchestration, evaluate XaaS only where exact-version support makes it appropriate, search relevant open/closed GitHub issues/PRs/discussions and Apache/provider community evidence, record the documentation coverage, and change the architecture if evidence shows a materially better approach. Preserve CloudStack authority/core unless an exception is proven. Use the standing disposable-test authorization to execute R0–R4 work in the designated LayerSentry test environment without repeated confirmation, including destructive rebuild/failure/DR/upgrade tests when useful. Validate runtime-affecting work on Rocky Linux 9, never persist plaintext credentials, never touch an unconfirmed production/customer target, and never promote status beyond its evidence gate.
 
 ---
 
@@ -966,6 +1088,6 @@ For a new ChatGPT/Codex session:
 
 The engineering principle is:
 
-> **Preserve CloudStack's mature engine. Make LayerSentry simple, secure, storage-aware, supportable, evidence-driven and inexpensive to carry forward to future releases.**
+> **Use CloudStack 4.22.1.1 native capabilities first, challenge every major design against exact source/docs/API/plugin/XaaS/community evidence, preserve CloudStack's mature authority, and make LayerSentry simple, secure, storage-aware, supportable, evidence-driven and inexpensive to carry forward.**
 
 The best change is the smallest supportable change that satisfies the requirement, improves a defensible engineering dimension, fails safely, can be diagnosed/upgraded/recovered, has explicit test evidence, updates durable project knowledge, and leaves the next engineering session with no need to guess what happened.
