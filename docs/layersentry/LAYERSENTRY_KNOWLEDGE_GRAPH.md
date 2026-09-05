@@ -15,6 +15,9 @@ AGENTS.md
 LAYERSENTRY_SUPER_MASTER_CONTEXT.md
   -> stable product + architecture + security + evidence contracts
 
+LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md
+  -> LayerSentry-managed RKE2 / CAPI / DBaaS / APaaS / Streaming specialist contract
+
 LAYERSENTRY_PROGRESS_LEDGER.md
   -> current HEADs / workflow IDs / artifacts / live observations / blockers
 
@@ -25,6 +28,7 @@ Specialist policy / architecture docs
   -> secure engineering
   -> upgrade/release/IP protection
   -> DRaaS architecture
+  -> K8s/Data Services architecture
   -> workstream contracts
   -> debugging runbook
 
@@ -34,7 +38,7 @@ Current repository + workflow evidence + live target
 
 Conflict precedence remains: live runtime -> workflow/artifact -> current source -> version-pinned upstream documentation -> stable project contracts -> historical handoffs.
 
-The optional accelerated schedule is `LAYERSENTRY_25_DAY_ACCELERATED_ACCEPTANCE_PLAN.md`. It links the existing release, UI, security, control-plane and DR contracts into a 25-calendar-day critical path with infrastructure deadlines and de-scope rules. Its schedule is `DESIGN_DEFINED`; it never overrides evidence gates or proves runtime readiness.
+The optional accelerated schedule is `LAYERSENTRY_25_DAY_ACCELERATED_ACCEPTANCE_PLAN.md`. It links the existing release, UI, security, control-plane and DR contracts into a 25-calendar-day critical path with infrastructure deadlines and de-scope rules. Its schedule is `DESIGN_DEFINED`; it never overrides evidence gates or proves runtime readiness. It predates the dedicated K8s/DBaaS/APaaS/Streaming workstream and is not a delivery estimate for that module.
 
 ## 2. Product graph
 
@@ -48,7 +52,11 @@ LayerSentry
   ADDS -> security hardening
   ADDS -> validation/evidence tooling
   ADDS -> storage-aware DR orchestration
-  EXCLUDES_V1 -> DBaaS/APaaS CloudStack-native placeholders
+  ADDS -> LayerSentry-managed RKE2/Kubernetes
+  ADDS -> DBaaS above Kubernetes
+  ADDS -> APaaS above Kubernetes
+  ADDS -> Streaming/Kafka above Kubernetes
+  DOES_NOT_ADD -> DBaaS/APaaS as CloudStack-core APIs/schema merely for product convenience
 ```
 
 ## 3. Repository graph
@@ -157,7 +165,58 @@ LayerSentry
   MUST_NOT_CREATE -> second VM scheduler
   MUST_NOT_CREATE -> second CloudStack inventory authority
   MAY_CREATE -> product/DR state outside CloudStack core
+  MAY_CREATE -> Kubernetes/Data Services product state without changing CloudStack core authority
 ```
+
+## 6a. LayerSentry K8s / Data Services graph
+
+```text
+LayerSentry UI/API
+  OWNS -> user experience / profiles / policy / compatibility / audit
+  -> Kubernetes API on LayerSentry management cluster
+
+LayerSentry Management RKE2
+  HOSTS -> CAPI
+  HOSTS -> CAPC
+  HOSTS -> CAPRKE2
+  HOSTS -> central Flux package reconciler
+
+CAPI
+  OWNS -> cluster/machine desired state
+  -> CAPC
+  -> CAPRKE2
+
+CAPC
+  OWNS -> CloudStack infrastructure belonging to CAPI Machines
+  USES -> CloudStack native API
+
+CAPRKE2
+  OWNS -> RKE2 bootstrap/control-plane lifecycle
+  PROVIDES -> automatic managed-node join
+
+CloudStack native API
+  REMAINS_AUTHORITY_FOR -> IaaS inventory/network/storage/IP/L4/project/account functions outside CAPC Machine ownership
+
+Central Flux
+  OWNS -> LayerSentry package desired state on remote CAPI clusters
+  MUST_NOT_DEPEND_ON -> tenant-selected Argo CD/Flux installation
+
+LayerSentry DBaaS
+  RUNS_ON -> LayerSentry-managed RKE2
+  USES -> OpenEverest/operator/provider adapters according to certified engine
+  REQUIRES -> certified storage + backup/upgrade/data-safety evidence
+
+LayerSentry APaaS
+  RUNS_ON -> LayerSentry-managed RKE2
+  MAY_INCLUDE -> OpenBao
+  MAY_INCLUDE -> Harbor
+
+LayerSentry Streaming
+  RUNS_ON -> LayerSentry-managed RKE2
+  USES -> Strimzi for Kafka
+```
+
+Detailed contract: `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`.
 
 ## 7. Backup and DR graph
 
@@ -186,6 +245,8 @@ LayerSentry DR Orchestration Plane
   OWNS -> RPO/RTO evidence
   DOES_NOT_OWN -> normal CloudStack VM scheduler/lifecycle authority
 ```
+
+Kubernetes/Data Services backup/DR providers integrate with the same LayerSentry DR truth model where cross-site protection is offered; they do not create a second fencing/failover authority.
 
 ## 8. DR provider decision graph
 
@@ -306,6 +367,39 @@ Traffic Switch Adapter
   MAY_USE -> certified stretched L2
 ```
 
+## 11a. Kubernetes storage and Frontend graph
+
+```text
+LayerSentry K8s Cluster
+  HAS_MANY -> StorageProfiles
+  HAS_MANY -> Frontends/VIPs
+
+StorageProfile
+  MAY_MAP_TO -> CloudStack node disk
+  MAY_MAP_TO -> CloudStack CSI block
+  MAY_MAP_TO -> CloudStack SharedFS/NFS
+  MAY_MAP_TO -> NFS CSI
+  MAY_MAP_TO -> certified OEM CSI
+  MAY_MAP_TO -> certified NVMe/TCP
+  MAY_MAP_TO -> advanced certified NVMe/RDMA
+
+CloudStack Disk Offering storageType=shared
+  DOES_NOT_IMPLY -> one raw block volume safely writable by all guest VMs
+
+CloudStack Shared FileSystem
+  PROVIDES -> NFS/RWX source for multi-node shared file access
+
+Frontend
+  OWNS_ONE -> externally managed VIP lifecycle
+  POINTS_TO -> application/backend
+  MAY_USE -> CloudStack L4 LB
+  MAY_USE -> Gateway API L7
+  MAY_USE -> certified hardware ADC/WAF
+
+Application
+  MAY_HAVE_MANY -> Frontends/VIPs
+```
+
 ## 12. Security graph
 
 ```text
@@ -313,11 +407,11 @@ CloudStack RBAC
   REMAINS -> server-side authorization boundary for CloudStack resources
 
 LayerSentry privileged service
-  MUST_AUTHZ -> exact DR/support/update action and exact tenant/resource
+  MUST_AUTHZ -> exact DR/support/update/K8s/Data Services action and exact tenant/resource
   USES -> least-privilege service identities
-  USES -> mTLS between trusted site components
+  USES -> mTLS between trusted site components where selected
   USES -> bounded retries/timeouts/idempotency
-  AUDITS -> failover/fencing/restore/delete/update operations
+  AUDITS -> failover/fencing/restore/delete/update/provision operations
 
 Secrets
   NEVER_FLOW_TO -> Git
@@ -341,6 +435,8 @@ New CloudStack/LayerSentry Release
   -> staging/canary
   -> production promotion
 ```
+
+Kubernetes/Data Services lifecycle separates package updates, QCOW2/RKE2 node-image updates, CNI/CSI changes, operators and database engines. See the specialist context.
 
 `LAYERSENTRY_UI_RELEASE_CONTRACT.md` defines the first transport-neutral UI
 artifact contract and links a CI build to its manifest, CycloneDX SBOM,
@@ -390,7 +486,7 @@ eBPF
 
 Implementation and limitations: `LAYERSENTRY_LOCKED_HOST_PROFILE.md` and
 `tools/layersentry/appliance/`. Percona remains evidence-gated rather than an
-assumed CloudStack 4.22.1.1 database choice.
+assumed CloudStack 4.22.1.1 management-database choice. OpenEverest/Percona operators for DBaaS are governed separately by the Kubernetes/Data Services module and exact compatibility evidence.
 
 ## 14. Support identity graph
 
@@ -441,10 +537,11 @@ New ChatGPT/Codex Session
   2 -> read LAYERSENTRY_SUPER_MASTER_CONTEXT.md
   3 -> read LAYERSENTRY_PROGRESS_LEDGER.md
   4 -> read assigned workstream
-  5 -> use this Knowledge Graph to locate related architecture/policy/evidence
-  6 -> fetch actual current repository + runner refs
-  7 -> inspect in-flight workflows/live target before mutation
-  8 -> resume first unmet evidence gate
+  5 -> read LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md when module applies
+  6 -> use this Knowledge Graph to locate related architecture/policy/evidence
+  7 -> fetch actual current repository + runner refs
+  8 -> inspect in-flight workflows/live target before mutation
+  9 -> resume first unmet evidence gate
 ```
 
 Never reconstruct volatile project status from this graph alone; follow its links to current source/evidence.
@@ -452,11 +549,12 @@ Never reconstruct volatile project status from this graph alone; follow its link
 ## 17. Customer experience graph
 
 `LAYERSENTRY_UI_EXPERIENCE_SPEC.md` is the page-by-page presentation and
-information-architecture contract for the LayerSentry customer interface.
+information-architecture contract for the base LayerSentry customer interface.
+The dedicated Kubernetes/Data Services service experience is additionally governed by `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`.
 
 ```text
 CloudStack APIs + RBAC + resources
-  REMAIN_AUTHORITATIVE_FOR -> authorization and lifecycle
+  REMAIN_AUTHORITATIVE_FOR -> CloudStack authorization and lifecycle
   PRESENTED_BY -> LayerSentry role-aware navigation
   RENDERED_THROUGH -> shared shell, tokens, page states and action patterns
   COMPOSED_BY -> Quick Provision only where multiple supported operations apply
@@ -464,9 +562,9 @@ CloudStack APIs + RBAC + resources
 
 LayerSentry UI experience
   INCLUDES -> authentication, dashboards, compute, storage, network, images
-  INCLUDES -> Kubernetes, object storage, infrastructure, protection, activity
+  INCLUDES -> Kubernetes, DBaaS, APaaS, Streaming, object storage, infrastructure, protection, activity
   INCLUDES -> identity, administration, support and exception states
-  EXCLUDES_FROM_V1 -> DBaaS and APaaS
+  REQUIRES -> capability/RBAC/provider gating for every optional module
 ```
 
 Visual hiding never grants or removes authority. Optional feature visibility
