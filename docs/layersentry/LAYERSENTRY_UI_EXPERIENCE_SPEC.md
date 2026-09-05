@@ -19,6 +19,34 @@ The experience uses one visual system: navy application chrome, teal interaction
 
 No page may label a resource healthy, protected, encrypted, HA-capable or DR-ready without a real supporting signal.
 
+## Functional-preservation invariant
+
+LayerSentry branding must not remove, disable, rename at the API boundary or
+change the payload of an existing authorized CloudStack operation. UI work may
+change layout, grouping, customer-facing wording, iconography and progressive
+disclosure while preserving:
+
+- every API-backed action available to the current role and resource state;
+- the original action object, API name, parameters and asynchronous-job flow;
+- authorized list, detail and deep-link routes;
+- configured storage, network, backup, Kubernetes and extension integrations;
+- advanced native workflows required by Platform/Support roles.
+
+Controls may be absent only when CloudStack authorization denies the API, the
+existing resource-state predicate makes the action invalid, an optional feature
+is not configured/usable, or the KVM-only V1 contract excludes a non-KVM choice.
+Presentation hiding is never authorization.
+
+Shared action icons are derived from the existing API verb without mutating or
+filtering the action: create/add/deploy, start, stop, restart, edit, migrate,
+attach, detach, restore and delete actions use consistent semantic icons.
+Destructive styling is based on the destructive API verb and does not alter the
+underlying confirmation or execution behavior.
+
+Every UI slice must test action-count/identity preservation, emitted action/API
+identity, authorized deep links and representative integration workflows in
+addition to visual and accessibility assertions.
+
 ## Persona navigation
 
 | Persona | Primary navigation | Advanced access |
