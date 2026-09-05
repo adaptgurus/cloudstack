@@ -32,10 +32,16 @@ disclosure while preserving:
 - configured storage, network, backup, Kubernetes and extension integrations;
 - advanced native workflows required by Platform/Support roles.
 
-Controls may be absent only when CloudStack authorization denies the API, the
-existing resource-state predicate makes the action invalid, an optional feature
-is not configured/usable, or the KVM-only V1 contract excludes a non-KVM choice.
-Presentation hiding is never authorization.
+Controls may be absent from the current rendered context only when CloudStack
+authorization denies the API, the existing resource-state predicate makes the
+action invalid, an optional feature/provider is not configured and usable, or
+the KVM-only V1 customer profile excludes a non-KVM choice. These conditions are
+presentation gates, not permission to delete or degrade the existing GUI route,
+component, action definition or integration. If the upstream GUI implements the
+workflow, it must remain functional when its original supported eligibility
+conditions are satisfied (including outside the KVM-focused customer profile).
+Presentation hiding is never authorization, and LayerSentry must not introduce a
+new denial where CloudStack authorizes an otherwise valid operation.
 
 Shared action icons are derived from the existing API verb without mutating or
 filtering the action: create/add/deploy, start, stop, restart, edit, migrate,
