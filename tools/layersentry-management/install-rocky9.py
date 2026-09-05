@@ -223,10 +223,11 @@ def mysql(defaults, sql):
     return run(['mysql', '--defaults-extra-file=' + str(defaults), '--batch', '--skip-column-names'], data=sql)
 
 
-def defaults_file(path, host, user, password, ca=None):
+def defaults_file(path, host, user, password, ca=None, socket=None):
     # Values are validated before this writer; no CLI password arguments.
     write_private(path, '[client]\nuser=' + user + '\npassword=' + password
                   + '\nhost=' + host + '\nconnect-timeout=15\n'
+                  + ('socket=' + socket + '\n' if socket else '')
                   + ('ssl-mode=VERIFY_IDENTITY\nssl-ca=' + ca + '\n' if ca else ''))
 
 
@@ -398,19 +399,47 @@ class Installer:
         active = subprocess.run(['systemctl', 'is-active', '--quiet', 'mysqld'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
         require(active.returncode != 0, 'database service must be stopped before bootstrap recovery')
-        write_private('/etc/my.cnf.d/layersentry.cnf', combined_mysql_configuration(self.c), 0o644)
+        recovery = RUNTIME_DIR / 'layersentry-mysql-recovery'
+        require(not recovery.exists(), 'database recovery runtime directory already exists')
+        recovery.mkdir(mode=0o700)
+        run(['chown', 'mysql:mysql', str(recovery)])
+        socket = recovery / 'mysql.sock'
+        restricted = (combined_mysql_configuration(self.c) + 'skip_networking=ON\nmysqlx=OFF\n'
+                      + 'socket=' + str(socket) + '\n')
+        write_private('/etc/my.cnf.d/layersentry.cnf', restricted, 0o644)
         try:
             run(['systemctl', 'enable', '--now', 'mysqld'])
             with tempfile.TemporaryDirectory(prefix='layersentry-db-recovery-', dir=RUNTIME_DIR) as temporary:
                 auth = Path(temporary) / 'client.cnf'
-                defaults_file(auth, 'localhost', 'root', self.s['db_admin_password'])
-                require(mysql(auth, 'SELECT 1;') == '1', 'database administrator authentication failed')
+                defaults_file(auth, 'localhost', 'root', self.s['db_admin_password'], socket=str(socket))
+                try:
+                    authenticated = mysql(auth, 'SELECT 1;') == '1'
+                except RuntimeError:
+                    authenticated = False
+                if not authenticated:
+                    defaults_file(auth, 'localhost', 'root', '', socket=str(socket))
+                    require(mysql(auth, 'SELECT 1;') == '1',
+                            'neither supplied nor empty local administrator authentication succeeded')
                 require(mysql(auth, "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name IN ('cloud','cloud_usage');") == '0',
                         'CloudStack schema exists; bootstrap recovery will not clear the journal')
+                if not authenticated:
+                    mysql(auth, "ALTER USER 'root'@'localhost' IDENTIFIED BY '"
+                          + self.s['db_admin_password'] + "';")
+                    defaults_file(auth, 'localhost', 'root', self.s['db_admin_password'], socket=str(socket))
+                    require(mysql(auth, 'SELECT 1;') == '1', 'database password assignment verification failed')
+            run(['systemctl', 'stop', 'mysqld'])
+            write_private('/etc/my.cnf.d/layersentry.cnf', combined_mysql_configuration(self.c), 0o644)
+            run(['systemctl', 'enable', '--now', 'mysqld'])
+            with tempfile.TemporaryDirectory(prefix='layersentry-db-recovery-check-', dir=RUNTIME_DIR) as temporary:
+                auth = Path(temporary) / 'client.cnf'
+                defaults_file(auth, 'localhost', 'root', self.s['db_admin_password'])
+                require(mysql(auth, 'SELECT 1;') == '1', 'normal database authentication failed')
         except Exception:
             subprocess.run(['systemctl', 'disable', '--now', 'mysqld'],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
             raise
+        finally:
+            shutil.rmtree(recovery, ignore_errors=True)
         del self.journal['stages']['database']
         self.save()
 
