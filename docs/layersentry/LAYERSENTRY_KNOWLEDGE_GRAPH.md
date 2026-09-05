@@ -448,3 +448,22 @@ New ChatGPT/Codex Session
 ```
 
 Never reconstruct volatile project status from this graph alone; follow its links to current source/evidence.
+
+## 17. Rocky installation and database recovery tooling
+
+`tools/layersentry-management/install-rocky9.py` connects first-node combined
+DB/management provisioning or an external initialized DB join to the packaged
+CloudStack schema/encryption utilities, exact RPM inputs, scoped firewalld rules,
+SELinux enforcement and a restricted stage journal/checkpoint. The existing
+join-only bootstrap retains its interface.
+
+`tools/layersentry-management/db-backup.py` connects a dedicated database account
+to native transactional dumps, a recovery-custodied CMS recipient certificate,
+scheduled backup retention, integrity checks and explicitly isolated restore
+checks. Database backup depends on separate management-key/configuration escrow
+for full CloudStack recovery. It does not imply off-site protection or PITR.
+
+The architecture decision, threat boundary, configuration contract, recovery
+procedure and acceptance gates are in
+`LAYERSENTRY_ROCKY9_INSTALLER_AND_DB_BACKUPS.md`. Current runtime results belong
+in the progress ledger and runner evidence.
