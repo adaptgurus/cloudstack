@@ -19,9 +19,17 @@ import { vueProps } from '@/vue-app'
 import { getAPI } from '@/api'
 
 export async function applyCustomGuiTheme (accountid, domainid) {
-  await fetch('config.json').then(response => response.json()).then(config => {
-    vueProps.$config = config
-  })
+  // main.js already loaded config.json with a cache-busting query string. Do not
+  // fetch config.json again here: a browser-cached copy can silently restore the
+  // old upstream logo, footer, API Docs setting and colours after startup.
+  //
+  // Layersentry distributions intentionally lock customer-facing identity. The
+  // upstream GUI-theme API remains available to the backend, but legacy/default
+  // CloudStack GUI themes must not override product branding or inject stale CSS.
+  if (vueProps.$config?.brandLocked === true) {
+    await applyStaticCustomization(vueProps.$config.favicon, null)
+    return
+  }
 
   let guiTheme
 
@@ -93,11 +101,11 @@ async function applyStaticCustomization (favicon, css) {
 
   let style = document.getElementById('guiThemeCSS')
   if (style != null) {
-    style.innerHTML = css
+    style.innerHTML = css || ''
   } else {
     style = document.createElement('style')
     style.setAttribute('id', 'guiThemeCSS')
-    style.innerHTML = css
+    style.innerHTML = css || ''
     document.body.appendChild(style)
   }
 }

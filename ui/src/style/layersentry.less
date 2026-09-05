@@ -1,0 +1,418 @@
+/*
+ * Layersentry presentation layer for Apache CloudStack 4.22.1.1.
+ * UI-only: no routes, permissions, API calls, form rules, or component logic.
+ */
+
+:root {
+  --ls-brand: #000f42;
+  --ls-nav: #071536;
+  --ls-primary: #1849b5;
+  --ls-primary-hover: #123a91;
+  --ls-bg: #f5f7fa;
+  --ls-surface: #ffffff;
+  --ls-surface-subtle: #f8fafc;
+  --ls-text: #344054;
+  --ls-text-strong: #101828;
+  --ls-text-muted: #667085;
+  --ls-border: #d0d5dd;
+  --ls-border-subtle: #e4e7ec;
+  --ls-focus: #84adff;
+  --ls-success: #14804a;
+  --ls-warning: #b54708;
+  --ls-danger: #b42318;
+  --ls-radius: 6px;
+  --ls-radius-lg: 10px;
+  --ls-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --ls-shadow-sm: 0 2px 8px rgba(16, 24, 40, 0.08);
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body:not(.dark-mode),
+body:not(.dark-mode) .ant-layout,
+body:not(.dark-mode) .layout-content {
+  background: var(--ls-bg);
+}
+
+/* Accessible, consistent keyboard focus without changing click behavior. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible,
+.ant-btn:focus-visible,
+.ant-input:focus-visible,
+.ant-select-focused .ant-select-selector,
+.ant-checkbox-wrapper:focus-within,
+.ant-radio-wrapper:focus-within {
+  outline: 2px solid var(--ls-focus) !important;
+  outline-offset: 2px;
+}
+
+/* Application shell */
+body:not(.dark-mode) .ant-layout-header {
+  background: var(--ls-surface);
+  border-bottom: 1px solid var(--ls-border-subtle);
+  box-shadow: none;
+}
+
+body:not(.dark-mode) .layout-content {
+  min-width: 0;
+}
+
+body:not(.dark-mode) .ant-breadcrumb {
+  color: var(--ls-text-muted);
+}
+
+body:not(.dark-mode) .ant-breadcrumb a {
+  color: var(--ls-text-muted);
+}
+
+body:not(.dark-mode) .ant-breadcrumb a:hover {
+  color: var(--ls-primary);
+}
+
+body:not(.dark-mode) .ant-page-header,
+body:not(.dark-mode) .page-header {
+  background: transparent;
+}
+
+body:not(.dark-mode) .ant-page-header-heading-title,
+body:not(.dark-mode) h1,
+body:not(.dark-mode) h2,
+body:not(.dark-mode) h3 {
+  color: var(--ls-text-strong);
+}
+
+/* Navigation: preserve CloudStack menu structure and RBAC visibility. */
+body:not(.dark-mode) .sider {
+  box-shadow: 1px 0 0 rgba(16, 24, 40, 0.08);
+}
+
+body:not(.dark-mode) .sider .ant-menu-dark,
+body:not(.dark-mode) .sider .ant-menu-dark .ant-menu-sub {
+  background: var(--ls-nav);
+}
+
+body:not(.dark-mode) .sider .ant-menu-item,
+body:not(.dark-mode) .sider .ant-menu-submenu-title {
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+body:not(.dark-mode) .sider .ant-menu-dark .ant-menu-item-selected {
+  background: rgba(255, 255, 255, 0.11);
+  font-weight: 600;
+}
+
+body:not(.dark-mode) .sider .ant-menu-dark .ant-menu-item-selected::after {
+  border-right-color: #ffffff;
+}
+
+/* Content surfaces */
+body:not(.dark-mode) .ant-card {
+  border-color: var(--ls-border-subtle);
+  border-radius: var(--ls-radius-lg);
+  box-shadow: var(--ls-shadow-xs);
+}
+
+body:not(.dark-mode) .ant-card-head {
+  min-height: 48px;
+  border-bottom-color: var(--ls-border-subtle);
+  padding: 0 20px;
+}
+
+body:not(.dark-mode) .ant-card-head-title {
+  color: var(--ls-text-strong);
+  font-weight: 600;
+}
+
+body:not(.dark-mode) .ant-card-body {
+  padding: 20px;
+}
+
+/* Tables: compact, readable and suitable for infrastructure data. */
+body:not(.dark-mode) .ant-table-wrapper {
+  max-width: 100%;
+}
+
+body:not(.dark-mode) .ant-table {
+  color: var(--ls-text);
+  border-radius: var(--ls-radius);
+}
+
+body:not(.dark-mode) .ant-table-container {
+  border-color: var(--ls-border-subtle);
+}
+
+body:not(.dark-mode) .ant-table-thead > tr > th {
+  background: var(--ls-surface-subtle);
+  border-bottom: 1px solid var(--ls-border);
+  color: var(--ls-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+body:not(.dark-mode) .ant-table-tbody > tr > td {
+  border-bottom-color: var(--ls-border-subtle);
+  padding-top: 11px;
+  padding-bottom: 11px;
+  vertical-align: middle;
+}
+
+body:not(.dark-mode) .ant-table-tbody > tr.ant-table-row:hover > td,
+body:not(.dark-mode) .ant-table-tbody > tr > td.ant-table-cell-row-hover {
+  background: #f9fbff;
+}
+
+body:not(.dark-mode) .ant-table-tbody > tr.ant-table-row-selected > td {
+  background: #f1f5ff;
+}
+
+body:not(.dark-mode) .ant-table-content {
+  overflow-x: auto;
+}
+
+body:not(.dark-mode) .ant-pagination-item,
+body:not(.dark-mode) .ant-pagination-prev .ant-pagination-item-link,
+body:not(.dark-mode) .ant-pagination-next .ant-pagination-item-link {
+  border-color: var(--ls-border);
+  border-radius: var(--ls-radius);
+}
+
+body:not(.dark-mode) .ant-pagination-item-active {
+  border-color: var(--ls-primary);
+}
+
+/* Forms */
+body:not(.dark-mode) .ant-form-item-label > label {
+  color: var(--ls-text);
+  font-weight: 500;
+}
+
+body:not(.dark-mode) .ant-input,
+body:not(.dark-mode) .ant-input-affix-wrapper,
+body:not(.dark-mode) .ant-select:not(.ant-select-customize-input) .ant-select-selector,
+body:not(.dark-mode) .ant-picker,
+body:not(.dark-mode) .ant-input-number {
+  border-color: var(--ls-border);
+  border-radius: var(--ls-radius);
+  box-shadow: none;
+  min-height: 38px;
+}
+
+body:not(.dark-mode) .ant-input:hover,
+body:not(.dark-mode) .ant-input-affix-wrapper:hover,
+body:not(.dark-mode) .ant-select:not(.ant-select-disabled):hover .ant-select-selector,
+body:not(.dark-mode) .ant-picker:hover,
+body:not(.dark-mode) .ant-input-number:hover {
+  border-color: #8098c9;
+}
+
+body:not(.dark-mode) .ant-form-item-explain-error {
+  color: var(--ls-danger);
+}
+
+body:not(.dark-mode) .ant-form-item-extra,
+body:not(.dark-mode) .ant-form-item-explain:not(.ant-form-item-explain-error) {
+  color: var(--ls-text-muted);
+}
+
+/* Buttons */
+.ant-btn {
+  border-radius: var(--ls-radius);
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.ant-btn-primary {
+  box-shadow: none;
+}
+
+body:not(.dark-mode) .ant-btn-default {
+  border-color: var(--ls-border);
+  color: var(--ls-text);
+}
+
+body:not(.dark-mode) .ant-btn-default:hover,
+body:not(.dark-mode) .ant-btn-default:focus {
+  border-color: var(--ls-primary);
+  color: var(--ls-primary);
+}
+
+body:not(.dark-mode) .ant-btn-dangerous,
+body:not(.dark-mode) .ant-btn-link.ant-btn-dangerous {
+  color: var(--ls-danger);
+}
+
+/* Modals and drawers */
+body:not(.dark-mode) .ant-modal-content,
+body:not(.dark-mode) .ant-drawer-content {
+  border-radius: var(--ls-radius-lg);
+}
+
+body:not(.dark-mode) .ant-modal-header {
+  border-bottom-color: var(--ls-border-subtle);
+  border-radius: var(--ls-radius-lg) var(--ls-radius-lg) 0 0;
+  padding: 18px 20px;
+}
+
+body:not(.dark-mode) .ant-modal-title {
+  color: var(--ls-text-strong);
+  font-weight: 600;
+}
+
+body:not(.dark-mode) .ant-modal-body {
+  padding: 20px;
+}
+
+body:not(.dark-mode) .ant-modal-footer {
+  border-top-color: var(--ls-border-subtle);
+  padding: 12px 20px;
+}
+
+/* Status and operational feedback. Existing icons/text remain authoritative. */
+body:not(.dark-mode) .ant-tag {
+  border-radius: 999px;
+  font-weight: 500;
+  line-height: 20px;
+  padding: 0 8px;
+}
+
+body:not(.dark-mode) .ant-alert {
+  border-radius: var(--ls-radius);
+}
+
+body:not(.dark-mode) .ant-empty-description {
+  color: var(--ls-text-muted);
+}
+
+body:not(.dark-mode) .ant-spin-text,
+body:not(.dark-mode) .ant-typography-secondary {
+  color: var(--ls-text-muted);
+}
+
+/* Login / password-reset shell. Authentication fields and handlers are unchanged. */
+body.userLayout,
+body.userLayout:not(.dark-mode) {
+  background: var(--ls-bg);
+}
+
+body.userLayout .user-layout {
+  min-height: 100vh;
+  position: relative;
+}
+
+body.userLayout .user-layout-container {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+body.userLayout .user-layout-header {
+  margin-bottom: 18px;
+}
+
+body.userLayout .user-layout-logo {
+  object-fit: contain;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-login {
+  width: min(408px, calc(100vw - 32px));
+  max-width: 408px;
+  background: var(--ls-surface);
+  border: 1px solid var(--ls-border-subtle);
+  border-radius: var(--ls-radius-lg);
+  box-shadow: var(--ls-shadow-sm);
+  padding: 28px 28px 24px;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-login .ant-tabs-nav {
+  margin-bottom: 22px;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-login .ant-tabs-tab {
+  color: var(--ls-text-muted);
+  font-weight: 500;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-login .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--ls-primary);
+  font-weight: 600;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-login .ant-form-item {
+  margin-bottom: 16px;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-login .ant-input,
+body.userLayout:not(.dark-mode) .user-layout-login .ant-input-affix-wrapper,
+body.userLayout:not(.dark-mode) .user-layout-login .ant-select-selector {
+  min-height: 44px;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-login .login-button {
+  height: 44px;
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-footer {
+  color: var(--ls-text-muted);
+  font-size: 13px;
+  padding: 0 16px;
+}
+
+body.userLayout:not(.dark-mode) .user-layout-footer a {
+  color: var(--ls-primary);
+}
+
+/* Responsive polish; keep dense infrastructure tables scrollable rather than converting them to cards. */
+@media (max-width: 1024px) {
+  body:not(.dark-mode) .ant-card-head,
+  body:not(.dark-mode) .ant-card-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  body.userLayout .user-layout-container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  body.userLayout:not(.dark-mode) .user-layout-login {
+    width: 100%;
+    padding: 24px 20px 20px;
+  }
+
+  body:not(.dark-mode) .ant-table-thead > tr > th,
+  body:not(.dark-mode) .ant-table-tbody > tr > td {
+    white-space: nowrap;
+  }
+
+  body:not(.dark-mode) .ant-modal {
+    max-width: calc(100vw - 24px);
+    margin: 12px auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

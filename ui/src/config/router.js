@@ -23,6 +23,7 @@ import ApiDocsPlugin from '@/views/plugins/ApiDocsPlugin.vue'
 
 import { shallowRef } from 'vue'
 import { vueProps } from '@/vue-app'
+import { isLayersentryKvmProfile } from '@/config/productProfile'
 
 import compute from '@/config/section/compute'
 import storage from '@/config/section/storage'
@@ -207,6 +208,17 @@ export function asyncRouterMap () {
           icon: 'DashboardOutlined'
         },
         component: () => import('@/views/dashboard/Dashboard')
+      },
+      {
+        path: '/quick-provision',
+        name: 'quickProvision',
+        hidden: !isLayersentryKvmProfile(),
+        meta: {
+          title: 'Quick Provision',
+          icon: 'RocketOutlined',
+          permission: ['deployVirtualMachine']
+        },
+        component: () => import('@/views/layersentry/QuickProvision.vue')
       },
 
       generateRouterMap(compute),

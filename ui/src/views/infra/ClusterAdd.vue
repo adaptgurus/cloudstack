@@ -199,6 +199,7 @@ import TooltipLabel from '@/components/widgets/TooltipLabel'
 import DedicateDomain from '../../components/view/DedicateDomain'
 import ResourceIcon from '@/components/view/ResourceIcon'
 import DetailsInput from '@/components/widgets/DetailsInput'
+import { filterProductHypervisors } from '@/config/productProfile'
 
 export default {
   name: 'ClusterAdd',
@@ -278,7 +279,7 @@ export default {
     fetchHypervisors () {
       this.loading = true
       getAPI('listHypervisors').then(response => {
-        this.hypervisorsList = response.listhypervisorsresponse.hypervisor || []
+        this.hypervisorsList = filterProductHypervisors(response.listhypervisorsresponse.hypervisor)
       }).catch(error => {
         this.$notifyError(error)
       }).finally(() => {

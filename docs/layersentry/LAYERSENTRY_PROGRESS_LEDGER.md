@@ -1,0 +1,388 @@
+# LayerSentry V1 — Durable Progress Ledger
+
+## Purpose
+
+This file is the **volatile, frequently updated, Git-backed operational checkpoint** for LayerSentry work. Current HEADs, workflow/job/artifact IDs, live target observations, completion state, blockers and next execution gates belong here rather than in the canonical Super Master Context.
+
+Stable architecture, safety, evidence/status governance and production-certification rules are authoritative in:
+
+`docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md`
+
+Specialist stable policy:
+
+- secure implementation/trust boundaries: `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
+- upgrade/supply-chain/IP protection: `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`
+- upstream/fork deltas: `LAYERSENTRY_UPSTREAM_DIFF.md`
+- DR target architecture: `LAYERSENTRY_DRAAS_ARCHITECTURE.md`
+- stable relationship index: `LAYERSENTRY_KNOWLEDGE_GRAPH.md`
+
+Historical re-audits/handoffs are audit history after their findings are incorporated and are not normal startup authority.
+
+## Mandatory checkpoint rule
+
+After every meaningful atomic task, and before starting a risky/long/destructive task, persist progress to GitHub/evidence where practical:
+
+1. Commit source/config/document changes in a small atomic commit.
+2. Record the task status and exact commit SHA here when shared project state changed.
+3. Record workflow run/job/artifact IDs when CI or live deployment was used.
+4. Record live assertions actually executed.
+5. Record unresolved limitations and the exact next action.
+6. If runtime changed without a source change, persist evidence/status in this ledger, workflow evidence or another versioned evidence artifact.
+7. Never rely on chat text, hidden scratchpad, browser state or model memory as the only record of completion.
+
+A page refresh or new chat recovers from Git/repository/workflow/live evidence rather than restarting work from memory.
+
+## Recovery after refresh/reconnect/new chat
+
+Before changing anything:
+
+1. Read `/AGENTS.md`.
+2. Read `LAYERSENTRY_SUPER_MASTER_CONTEXT.md`.
+3. Read this progress ledger.
+4. Read the assigned workstream file when applicable.
+5. Use `LAYERSENTRY_KNOWLEDGE_GRAPH.md` when the task crosses components/decisions.
+6. Fetch the actual current HEAD of `adaptgurus/cloudstack` branch `layersentry/4.22.1.1-ui`.
+7. Fetch the actual current `adaptgurus/cozystack` runner integration branch when relevant.
+8. Inspect the latest relevant workflow/run/artifact.
+9. If the previous action may still be running, inspect its exact state before retrying.
+10. Resume from the first unmet evidence gate.
+
+## Current checkpoint
+
+### SOURCE_COMPLETE — 2026-09-05 integrated release/UI/security/R0 foundation
+
+The integration lead fetched the authoritative repositories, created isolated worktrees, reviewed each workstream, and integrated the source batches in dependency order B -> A -> C -> D. No live runtime mutation was performed by this integration batch.
+
+Integrated CloudStack branch commits, based on fetched integration head `26a5e4b092b37ff0693c6b3154a2090171440bd6`:
+
+- release-contract foundation: `f8d5cccea6`;
+- lockfile-strict release workflow correction: `d8bf0dd72b`;
+- KVM-only LayerSentry UI product-profile foundation: `05d82af2c1`;
+- RBAC/direct-route/direct-API evidence contract: `45a3d98a03`;
+- control-plane database/R0 evidence decision: `0080e12477`.
+
+Integrated cozystack runner commit, based on fetched runner head `605866aa1b3736e52357cc9aff52272c73cb2ded`:
+
+- dispatch-only authenticated read-only CloudStack API inventory: `16234a1e2`.
+
+Latest live R0 evidence inspected:
+
+- workflow run `33913985331`;
+- job `101156784267`, conclusion `success`;
+- artifact `9952447606`, `layersentry-dr-r0-live-inventory-33913985331`;
+- runner/host `TESTSER`, one running nested-virtualization VM `sen`, Hyper-V VMMS running, one internal LayerSentry switch, no VM checkpoints;
+- CloudStack UI probe HTTP 200 and unauthenticated `listCapabilities` HTTP 401;
+- artifact states `MUTATION_PERFORMED=false`.
+
+The evidence proves only the listed R0 host/VM/reachability assertions. It does not prove authenticated CloudStack inventory, a second Site, independent failure domains, B&R, DR, DB/LB/Management HA, upgrade, fencing, or production certification.
+
+Exact Apache CloudStack documentation tag `4.22.1.1` contains conflicting database statements: the compatibility matrix lists MySQL 8.4 or equivalent, while the installation guide says MySQL 8.0 was tested. Therefore the LayerSentry database version/topology remains a measured compatibility decision; neither version is promoted as the HA baseline until the required Rocky Linux 9 matrix passes.
+
+#### Evidence-backed module readiness matrix
+
+| Module | Current status | Evidence in this checkpoint | First unmet gate |
+| --- | --- | --- | --- |
+| Release artifact contract | `SOURCE_COMPLETE` | deterministic archive foundation, manifest, SHA-256, CycloneDX SBOM, provenance, source-map rejection, six passing contract tests | execute real Node/Vue CI build; implement signature/trust, installer consumption, atomic deployment and rollback |
+| KVM-only customer profile | `SOURCE_COMPLETE` | explicit `layersentry-kvm` config and shared KVM filtering on five provisioning surfaces; source unit specification | execute UI unit/lint/build, deploy exact artifact, Chrome/Firefox Rocky Linux 9 workflows and no-KVM empty/error behavior |
+| RBAC/negative validation | `SOURCE_COMPLETE` | four-role/11-case matrix, direct route/API/object-ID negatives, fail-closed linter, redacted evidence schema, six passing tests | add runner/browser/API adapters and execute with scoped role credentials and authorized foreign-object fixtures |
+| Hyper-V/Rocky reachability discovery | `LIVE_VERIFIED` | run `33913985331` and artifact `9952447606` for the exact assertions above | authenticated CloudStack inventory through the new no-guest-mutation workflow |
+| Authenticated CloudStack inventory | `BLOCKED` | dispatch-only R0 workflow integrated; repository currently exposes no configured LayerSentry API secret names | provision scoped `LAYERSENTRY_CLOUDSTACK_API_KEY` and `LAYERSENTRY_CLOUDSTACK_SECRET_KEY`, dispatch, review artifact |
+| Native NAS B&R/two-Zone recovery | `BLOCKED` | current live inventory has one VM on one Hyper-V host; no B&R evidence | authenticated inventory plus approved second Rocky Linux 9/KVM target and disposable workload |
+| DB HA/version selection | `PENDING` / `NOT_TESTED` | exact 4.22.1.1 documentation conflict recorded; no DB topology deployed | compare/test 8.0 and 8.4 candidates, routing, failover, quorum, backup/PITR, restore and upgrade |
+| 3 Management / 3 DB / 2 LB HA | `NOT_TESTED` | no matching live topology exists in current evidence | provision independent failure domains and execute the complete failure/recovery matrix |
+| Advanced DR/failover/failback/fencing | `NOT_TESTED` | architecture remains `DESIGN_DEFINED`; no provider implementation/runtime proof | complete native recovery first, then provider/Test Recovery/planned failover/failback before automatic failover |
+| Production certification | `PENDING` | mandatory Rocky Linux 9 release gates are incomplete | all release-specific functional, security, HA, DR, upgrade, recovery, performance and soak gates |
+
+Combined source verification for this checkpoint is recorded in the final integration commit and command evidence. Runtime-affecting claims remain below `LIVE_VERIFIED` until exact artifacts are exercised on Rocky Linux 9.
+
+Pinned-toolchain build attempt after integration:
+
+- official Node.js `v16.20.2` Linux x64 archive was downloaded to temporary storage and its SHA-256 `874463523f26ed528634580247f403d200ba17a31adf2de98a7b124c6eb33d87` matched the official Node.js `SHASUMS256.txt` entry;
+- bundled npm version was `8.19.4`;
+- `npm ci --no-audit --no-fund` failed before build because the checked-in `ui/package-lock.json` is not synchronized with `ui/package.json` and old-lock metadata resolution also reported no matching `vue-loader-v16@16.8.3`;
+- no tracked file changed and no artifact/runtime deployment occurred;
+- the release workflow was not dispatchable from the non-default integration branch because GitHub had not registered the newly added workflow on the repository default branch.
+
+This is a failed evidence gate, not `CI_VERIFIED`. The next release-build action is to research and repair the upstream UI dependency/lock contract in a controlled change, including the `vue-loader-v16` alias and the package-version mismatches, then repeat the exact pinned clean install, lint, unit, build, deterministic artifact comparison, and verifier negatives.
+
+### SOURCE_COMPLETE — DR architecture revalidation + Super Master Context v3 + knowledge graph
+
+Before advanced DR implementation, the existing LayerSentry DR direction was revalidated against CloudStack 4.22.1.1 source/documentation plus current public libvirt/QEMU, Ceph, LINSTOR/DRBD and Nutanix DR architecture material.
+
+CloudStack branch at the completion of the canonical-context update before this ledger checkpoint:
+
+`a9d9c906292e4df58f84076aaad9c12902b47a1f`
+
+Runner/integration branch re-fetched during this review:
+
+- repository: `adaptgurus/cozystack`;
+- branch: `ops/layersentry-hyperv-inventory`;
+- current observed HEAD: `605866aa1b3736e52357cc9aff52272c73cb2ded`.
+
+Source commits produced by the research/governance pass:
+
+- DR pre-implementation revalidation decision record: `ef8b4c9e511f2485f9976f6c14c478d2e4ab8ea5`;
+- stable engineering knowledge graph: `770f256b0c4f59f10caceb9d99352d9a20358317`;
+- refined storage-native-first DR architecture: `a9dd8cd8767e885cf7ee30f5ca697e2e9752ab91`;
+- root `AGENTS.md` research-first/Rocky9 lifecycle rules: `4058bac7f6671247c0a8214e58f233f99ee0e28d`;
+- consolidated Super Master Context schema 3.0: `a9d9c906292e4df58f84076aaad9c12902b47a1f`.
+
+Architecture decision:
+
+1. keep CloudStack authoritative for VM/network/storage/account/Zone/KVM lifecycle;
+2. prove/reuse native CloudStack B&R/cross-Zone recovery first;
+3. use one provider-neutral LayerSentry Protection Plan/Recovery Point experience;
+4. prefer certified storage-native replication for low-RPO current replicas;
+5. LayerSentry HCI preference: LINSTOR/DRBD, without forcing SAN/NAS customers to migrate;
+6. Ceph path: native RBD mirroring when selected/certified;
+7. enterprise SAN path: array-native consistency-group replication/promotion/reverse replication adapters;
+8. generic QCOW2/file-backed NAS fallback: libvirt backup/checkpoint APIs rather than a LayerSentry-owned raw QMP/NBD protocol;
+9. CloudStack NAS B&R remains baseline/fallback/long-retention/reseed path;
+10. `rsync` is not the generic primary running-VM replication engine;
+11. Hot Replica and historical point-in-time Recovery Point Catalog are separate;
+12. planned failover/failback is certified before automatic emergency failover;
+13. automatic failover requires independent witness/quorum plus safe fencing/exclusivity.
+
+CloudStack capabilities revalidated during research include:
+
+- B&R provider abstraction and NAS KVM provider;
+- selected old-backup restore/new-VM creation;
+- 4.22 cross-Zone create-from-NAS-backup use case;
+- KVM file-backed incremental snapshot mechanisms and documented VM/Volume snapshot safety limitations;
+- native LINSTOR primary storage;
+- 4.22.1.x NAS B&R support for LINSTOR primary storage;
+- backup scheduling is HOURLY/DAILY/WEEKLY/MONTHLY, so the 300-second framework sync interval is not a 5-minute backup SLA.
+
+Static/source verification:
+
+- comparison from prior branch checkpoint `ad80b8ba47450fe21501d4114cae2428fc4ac515` to `a9d9c906292e4df58f84076aaad9c12902b47a1f` was a fast-forward of five commits;
+- changed files were limited to `AGENTS.md`, `LAYERSENTRY_DRAAS_ARCHITECTURE.md`, new `LAYERSENTRY_KNOWLEDGE_GRAPH.md`, `LAYERSENTRY_SUPER_MASTER_CONTEXT.md`, and new DR revalidation evidence;
+- no CloudStack Java/API/DB/KVM-agent/UI runtime/infrastructure implementation was changed;
+- supplied temporary password values were deliberately not persisted; stable context records only authorized identities and runtime secret-reference names;
+- Support Cluster UUID remains `UNKNOWN / PENDING` until implemented/discovered from live evidence; no UUID was fabricated.
+
+Scope/status limits:
+
+- this checkpoint is `SOURCE_COMPLETE` for research/design/governance only;
+- no DR runtime implementation was deployed or mutated by this pass;
+- no architecture claim is promoted to `LIVE_VERIFIED`;
+- advanced DR implementation remains `PENDING`;
+- independent-site automatic failover/failback remains `NOT_TESTED`;
+- current lab still requires a second independent failure domain before production DR certification can be claimed.
+
+The previously documented `+5–7 engineering man-day` advanced-DR estimate is superseded. The current multi-backend advanced DR planning range after native two-Zone proof is approximately **36–57 engineering man-days**, excluding additional storage-family adapters/certification. This is planning effort, not a delivery promise.
+
+### SOURCE_COMPLETE — canonical context governance v2 / context-cleanliness + production-engineering re-audit
+
+The LayerSentry AI/Codex context stack was re-audited and normalized so stable policy and volatile execution state no longer compete with one another, while production/security controls are carried in focused stable specialist policies rather than duplicated across every context file.
+
+Source commits in this documentation-only context-governance update:
+
+- canonical stable Super Master Context v2: `74658e14e887a9fde2687d947e63e477cd4d485e`;
+- simplified root `AGENTS.md` authority/read order: `ea9d4fbf9e67f92fe1a4ffd686bdf0c4f2549417`;
+- old master-context re-audit converted to archival pointer: `f3ad1588ee54c5f74644c171f9a571c7ccce61ed`;
+- `CODEX_MASTER_CONTEXT.md` converted to concise execution index: `3e2a787908aa1cf4bbe99e45aab11180fc9078c1`;
+- multi-agent master deduplicated: `63d2f4230e365c6bc4e09325523481b87d9fdb9f`;
+- four-agent runbook authority/startup flow simplified: `0af02405d8094ca3353407877d9b462a3e706406`;
+- upgrade/supply-chain/IP policy converted to stable-only production policy: `6fa3ff7aa24ed84584325e311a8d38a5cc9ecec1`;
+- historical WSL/Codex handoff archived: `f759377e299d33caa42b9e21f0731d285d2157a3`;
+- Workstream A aligned to canonical model: `33a89352a9a6b1b7620b5036b83fe1f4fac6e89a`;
+- Workstream B aligned to release/supply-chain model: `2c9d26002b4f4bd255a8920db4f2f69c0fb3d240`;
+- Workstream C aligned to security/evidence model: `6dd96eeb0d54cbb5096d184e038c0441457b52fe`;
+- Workstream D aligned to governed statuses/R0-R4 safety: `adf720404be86cad2d3c8275146d11ffc5e732f2`;
+- Codex startup README reduced to a minimal workstream index: `179134a9168c342e4c43d47a35a0ed471274bdc9`;
+- Windows/WSL setup made stable/non-duplicative: `13ea3926b736818749b1f9011d7b7c7bb39535b2`;
+- secure engineering specialist policy added: `0e288f3d05f4730ac5404e88c06af1635c7039bd`;
+- root `AGENTS.md` linked/enforced secure-engineering baseline: `581cfd2c4c82a7c580491e78cac6d37d3ee0da5d`;
+- Codex execution index linked secure-engineering policy: `85e2a1082f998b147d5ad0c49e3884ece58fb996`.
+
+Key governance changes:
+
+- volatile HEADs/run IDs/artifact IDs/live IPs/current statuses removed from the Super Master Context;
+- current execution state now lives only in this progress ledger plus underlying evidence;
+- historical re-audit/handoff files are no longer mandatory startup context;
+- mandatory Codex startup reduced to `AGENTS.md` + canonical Super Master Context + progress ledger + assigned workstream;
+- specialist documents are loaded on demand;
+- duplicate Codex/multi-agent/host-setup instructions were reduced to indexes/runbooks with one source of truth per concern;
+- explicit instruction-injection isolation added for logs/issues/web/API/customer-controlled content;
+- R0-R4 change-risk classification added and propagated to workstreams;
+- one stray non-governed DR pseudo-status (`FUNCTIONAL_POC`) was removed; functional POC is now scope narrative under a governed status such as `LIVE_VERIFIED`, never a separate status;
+- production certification gates expanded to cover supply chain, installation/recovery, RBAC, appliance security, optional integrations, HA, upgrade and reliability/performance evidence;
+- release policy explicitly covers trust/signing, SBOM/provenance, dependency/secret scanning, key rotation/revocation and rollback classes;
+- secure-engineering policy now covers threat modeling, untrusted input, authorization/confused-deputy prevention, browser security, command/path/archive/SSRF/SQL/parser safety, cryptography/TLS, CI signing-secret boundaries, dependency build-script risk, privacy/redaction, resource-exhaustion/retry safety, source governance, incident response and production documentation gates;
+- effort arithmetic corrected: historical component ranges sum to **20–29 engineering man-days**, not 20–27.
+
+Scope limit: this is `SOURCE_COMPLETE` documentation/governance work only. It changes no CloudStack Java/API/DB/KVM-agent/orchestration code and performs no live runtime mutation. It does not promote any product capability to a stronger runtime status.
+
+### PENDING — production source/release repository governance
+
+Current branch metadata still reports the active LayerSentry integration branch as unprotected and current documentation commits as unsigned. This is source-governance state, not runtime product vulnerability and not evidence that artifact signing exists.
+
+Before a production stable-release control plane, establish an appropriate branch/ruleset/release governance model including as applicable:
+
+- protected integration/stable refs;
+- required CI/status checks;
+- review requirements for release/security-sensitive changes;
+- restricted force-push/deletion;
+- least-privilege promotion/signing permissions;
+- deliberate commit/tag-signing policy if used;
+- auditable stable-release approval/promotion.
+
+Production LayerSentry artifact signing/trust verification remains a separate `PENDING` release-engineering gate.
+
+### LIVE_VERIFIED — LayerSentry V1 DBaaS/APaaS placeholder removal on `sen`
+
+Customer-facing DBaaS/APaaS placeholder routes, placeholder section files, the LayerSentry ServiceCatalog placeholder, and the remaining onboarding text reference have been removed from the V1 UI and the exact cleaned build has been deployed to the current `sen` test target.
+
+Exact UI commit deployed:
+
+`6ce76d6c241629086ffcad794093dbdd5f2dd5ba`
+
+Key source changes leading to this UI:
+
+- `ui/src/config/router.js`: DBaaS/APaaS imports and route registration removed;
+- `ui/src/config/section/dbaas.js`: removed;
+- `ui/src/config/section/apaas.js`: removed;
+- `ui/src/views/layersentry/ServiceCatalog.vue`: removed;
+- `ui/src/views/dashboard/OnboardingDashboard.vue`: obsolete DBaaS/APaaS service-catalog wording removed and replaced with truthful Kubernetes/object-storage/backup wording conditional on provider configuration.
+
+No CloudStack Java backend, API, database schema, KVM-agent or orchestration-core functionality was changed by this task.
+
+Served-UI repair commit:
+
+`85031bd2e394c16c631b6e493ced1af87c19fbd3`
+
+It pins UI `6ce76d...`, fails if `DBaaS` or `APaaS` remains in built/served JavaScript, and emits diagnostic file names if a placeholder marker is found.
+
+Resume path commit:
+
+`8ccb2e7af9b3109e8d39c76d64e8943766158310`
+
+Main installer pin-alignment commit:
+
+`6cc23984c253a7ea9618b9c7553d12a495dcc971`
+
+Runner workflow/request:
+
+- workflow pin update commit: `675f6e433feb85ce9320a1b8a6d073e8f758fd0d`;
+- request commit: `af484d1b6e063c4929634ed045560f95f3891d7d`;
+- workflow run: `33879178031`;
+- job: `101043343720`;
+- conclusion: `success`;
+- evidence artifact ID: `9939463820`;
+- artifact name: `layersentry-customer-ui-deploy-33879178031`;
+- artifact digest: `sha256:1a308fdcfff5a87348a4dad3783afc4bf24ea4b5efa6a583a6203064b8599813`.
+
+Live assertions proven by this exact run:
+
+- build passed from immutable UI source `6ce76d...`;
+- `BUILD_CONFIG_CHECKS` passed;
+- build contained no `DBaaS`/`APaaS` placeholder markers under the enforced V1 check;
+- runtime backup created at `/var/backups/layersentry/20260904-191720/served-ui-before-branding` before deployment;
+- management service restarted and returned HTTP 200 after its normal startup window;
+- `RUNTIME_CONFIG_CHECKS` passed;
+- `HTTP=200`;
+- served config `/etc/cloudstack/management/config.json`;
+- `V1_PLACEHOLDERS=ABSENT`;
+- `ONBOARDING=PASS`;
+- `LOGO_ASSETS=PASS`;
+- `RUNTIME_CONFIG=PASS`;
+- `TERMINOLOGY=PASS`;
+- independent `--verify-only` verification repeated the same assertions successfully;
+- Hyper-V console capture succeeded and VM `sen` remained Running.
+
+Scope limit: this `LIVE_VERIFIED` status proves the current V1 placeholder removal and the assertions above only. It does not certify the future KVM-only profile, self-service dashboards, Kubernetes, object storage, HA architecture, appliance lockdown, upgrade path, backup or DR.
+
+### Historical diagnostic run — FAILED BEFORE DEPLOY, superseded by the successful run above
+
+First removal attempt:
+
+- run `33877641094`;
+- job `101038334940`;
+- artifact `9938829995`;
+- digest `sha256:c10be571cefc3896602107b7c3ef2611ee28fbde0410cf53be113360d0e95b1d`.
+
+The build completed but pre-deployment validation correctly blocked deployment because `OnboardingDashboard.vue` still contained DBaaS/APaaS wording. Because failure occurred in build validation before runtime backup/deploy, that run did not replace the live UI. The source was corrected and the later run `33879178031` is authoritative for the completed removal.
+
+### LIVE_VERIFIED — historical served LayerSentry branding/customer terminology baseline on `sen`
+
+Earlier evidence remains useful for provenance:
+
+- workflow run: `33856746145`;
+- job: `100971705863`;
+- conclusion: `success`;
+- artifact: `9930784385`;
+- artifact digest: `sha256:6a6751c9c07723f73df36e02b9f66ee3a41cb3098ac2f2834945af4759e9a50b`.
+
+This historical run has been superseded for the DBaaS/APaaS-removal scope by run `33879178031` but remains evidence for the earlier branding lineage.
+
+### PARTIAL
+
+- customer terminology: substantial work exists and current onboarding terminology passed live verification, but full role/context wrong-label audit remains pending;
+- installer: current V1 UI/resume/served-repair pins are aligned for the placeholder-removal scope, but CI-built UI artifact deployment, SELinux final state/policy, firewall-policy validation, appliance lockdown and signed update controls remain incomplete;
+- self-service foundation: upstream CloudStack components exist, but final LayerSentry Department Admin/User UX is not yet implemented/live-proven;
+- IP protection: stable architecture/policy is defined, but production artifact/source-map/signing/appliance controls remain dependent on implementation/evidence;
+- upgrade engineering: architecture is defined, but supported N-1 -> N upgrade automation and release-specific evidence are pending.
+
+### PENDING / NOT_TESTED
+
+- KVM-only `layersentry-kvm` product profile;
+- Platform Admin dashboard redesign;
+- Department Admin self-service dashboard;
+- normal User self-service dashboard;
+- simplified VM wizard;
+- simplified Kubernetes wizard;
+- simplified Bucket UX;
+- final Site/Infrastructure onboarding simplification;
+- CI-built immutable UI artifact deployment;
+- production source-map suppression/support-build strategy implementation;
+- signed release manifest/artifact/update channel;
+- N-1 -> N LayerSentry upgrade test automation;
+- CloudStack schema-aware upgrade orchestration/rollback evidence;
+- SELinux-enforcing appliance policy/modules and live validation;
+- firewalld-enabled LayerSentry KVM traffic/security validation;
+- package/repository lockdown;
+- controlled signed update mechanism;
+- full air-gap CKS;
+- CKS metadata-isolation NetworkPolicy live validation;
+- CKS CSI integration live validation for the selected Kubernetes ISO/profile;
+- live Kubernetes validation;
+- live object-store/Bucket validation;
+- KVM snapshot-conflict guard implementation/test;
+- native NAS B&R proof;
+- DR source-record retention/purge negative test;
+- two-zone cross-zone DR proof;
+- RPO/RTO measurement;
+- DR Site pairing/inventory sync;
+- provider capability model;
+- Protection Plan + Recovery Point Catalog;
+- LINSTOR/DRBD provider certification;
+- NAS/libvirt incremental provider certification;
+- first enterprise SAN provider certification;
+- automated DR network/IP mapping;
+- old-checkpoint recovery;
+- Test Recovery;
+- planned failover/failback;
+- witness/fencing/emergency automatic failover;
+- 3-Management/2-LB/3-DB HA deployment/certification;
+- physical OOBM/fencing certification on supported hardware;
+- rolling upgrade certification;
+- production release certification;
+- proprietary Support Cluster UUID implementation/live discovery.
+
+## Exact next execution sequence
+
+1. Before runtime implementation, run fresh read-only discovery of the intended Rocky Linux 9/CloudStack target through the approved runner path and establish a secure non-mutating API/SSH credential injection method; do not reintroduce guest `authorized_keys` mutation for R0 discovery.
+2. Establish/obtain a second independent Rocky Linux 9/KVM DR failure domain with sufficient compute/storage/network capacity; a same-host nested lab can prove function only, not production site independence.
+3. Prove native CloudStack 4.22.1.1 NAS B&R two-Zone recovery first: backup, selected old backup, cross-Zone VM create, network mapping, data validation, source-record retention negative case and measured timings.
+4. Implement Site Pairing/capability sync and provider-neutral Protection Plan/Recovery Point Catalog outside CloudStack core.
+5. Certify the first real production storage path. Prefer LINSTOR/DRBD if building the LayerSentry HCI profile; otherwise certify the actual NAS/SAN backend required by the target deployment first.
+6. Implement/verify older-point recovery and isolated Test Recovery before failover automation.
+7. Implement and repeatedly test Planned Failover + reverse replication + Failback.
+8. Add witness/exclusive lease/fencing and only then test emergency automatic failover under R4 controls.
+9. Run security/RBAC, restart/idempotency, corruption/stale-point, performance/scale/soak and upgrade/rollback regression on Rocky Linux 9 for every certified provider.
+10. Continue separate V1 UI/appliance/release governance work without conflating those milestones with DR certification.
+
+## Refresh-safe invariant
+
+**If the user refreshes the page in the middle of work, already committed/evidenced completed tasks remain completed. The next session must discover and preserve them from GitHub/workflow/live evidence. It must not restart from the beginning or mark them lost merely because the chat UI no longer contains the previous assistant output.**

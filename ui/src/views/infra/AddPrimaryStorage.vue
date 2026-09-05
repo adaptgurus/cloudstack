@@ -435,6 +435,7 @@ import _ from 'lodash'
 import { mixinForm } from '@/utils/mixin'
 import ResourceIcon from '@/components/view/ResourceIcon'
 import TooltipLabel from '@/components/widgets/TooltipLabel'
+import { filterProductHypervisors } from '@/config/productProfile'
 
 export default {
   name: 'AddPrimaryStorage',
@@ -452,7 +453,7 @@ export default {
   inject: ['parentFetchData'],
   data () {
     return {
-      hypervisors: ['KVM', 'VMware', 'Hyperv', 'Any', 'Simulator'],
+      hypervisors: filterProductHypervisors(['KVM', 'VMware', 'Hyperv', 'Any', 'Simulator']),
       protocols: [],
       providers: [],
       scope: 'cluster',
