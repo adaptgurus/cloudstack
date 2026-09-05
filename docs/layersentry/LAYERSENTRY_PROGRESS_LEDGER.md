@@ -49,6 +49,20 @@ Before changing anything:
 
 ## Current checkpoint
 
+### PARTIAL — 2026-09-06 native DR baseline and acceptance tooling
+
+The dedicated DR session owns DC/DR lab runtime operations; the other session acknowledged a source-only reservation. Fresh authenticated DC and Hyper-V inventories supersede the historical single-VM/API-secret blockers below. Both Rocky lab VMs now exist, but native recovery has not passed. See the [runner evidence and readiness matrix](https://github.com/adaptgurus/cozystack/blob/ops/layersentry-hyperv-inventory/hack/layersentry/evidence/dr-native-baseline-20260906.md).
+
+- Hyper-V R0 run `33998994352`: two Running nested lab VMs on `TESTSER`, 12/16 vCPU and 40 GiB RAM each, same host/switch/storage failure domain; DR has attached 100 GiB OS and 500 GiB data virtual disks.
+- DC API run `33999356386`, source `6d06709e3a824f3a8fb410a6c3e4a228e5c460a0`: CloudStack 4.22.1.1, one Up KVM Host, Basic Zone `dc` Disabled, empty primary/image-storage/user-VM collections, SystemVM template not ready. B&R framework is disabled with provider `dummy`; backup APIs return HTTP/API 401 and async-job listing returns 431. The run deliberately fails overall with `InventoryComplete=false`; failed API calls do not prove absent resources.
+- Native recovery adapter: `SOURCE_COMPLETE` for its bounded metadata/clone/journal scope only, fourteen offline tests passed. It creates stopped fresh clones from explicit older/latest backup UUIDs, journals intent before mutations and refuses blind retries. Actual guest hashes, restore, RPO/RTO and full E2E remain `NOT_TESTED`.
+- Exact 4.22.1.1 source audit identifies a Basic destination constraint: backup allocation supplies network IDs, while Basic allocation rejects them. An Advanced recovery Zone with explicit recovery networks is the supported candidate; no core patch was made. Both Zones must belong to the same management database, and DR's KVM agent must have only one controlling deployment.
+- UI run `33999043753`: CI built exact UI source `c4a2bb29457634e38a9375d5de33b04eb3a9c825`; DR live preflight rejected the assumed WEB-INF/META-INF layout before UI changes. Runtime layout/configuration preservation and browser/API validation remain `PENDING`.
+- DR guest probe `33999431832`: Rocky 9.8, hostname `layersentry-dr-mgmt1`, Management 4.22.1.1-1 active, SELinux Enforcing and firewalld active. `/dev/kvm` is accessible, but agent/libvirt/qemu-kvm are absent; data disk `/dev/sdb` reports 500 GiB without a filesystem or mount. The package-owned `WEB-INF/web.xml` exists and optional inner `META-INF` is absent. Backend fingerprint/configuration-preservation deployment corrections passed twenty-one local tests; live redeployment remains separate.
+- Pinned-trust DC collector, exact-VM console snapshot and expanded API/DR inventory tests passed locally. The `.14` host key still requires independent out-of-band verification before password SSH; `.20`'s pinned key is not interchangeable.
+
+Next gates are guest inventory/trust, functional source storage/templates/networking, Advanced destination registration, NAS B&R enablement, disposable workload plus two distinct recovery points, actual root/data-disk recovery checks and failure/RBAC negatives. Same-host function tests cannot certify independent-site DR. Advanced replication, planned failover/failback, witness/fencing and production DR remain `NOT_TESTED`.
+
 ### SOURCE_COMPLETE — 2026-09-05 integrated release/UI/security/R0 foundation
 
 The integration lead fetched the authoritative repositories, created isolated worktrees, reviewed each workstream, and integrated the source batches in dependency order B -> A -> C -> D. No live runtime mutation was performed by this integration batch.

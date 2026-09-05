@@ -220,6 +220,8 @@ Detailed contract: `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`.
 
 ## 7. Backup and DR graph
 
+The first native NAS acceptance path uses `createVMFromBackup` with explicit older/latest backup UUIDs and fresh stopped clones. It requires both Zones in one CloudStack management database, the retained source/backup metadata, and the original backup offering/repository. Exact 4.22.1.1 source rejects the network-ID list supplied by backup allocation for a Basic destination; use an Advanced recovery Zone candidate and validate it live before promoting readiness. Separate DR Management installation and NAS file copies do not create native catalog identity. Fixture/journal tooling and current runtime observations are linked from the Progress Ledger.
+
 ```text
 CloudStack B&R Framework
   PROVIDES -> provider abstraction
