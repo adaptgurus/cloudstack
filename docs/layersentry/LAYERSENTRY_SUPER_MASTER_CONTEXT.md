@@ -1,12 +1,14 @@
 # LayerSentry V1 — Super Master Context
 
-**Context schema:** 3.1  
+**Context schema:** 3.2  
 **Role:** canonical stable product, architecture, safety, validation and production-engineering contract  
 **Product baseline:** Apache CloudStack 4.22.1.1 with a LayerSentry KVM-first product layer
 
 This document contains **stable rules and architecture**, not volatile execution state. Current branch HEADs, workflow/job/artifact IDs, live IPs, temporary blockers, current test results and current provider health belong in `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md` and underlying evidence.
 
 The companion relationship/navigation index is `docs/layersentry/LAYERSENTRY_KNOWLEDGE_GRAPH.md`.
+
+For LayerSentry-managed RKE2, CAPI/CAPC/CAPRKE2, DBaaS, APaaS, Streaming, Kubernetes package/storage/network/VIP/WAF and related self-service behavior, the scoped specialist contract is `docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`. That specialist contract extends this canonical context without replacing unrelated VM, DR, appliance, release, security or CloudStack-core rules.
 
 ---
 
@@ -21,6 +23,7 @@ Use one source of truth for each kind of fact.
 | What source exists now? | current fetched repository branch/commit |
 | What is current project status? | `LAYERSENTRY_PROGRESS_LEDGER.md`, corroborated by evidence |
 | What are stable product/architecture/security/validation rules? | this Super Master Context |
+| What governs LayerSentry-managed K8s/DBaaS/APaaS/Streaming? | `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`, subordinate to this file for shared/global rules |
 | How are important components/sources related? | `LAYERSENTRY_KNOWLEDGE_GRAPH.md` |
 | What are secure implementation rules? | `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md` |
 | What are upgrade/IP/supply-chain rules? | `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md` |
@@ -34,6 +37,8 @@ Use one source of truth for each kind of fact.
 Do not average or guess. Resolve conflicts according to the table and gather fresher evidence. Repository/workflow/live evidence overrides historical handoffs.
 
 Official documentation/source defines documented support; GitHub issues, PRs, discussions, Apache mailing-list/community evidence and provider forums are mandatory diagnostic/decision inputs for major work but do not silently override the exact release source or official support contract.
+
+For the Kubernetes/Data Services module, old historical statements that DBaaS/APaaS were excluded are superseded by schema 3.2 and the dedicated specialist context. Historical commits/ledgers remain historical evidence and should not be rewritten to pretend the earlier scope never existed.
 
 ### Historical-document rule
 
@@ -49,9 +54,10 @@ Before changing source or runtime:
 2. read this file;
 3. read `LAYERSENTRY_PROGRESS_LEDGER.md`;
 4. read the assigned workstream file when scoped;
-5. use `LAYERSENTRY_KNOWLEDGE_GRAPH.md` when the task crosses components or prior decisions;
-6. fetch actual current repository/runner refs and inspect current worktree/state;
-7. inspect in-flight workflows/async operations before any potentially conflicting mutation.
+5. read `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` when the task touches LayerSentry-managed Kubernetes/Data Services/APaaS/Streaming;
+6. use `LAYERSENTRY_KNOWLEDGE_GRAPH.md` when the task crosses components or prior decisions;
+7. fetch actual current repository/runner refs and inspect current worktree/state;
+8. inspect in-flight workflows/async operations before any potentially conflicting mutation.
 
 Typical source baseline commands:
 
@@ -74,7 +80,7 @@ LayerSentry V1 is a **commercial, production-oriented, on-prem KVM private-cloud
 
 Customer outcome:
 
-> A customer receives a simple LayerSentry portal/appliance for VM, Kubernetes, storage, networking, object storage, backup/recovery and validated DR capabilities without needing to operate most CloudStack internals directly.
+> A customer receives a simple LayerSentry portal/appliance for VM, Kubernetes, DBaaS, APaaS, Streaming, storage, networking, object storage, backup/recovery and validated DR capabilities without needing to operate most CloudStack or Kubernetes internals directly.
 
 Architecture:
 
@@ -111,7 +117,11 @@ LayerSentry value is **simplification, automation, hardening, supportability, va
 - images/templates/ISOs;
 - volumes and safe snapshot workflows;
 - VM HA/live migration where prerequisites are proven;
-- native CloudStack Kubernetes Service (CKS);
+- native CloudStack Kubernetes Service (CKS) where it remains useful/selected;
+- **LayerSentry K8s** using the dedicated RKE2/CAPI architecture after exact release qualification;
+- **LayerSentry DBaaS** implemented above LayerSentry-managed Kubernetes rather than inside CloudStack core;
+- **LayerSentry APaaS** including certified services such as OpenBao/Harbor;
+- **LayerSentry Streaming** including certified Strimzi/Kafka workflows;
 - native object-storage bucket workflows;
 - Backup & Recovery;
 - cross-Zone recovery foundation and LayerSentry DR orchestration as it becomes certified;
@@ -121,16 +131,17 @@ LayerSentry value is **simplification, automation, hardening, supportability, va
 
 ### Explicit V1 anti-goals
 
-- DBaaS/APaaS as CloudStack-native LayerSentry V1 services/placeholders;
-- a second VM scheduler or provisioning backend;
+- implementing DBaaS/APaaS as CloudStack-core/native database schema/API features merely for LayerSentry convenience;
+- rewriting native CloudStack CKS internally to become RKE2;
+- a second VM scheduler or provisioning backend that conflicts with CloudStack/CAPI ownership;
 - a second quota/RBAC/user database;
-- replacement Kubernetes/object-storage engines where native CloudStack integration is sufficient;
+- replacement Kubernetes/object-storage engines where the selected supported integration is sufficient;
 - deleting non-KVM upstream hypervisor implementations from CloudStack core;
 - inventing unsupported API fields to simplify UI;
 - claiming impossible-to-reverse-engineer or mathematically immutable appliance properties;
 - claiming universal survival of every failure mode.
 
-Future DBaaS belongs above Kubernetes through a separate LayerSentry service/operator model, not inside CloudStack core.
+LayerSentry DBaaS/APaaS/Streaming belong above Kubernetes through the separate LayerSentry service/operator model defined in the dedicated specialist context, not inside CloudStack core.
 
 ---
 
@@ -160,12 +171,13 @@ Key documentation:
 - `AGENTS.md` — operating rules;
 - `LAYERSENTRY_PROGRESS_LEDGER.md` — volatile project checkpoint;
 - `LAYERSENTRY_KNOWLEDGE_GRAPH.md` — stable relationship index;
+- `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` — LayerSentry-managed RKE2/DBaaS/APaaS/Streaming specialist architecture;
 - `LAYERSENTRY_DRAAS_ARCHITECTURE.md` — selected DR architecture;
 - `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md` — implementation security;
 - `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md` — release/update/IP controls;
 - `LAYERSENTRY_DEBUGGING_RUNBOOK.md` — systematic troubleshooting;
 - `LAYERSENTRY_UPSTREAM_DIFF.md` — fork/upstream delta record;
-- `docs/layersentry/codex/` — scoped workstream contracts.
+- `docs/layersentry/codex/` — scoped workstream contracts, including Workstream E for K8s/Data Services.
 
 ---
 
@@ -237,7 +249,7 @@ For a **major** decision or change, research must cover all materially relevant 
 - Rocky/RHEL 9, SELinux and firewalld documentation for host/appliance behavior;
 - database documentation for the exact selected DB/version/topology;
 - storage/network/provider documentation for the exact product/protocol/driver/version being certified;
-- Kubernetes/CKS/CSI/CNI documentation for Kubernetes-facing behavior;
+- Kubernetes/CKS/CAPI/CAPRKE2/RKE2/CSI/CNI documentation for Kubernetes-facing behavior;
 - backup/DR/LB/WAF/ADC/provider documentation when those integrations are affected;
 - CI/build/signing/SBOM/provenance documentation when release engineering is affected.
 
@@ -250,14 +262,15 @@ For each major customer capability, explicitly answer in this order:
 1. **Can CloudStack 4.22.1.1 native APIs implement it correctly?** If yes, prefer the native path.
 2. **Is there an existing supported CloudStack plugin/provider/extension contract?** If yes, prefer it over a parallel LayerSentry engine when it meets requirements.
 3. **Is XaaS available and suitable in the exact 4.22.1.1 source/version for this external resource/lifecycle requirement?** Use it only when it improves separation/supportability without duplicating CloudStack authority.
-4. **Does LayerSentry need a BFF/controller/orchestration service?** Use one for multi-step/composite workflows, policy, provider abstraction, retries/idempotency, evidence and external integrations while keeping CloudStack authoritative.
-5. **Is a core CloudStack modification unavoidable?** Only then use the core-change exception gate.
+4. **Does the selected Kubernetes ecosystem already provide the correct controller?** For LayerSentry-managed RKE2, prefer CAPI/CAPC/CAPRKE2, CloudStack CCM, Gateway API, CSI and operators according to the specialist context rather than recreating them.
+5. **Does LayerSentry need a BFF/controller/orchestration service?** Use one for multi-step/composite workflows, policy, provider abstraction, retries/idempotency, evidence and external integrations while keeping CloudStack/Kubernetes authorities intact.
+6. **Is a core CloudStack modification unavoidable?** Only then use the core-change exception gate.
 
 Never choose XaaS merely because it is easier to code. Never use XaaS or a LayerSentry controller to create a second VM scheduler, second tenancy/RBAC system, second quota/accounting authority or conflicting copy of CloudStack resource state.
 
 ### 5.3 GitHub issues, PRs, discussions and community evidence for major work
 
-For major architectural, storage, network, HA, DR, security, upgrade, release, API, CKS or provider decisions, perform a comprehensive relevance search across the available upstream/community history. Search with feature names, API names, classes/plugins, provider names, version numbers and failure symptoms as appropriate.
+For major architectural, storage, network, HA, DR, security, upgrade, release, API, CKS/Kubernetes or provider decisions, perform a comprehensive relevance search across the available upstream/community history. Search with feature names, API names, classes/plugins, provider names, version numbers and failure symptoms as appropriate.
 
 Review, where available and relevant:
 
@@ -282,7 +295,7 @@ Every major architecture decision should maintain, in the decision/evidence reco
 | source/document | exact URL/repository/path or document identifier |
 | version/date | exact version/tag/commit/date where available |
 | relevance | why it applies to the decision |
-| native API/plugin/XaaS finding | what supported mechanism exists |
+| native API/plugin/XaaS/controller finding | what supported mechanism exists |
 | limitations/bugs | relevant restrictions/issues/PRs/discussions |
 | alternative | credible competing design/product/path |
 | decision impact | keep/change/reject/defer and why |
@@ -295,7 +308,7 @@ Every significant decision record includes:
 1. existing approach;
 2. advantages/disadvantages;
 3. alternatives researched;
-4. native API/plugin/XaaS assessment;
+4. native API/plugin/XaaS/controller assessment;
 5. documentation/issues/discussion coverage summary;
 6. recommended approach;
 7. why it is superior;
@@ -372,10 +385,11 @@ Prefer in order, after the research gate:
 2. CloudStack configuration;
 3. **native CloudStack 4.22.1.1 APIs**;
 4. supported CloudStack plugin/provider/extension contracts;
-5. **XaaS when exact 4.22.1.1 source/docs show it is applicable and superior for the external capability**;
-6. LayerSentry-specific BFF/controller/orchestration using supported APIs/contracts;
-7. installer/bootstrap automation;
-8. narrow upstream/core patch only when the alternatives cannot satisfy the requirement.
+5. selected upstream Kubernetes controllers/providers for the dedicated LayerSentry K8s module;
+6. **XaaS when exact 4.22.1.1 source/docs show it is applicable and superior for the external capability**;
+7. LayerSentry-specific BFF/controller/orchestration using supported APIs/contracts;
+8. installer/bootstrap automation;
+9. narrow upstream/core patch only when the alternatives cannot satisfy the requirement.
 
 Any core-change exception requires exact need, evidence supported interfaces are insufficient, affected subsystem/files, compatibility/security consequences, upgrade/rebase risk, regression tests, rollback/removal strategy and upstream-delta update.
 
@@ -404,6 +418,8 @@ Stable product profile:
 - selected validated MySQL-compatible topology/version according to the exact release/profile;
 - KVM/libvirt following secure CloudStack KVM guidance.
 
+Kubernetes/RKE2/CAPI/CAPC/CAPRKE2 and package versions are governed by the specialist release/compatibility matrix and must not be inferred from CloudStack's version alone.
+
 Do not delete upstream support just because LayerSentry narrows its certified customer profile.
 
 ---
@@ -418,11 +434,11 @@ Do not delete upstream support just because LayerSentry narrows its certified cu
 
 ### Firewalld
 
-Production target keeps a tested firewall policy. Validate management-agent, migration, console, bridge/VLAN forwarding, System VM, storage, B&R, CKS/CSI and reboot-persistence paths. Do not broadly expose management/libvirt ports.
+Production target keeps a tested firewall policy. Validate management-agent, migration, console, bridge/VLAN forwarding, System VM, storage, B&R, CKS/LayerSentry K8s/CSI and reboot-persistence paths. Do not broadly expose management/libvirt ports.
 
 ### SELinux
 
-Production target is `SELinux=enforcing` with reviewed minimal policy. Collect representative AVC denials, avoid blind broad `audit2allow`, and validate management, agent, libvirt, storage, System VM, console, migration, backup, CKS and upgrade paths.
+Production target is `SELinux=enforcing` with reviewed minimal policy. Collect representative AVC denials, avoid blind broad `audit2allow`, and validate management, agent, libvirt, storage, System VM, console, migration, backup, CKS/LayerSentry K8s and upgrade paths.
 
 ### Networking information
 
@@ -445,7 +461,7 @@ Users in the same CloudStack Account are not isolated owners of resources. Use s
 
 Every role test includes presentation plus direct URL/direct API authorization checks and object-ID tampering negatives.
 
-LayerSentry privileged controllers separately authorize any additional DR/support/update action they introduce and use least-privilege service identities.
+LayerSentry privileged controllers separately authorize any additional Kubernetes/Data Services/DR/support/update action they introduce and use least-privilege service identities.
 
 ---
 
@@ -458,15 +474,16 @@ Expose an optional feature only when applicable gates pass:
 1. RBAC/API permission;
 2. LayerSentry feature policy;
 3. global/Zone configuration;
-4. required provider/backend;
+4. required provider/backend/controller;
 5. offerings/templates/networks/storage prerequisites;
-6. reliable service/provider health signal when available.
+6. compatibility/release-artifact prerequisites where the module requires them;
+7. reliable service/provider health signal when available.
 
-Never display `Healthy`, `Protected`, `Replicated`, `HA`, `Encrypted`, `Backed up` or `DR Ready` without evidence.
+Never display `Healthy`, `Protected`, `Replicated`, `HA`, `Encrypted`, `Backed up`, `CSI Ready`, `WAF Protected` or `DR Ready` without evidence.
 
 ### Normal customer navigation
 
-Platform Admin areas may include Dashboard, Compute, Storage, Network, Images, Infrastructure, Backup & DR, Activity and Administration.
+Platform Admin areas may include Dashboard, Compute, Storage, Network, Images, Infrastructure, Kubernetes, Data Services, APaaS/Streaming, Backup & DR, Activity and Administration when those modules are enabled/qualified.
 
 Department/User views expose only owned/delegated functions. Physical infrastructure internals remain hidden unless role/support scope requires them.
 
@@ -476,19 +493,19 @@ Presentation mappings may include:
 
 - Zone -> Site;
 - Pod -> Infrastructure Group;
-- Cluster -> Compute Cluster;
+- CloudStack Cluster -> Compute Cluster;
 - Host -> KVM/Compute Host;
 - Service Offering -> Compute Profile;
-- Disk Offering -> Storage Profile;
+- Disk Offering -> Storage Profile when that is actually the underlying object;
 - Template -> OS Image;
 - Guest Network -> VM/Workload Network;
 - Physical Network -> Datacenter Network.
 
-Mappings are presentation only; backend APIs/fields remain unchanged. Avoid global substitutions that create semantic errors.
+A Kubernetes Cluster is not a CloudStack Compute Cluster. Kubernetes StorageClass/LayerSentry Kubernetes StorageProfile is not automatically a CloudStack Disk Offering. Mappings are presentation only; backend APIs/fields remain unchanged. Avoid global substitutions that create semantic errors.
 
 ---
 
-## 12. VM, CKS and object-storage contracts
+## 12. VM, Kubernetes and object-storage contracts
 
 ### VM workflow
 
@@ -496,17 +513,37 @@ Reuse CloudStack deployment APIs/scheduler. A simple LayerSentry VM wizard may a
 
 `Backup Policy` is not a native `deployVirtualMachine` field. Protection selected during VM creation is a separate post-deploy operation: deploy -> wait async result -> assign B&R/DR policy -> verify -> report partial failure honestly.
 
-### CKS
+### Native CKS
 
-Use native CloudStack Kubernetes Service where it meets requirements. Do not build a second Kubernetes lifecycle engine without a proven limitation.
+Native CloudStack Kubernetes Service remains available where it meets the selected requirement. Preserve its native API/upgrade semantics rather than modifying CKS internally to become RKE2.
 
-CSI maps CloudStack Disk Offerings to Kubernetes Storage Classes; do not invent a native CKS `storage profile` field.
+CSI maps CloudStack Disk Offerings to Kubernetes Storage Classes for the native CKS path; do not invent a native CKS `storage profile` field.
 
-Production CKS requires metadata isolation tests so pods cannot access CloudStack VM metadata/user-data unless explicitly required.
+Production native CKS requires metadata isolation tests so pods cannot access CloudStack VM metadata/user-data unless explicitly required.
 
-NAS VM-level B&R is not the primary protection mechanism for CKS nodes.
+NAS VM-level B&R is not the primary protection mechanism for Kubernetes nodes.
 
-Full air-gap CKS remains `PENDING` until an internal-registry/bootstrap path is implemented and live-tested; a binaries ISO alone does not prove complete offline provisioning.
+Full air-gap native CKS remains `PENDING` until an internal-registry/bootstrap path is implemented and live-tested; a binaries ISO alone does not prove complete offline provisioning.
+
+### LayerSentry K8s (RKE2)
+
+The separate LayerSentry-managed RKE2 service is governed by `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`.
+
+Selected direction after exact qualification:
+
+```text
+LayerSentry UI/API
+ -> CAPI
+ -> CAPC for CloudStack Machines
+ -> CAPRKE2 for RKE2 lifecycle
+ -> central Flux for LayerSentry packages
+```
+
+CloudStack native APIs remain authoritative for platform discovery and infrastructure operations outside CAPC Machine ownership. Do not mutate CAPI-owned VMs behind CAPC. Do not call the module production-ready until its exact CAPI/CAPC/CAPRKE2/RKE2/CSI/network/offline failure gates pass.
+
+### DBaaS/APaaS/Streaming
+
+These modules are valid product scope and are implemented above LayerSentry-managed Kubernetes, not as CloudStack core APIs/database-schema extensions. Their data, storage, package, branding, upgrade and application certification rules are in the specialist context.
 
 ### Object storage
 
@@ -527,6 +564,8 @@ Required behavior:
 - never claim both snapshot mechanisms are independently safe without release-specific evidence.
 
 For generic file-backed DR, prefer libvirt backup/checkpoint APIs rather than using long VM snapshot chains as the DR catalog.
+
+Kubernetes CSI snapshots/application-native backup semantics are separate and must follow the exact specialist storage/operator contract rather than being conflated with CloudStack VM snapshots.
 
 ---
 
@@ -571,13 +610,15 @@ Selected principles:
 
 - LINSTOR/DRBD: continuous/certified async hot replica + LINSTOR snapshot shipping for PITR;
 - Ceph RBD: `rbd-mirror` + RBD snapshot lineage;
-- enterprise SAN: array-native replication + consistency-group snapshots/bookmarks;
+- enterprise SAN: array-native replication + consistency-group snapshots/bookmarks/clones;
 - NFS/SharedMountPoint/QCOW2: libvirt incremental backup/checkpoint + CloudStack NAS B&R baseline;
 - unsupported backend: native Backup DR only.
 
 ### DR readiness truth
 
 A high architecture score is not implementation readiness. Advanced multi-backend DR remains at the evidence status actually achieved; do not transfer a design score to runtime status.
+
+Kubernetes/Data Services DR integrates with this provider-neutral DR architecture and its application/storage-native mechanisms; it must not silently introduce an independent failover/fencing truth model.
 
 ---
 
@@ -595,6 +636,8 @@ This becomes HA only when failure-domain placement, quorum, redundant network/st
 CloudStack management-node reboot/failure and DB/schema upgrade availability are different cases. Do not promise zero management-plane downtime for upgrade paths whose upstream procedure requires management services to stop.
 
 If LayerSentry control-plane VMs live on the estate they manage, provide an out-of-band/rescue recovery path that does not depend on a healthy CloudStack API.
+
+The separate Kubernetes management cluster/CAPI control plane inherits the same failure-domain/rescue principle and has additional module-specific backup/restore gates in the specialist context.
 
 ---
 
@@ -712,6 +755,8 @@ Do not claim a SLSA level unless actually implemented/evidenced.
 
 Release manifest records at least release version, upstream reference, source commit, package versions, OS/runtime compatibility, artifact digests/signatures, SBOM reference, configuration/policy versions, certified provider versions and supported upgrade-from versions.
 
+For the Kubernetes/Data Services module it additionally records the exact CAPI/CAPC/CAPRKE2/RKE2 tuple, QCOW2 digests, CNI/CCM/CSI/Gateway/package versions, NVIDIA/OEM artifacts when enabled, compatibility ranges, offline bundle identity and DBaaS/APaaS/Streaming package versions.
+
 ---
 
 ## 20. Installer/deployment contract
@@ -734,6 +779,8 @@ Every mutation is idempotent, deduplicated/state-checked or explicitly marked no
 For CloudStack async jobs, record job IDs and inspect terminal state. Timeout/lost connection is `UNKNOWN` until the exact operation is checked.
 
 The bootstrap controller must not become a runtime single point of failure after successful install.
+
+The Kubernetes/Data Services module uses the QCOW2 + signed offline release/catalog model defined in its specialist context; users install later packages from the local catalog rather than reinstalling the base ISO.
 
 ---
 
@@ -764,6 +811,8 @@ Rollback classification must be honest:
 
 Never promise simple package downgrade after an irreversible/unvalidated DB migration.
 
+Kubernetes/Data Services upgrades are split into package-only, node-image/RKE2, CNI/CSI, operator and database-engine lifecycles according to the specialist context rather than one blind transaction.
+
 ---
 
 ## 22. Observability, troubleshooting and supportability
@@ -781,9 +830,9 @@ Sanitized support/evidence tooling should collect as applicable:
 - SELinux AVC summary;
 - firewall state;
 - DB connectivity/replication summary;
-- CKS/CSI/CNI state;
+- CKS and LayerSentry K8s/CAPI/CAPC/CAPRKE2/CSI/CNI/package state;
 - object store/B&R/DR provider state;
-- recent async-job failures;
+- recent async-job/controller failures;
 - sanitized configuration;
 - Support Cluster UUID.
 
@@ -817,7 +866,7 @@ Never invent:
 - CloudStack inventory/provider health;
 - backup/restore/DR results;
 - RPO/RTO;
-- DB/LB/HA state;
+- DB/LB/HA/Kubernetes/CSI/WAF state;
 - permissions;
 - test results;
 - Support Cluster UUID;
@@ -862,6 +911,8 @@ Live evidence records exact source/artifact, workflow/job/artifact IDs where use
 If live validation is unavailable, retain a truthful lower status.
 
 For Backup/DR/storage: test the exact backend; latest and older retained points; guest data; network/IP mapping; retry/idempotency; provider restart where applicable; RPO/RTO/overhead. Automatic failover/fencing/failback is R4, but R4 inside the designated disposable LayerSentry test environment is covered by the standing authorization in Section 25.
+
+For LayerSentry-managed Kubernetes/Data Services, apply the additional CAPI/Machine/PVC/storage/VIP/air-gap/package/upgrade/data-integrity gates from the specialist context.
 
 ---
 
@@ -928,10 +979,11 @@ Use isolated worktrees/branches. Never let two writing agents share one worktree
 
 Default ownership:
 
-- A — UI/Self-service;
+- A — UI/Self-service and shared customer-facing components;
 - B — Release/Installer/Build;
 - C — Security/Validation;
-- D — DR/HA/Upgrade and runner automation.
+- D — DR/HA/Upgrade and runner automation;
+- E — LayerSentry K8s/DBaaS/APaaS/Streaming module.
 
 Agents do not self-merge into the shared integration branch unless explicitly assigned integration authority. Serialize heavy builds and conflicting live lab mutations, but parallelize independent research, source work, CI and non-conflicting tests to minimize calendar time.
 
@@ -965,7 +1017,7 @@ Applicable gates include:
 
 - branding/terminology;
 - KVM-only customer profile;
-- no V1 DBaaS/APaaS placeholders;
+- K8s/DBaaS/APaaS/Streaming feature gating matches the exact implemented/certified module state rather than stale placeholder/exclusion text;
 - feature prerequisite gating;
 - Platform/Department/User/read-only roles;
 - direct URL/API negatives;
@@ -985,6 +1037,10 @@ Applicable gates include:
 ### Core function
 
 Representative VM lifecycle, storage, network, console, HA/live migration, restart/failure behavior.
+
+### Kubernetes/Data Services
+
+Only when enabled/certified for the release: exact CAPI/CAPC/CAPRKE2/RKE2 tuple, automatic join/scale/replace, CNI/CCM/CSI data-safety, offline package lifecycle, Frontend/VIP/Gateway/WAF behavior, DBaaS/APaaS/Streaming workload-specific failure/backup/upgrade tests defined by the specialist context.
 
 ### Optional integrations
 
@@ -1058,6 +1114,8 @@ Historical base V1 ranges while aggressively reusing CloudStack capabilities wer
 - native cross-Zone recovery + simplified DR UX baseline: **2–3**;
 - deep base production validation: **3–5**.
 
+These historical ranges predate the dedicated LayerSentry-managed CAPI/RKE2/DBaaS/APaaS/Streaming module and must not be treated as an estimate for completing/certifying that module.
+
 The prior `+5–7 man-day` advanced-DR placeholder is **superseded and must not be used** for the expanded requirement.
 
 Current advanced multi-backend DR planning after native two-Zone proof is approximately **36–57 engineering man-days** for NAS/file-backed DR, LINSTOR/DRBD, a first enterprise-SAN family, PITR catalog, Test Recovery, recovery groups, planned/automatic failover, witness/fencing, failback, security and scale/failure testing. Additional storage families/providers add separate adapter/certification effort.
@@ -1076,11 +1134,13 @@ Do not duplicate the same rule across many files when a reference is sufficient.
 
 When CloudStack target version changes, repeat source/document/API/plugin/XaaS compatibility research and provider validation before carrying forward capability claims.
 
+When Kubernetes/Data Services target versions change, repeat CAPI/CAPC/CAPRKE2/RKE2/CNI/CSI/CCM/Gateway/operator/OEM compatibility research and the applicable specialist certification tests before carrying forward capability claims.
+
 ### Continuation instruction
 
 For a new ChatGPT/Codex session:
 
-> Continue LayerSentry from repository/workflow/live evidence, not memory. Read `AGENTS.md`, the Super Master Context, the Progress Ledger and assigned workstream. Use the Knowledge Graph to locate related decisions. Fetch actual CloudStack and cozystack refs before editing. For major work, verify exact Apache CloudStack 4.22.1.1 source/docs/APIs, check native APIs and supported plugins before XaaS or custom orchestration, evaluate XaaS only where exact-version support makes it appropriate, search relevant open/closed GitHub issues/PRs/discussions and Apache/provider community evidence, record the documentation coverage, and change the architecture if evidence shows a materially better approach. Preserve CloudStack authority/core unless an exception is proven. Use the standing disposable-test authorization to execute R0–R4 work in the designated LayerSentry test environment without repeated confirmation, including destructive rebuild/failure/DR/upgrade tests when useful. Validate runtime-affecting work on Rocky Linux 9, never persist plaintext credentials, never touch an unconfirmed production/customer target, and never promote status beyond its evidence gate.
+> Continue LayerSentry from repository/workflow/live evidence, not memory. Read `AGENTS.md`, the Super Master Context, the Progress Ledger and assigned workstream. Read `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` for LayerSentry-managed Kubernetes/Data Services/APaaS/Streaming work. Use the Knowledge Graph to locate related decisions. Fetch actual CloudStack and cozystack refs before editing. For major work, verify exact Apache CloudStack 4.22.1.1 source/docs/APIs, check native APIs and supported plugins before XaaS or custom orchestration, verify the selected Kubernetes controllers/providers before writing duplicate lifecycle code, evaluate XaaS only where exact-version support makes it appropriate, search relevant open/closed GitHub issues/PRs/discussions and Apache/provider community evidence, record the documentation coverage, and change the architecture if evidence shows a materially better approach. Preserve CloudStack authority/core unless an exception is proven. Use the standing disposable-test authorization to execute R0–R4 work in the designated LayerSentry test environment without repeated confirmation, including destructive rebuild/failure/DR/upgrade tests when useful. Validate runtime-affecting work on Rocky Linux 9, never persist plaintext credentials, never touch an unconfirmed production/customer target, and never promote status beyond its evidence gate.
 
 ---
 
@@ -1088,6 +1148,6 @@ For a new ChatGPT/Codex session:
 
 The engineering principle is:
 
-> **Use CloudStack 4.22.1.1 native capabilities first, challenge every major design against exact source/docs/API/plugin/XaaS/community evidence, preserve CloudStack's mature authority, and make LayerSentry simple, secure, storage-aware, supportable, evidence-driven and inexpensive to carry forward.**
+> **Use CloudStack 4.22.1.1 native capabilities first, use the selected CAPI/RKE2/Kubernetes controllers where they provide the correct LayerSentry-managed Kubernetes lifecycle, challenge every major design against exact source/docs/API/plugin/XaaS/controller/community evidence, preserve CloudStack's mature authority, and make LayerSentry simple, secure, storage-aware, supportable, evidence-driven and inexpensive to carry forward.**
 
 The best change is the smallest supportable change that satisfies the requirement, improves a defensible engineering dimension, fails safely, can be diagnosed/upgraded/recovered, has explicit test evidence, updates durable project knowledge, and leaves the next engineering session with no need to guess what happened.
