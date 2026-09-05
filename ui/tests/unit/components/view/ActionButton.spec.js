@@ -112,7 +112,7 @@ describe('Components > View > ActionButton.vue', () => {
       expect(button.attributes('aria-label')).toBeTruthy()
       expect(wrapper.html()).toContain('anticon-delete')
       await button.trigger('click')
-      expect(wrapper.emitted('exec-action')[0][0]).toBe(action)
+      expect(wrapper.emitted('exec-action')[0][0]).toStrictEqual(action)
       expect(action.api).toBe('deleteTestResource')
       expect(action.icon).toBe('close-outlined')
     })
