@@ -7,6 +7,13 @@ on:
         description: Immutable LayerSentry release version
         required: true
         type: string
+  push:
+    branches:
+      - layersentry/4.22.1.1-ui
+    paths:
+      - .github/workflows/layersentry-ui-release.yml
+      - ui/**
+      - tools/layersentry-release/**
 
 permissions:
   contents: read
@@ -15,8 +22,8 @@ jobs:
   build-unsigned-candidate:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: 16.20.2
           cache: npm
@@ -36,7 +43,7 @@ jobs:
           LAYERSENTRY_BUILDER_ID: github-actions/ubuntu-22.04
           LAYERSENTRY_NODE_VERSION: 16.20.2
           LAYERSENTRY_NPM_VERSION: 8.19.4
-          RELEASE_VERSION: ${{ inputs.release_version }}
+          RELEASE_VERSION: ${{ inputs.release_version || format('ci-{0}', github.sha) }}
         run: |
           tools/layersentry-release/build-ui-release.sh \
             --version "$RELEASE_VERSION" \
@@ -47,9 +54,9 @@ jobs:
             --expected-source-commit "$GITHUB_SHA" \
             --allow-unsigned
       - name: Upload immutable candidate bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: layersentry-ui-${{ inputs.release_version }}-${{ github.sha }}
+          name: layersentry-ui-${{ inputs.release_version || 'ci' }}-${{ github.sha }}
           path: layersentry-release/
           if-no-files-found: error
           retention-days: 30
