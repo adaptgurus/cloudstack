@@ -26,6 +26,7 @@ git log -5 --oneline --decorate
 Read specialist documents only when the task requires them:
 
 - LayerSentry-managed RKE2/CAPI, DBaaS, APaaS, Streaming, Kubernetes package/storage/network/VIP/WAF work: `docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`
+- LayerSentry VM-native Single-OS DBaaS/APaaS appliance work: `docs/layersentry/LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`
 - troubleshooting/regression/root-cause work: `docs/layersentry/LAYERSENTRY_DEBUGGING_RUNBOOK.md`
 - secure coding/trust-boundary/security-sensitive implementation: `docs/layersentry/LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
 - control-plane HA/XaaS/failure-domain/future-version work: `docs/layersentry/LAYERSENTRY_CONTROL_PLANE_XAAS_AND_FUTURE_UPGRADE_POLICY.md`
@@ -294,6 +295,7 @@ Until it is implemented/discovered on the current lab, report it as `UNKNOWN`/`P
 - Customer experience is KVM-only; non-KVM upstream implementations remain in CloudStack core.
 - Native CloudStack KVM remains the primary VM/network/storage orchestration path; XaaS is selective for genuinely external systems/lifecycle extensions, not a replacement for native KVM.
 - **LayerSentry K8s, DBaaS, APaaS and Streaming are valid LayerSentry modules.** They are implemented above CloudStack through the dedicated CAPI/RKE2/package/operator architecture and must not be forced into CloudStack core. Read `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` for their authoritative module contract.
+- **LayerSentry Single-OS DBaaS/APaaS is a separate VM-native module.** It is governed by `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` and must not be implemented by extending/merging the RKE2/CAPI lifecycle plane.
 - Native CloudStack CKS may remain available where selected, but LayerSentry-managed RKE2 is a separate lifecycle path; do not rewrite CKS into RKE2.
 - UI hiding is UX only; CloudStack RBAC is the server-side security boundary, with additional LayerSentry/Kubernetes authorization for module-specific privileged actions.
 - Feature visibility requires permission plus real configuration/provider/prerequisite state.
@@ -308,6 +310,20 @@ Until it is implemented/discovered on the current lab, report it as `UNKNOWN`/`P
 - NAS VM-level B&R is not the primary protection mechanism for Kubernetes nodes.
 - KVM Instance/VM-snapshot and Volume-snapshot safety limitations must be guarded and tested.
 
+## Single-OS DBaaS/APaaS non-overlap and acceptance invariant
+
+For any VM-native Single-OS DBaaS/APaaS task, Codex MUST read `docs/layersentry/LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` before design or implementation.
+
+This is a distinct architecture from the Kubernetes-managed RKE2/CAPI DBaaS/APaaS/Streaming path. Do not merge or share its lifecycle controller/state machine, guest agent/engine, provider/package state, topology/job state, or Kubernetes CRD/operator/CAPI/RKE2 objects. API routes/namespaces whose lifecycle semantics differ must remain distinct.
+
+Shared LayerSentry surfaces are allowed only through clean contracts: native CloudStack VM/network/storage APIs, CloudStack RBAC/tenancy/quota authority, common UI shell/design system, secure-engineering policy, secret infrastructure, observability/audit presentation and evidence vocabulary.
+
+The Single-OS base is Rocky Linux 9 minimal with SELinux Enforcing, firewalld active/default-deny, no unnecessary listeners, signed package/repository verification, safe argv/path handling, bounded operations, secret redaction and hardened systemd service settings. Broad firewall disablement, `setenforce 0`, `curl | bash`, arbitrary remote scripts or unbounded shell/eval execution are release blockers.
+
+Current acceptance envelope for this workstream is exactly one disposable Hyper-V Generation 2 VM with **2 vCPU**, **2048 MB static RAM**, **Dynamic Memory OFF** and **Rocky Linux 9**. Do not create a second VM to satisfy cluster tests. Local mocks/processes/network namespaces may validate cluster planning/error paths but are not proof of multi-node HA, replication, quorum or failover.
+
+The guest lifecycle engine (`layersentryd` working name) remains `PENDING` until implemented and tested. Never infer live functionality from the architecture document. Standalone hardening/runtime behavior becomes `LIVE_VERIFIED` only from durable runner evidence against the exact artifact on the authorized Hyper-V/Rocky Linux 9 path. Real multi-node cluster behavior remains `NOT_TESTED`/`PARTIAL` under the one-VM restriction.
+
 ## Parallel-agent rules
 
 Never let two writing agents use one worktree.
@@ -319,6 +335,7 @@ Default ownership:
 - C — Security/Validation: RBAC negative tests, SELinux/firewall/package/snapshot/Kubernetes security and evidence tooling.
 - D — DR/HA/Upgrade: runner/Hyper-V/DR/HA/upgrade proof automation and evidence.
 - E — K8s/DBaaS/APaaS/Streaming: CAPI/RKE2, package plane, module storage/network/VIP/WAF, DBaaS/APaaS/Streaming integrations.
+- F — Single-OS DBaaS/APaaS: VM-native Rocky Linux appliance, `layersentryd`, provider manifests, guest hardening and one-VM acceptance evidence. F must not modify/merge the E lifecycle plane unless an explicit cross-module contract change is separately approved.
 
 Agents do not merge themselves into the shared integration branch unless explicitly assigned integration responsibility. Only the integration/lead path updates the shared progress ledger by default.
 
