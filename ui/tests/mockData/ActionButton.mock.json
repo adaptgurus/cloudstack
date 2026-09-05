@@ -15,7 +15,8 @@
     "test-api-case-3": {},
     "test-api-case-4": {},
     "test-api-case-5": {},
-    "test-api-case-6": {}
+    "test-api-case-6": {},
+    "deleteTestResource": {}
   },
   "routes": [
     {
