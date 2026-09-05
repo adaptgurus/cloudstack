@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from urllib.parse import parse_qsl
 
 STATE = Path('/var/lib/layersentry/installation')
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -39,7 +40,7 @@ def write_private(path, value, mode=0o600):
     require(not path.is_symlink(), 'refusing symlink destination')
     fd, temporary = tempfile.mkstemp(dir=path.parent)
     try:
-        with os.fdopen(fd, 'w') as stream:
+        with os.fdopen(fd, 'wb' if isinstance(value, bytes) else 'w') as stream:
             stream.write(value)
             stream.flush()
             os.fsync(stream.fileno())
@@ -57,6 +58,102 @@ def run(argv, *, data=None, timeout=1800, env=None):
     if result.returncode:
         raise RuntimeError(Path(argv[0]).name + ' failed; output withheld to protect credentials')
     return result.stdout.strip()
+
+
+def java_properties(content):
+    """Read the effective Properties.load(InputStream) values without executing them.
+
+    Handles Java separators, comments, continuations and escapes; duplicate keys
+    use the last value. Callers decode bytes as ISO-8859-1, like Properties.load.
+    """
+    def unescape(value):
+        result = []
+        index = 0
+        while index < len(value):
+            character = value[index]
+            index += 1
+            if character == '\\':
+                require(index < len(value), 'incomplete Java properties escape')
+                character = value[index]
+                index += 1
+                if character == 'u':
+                    digits = value[index:index + 4]
+                    require(len(digits) == 4 and re.fullmatch('[0-9a-fA-F]{4}', digits),
+                            'invalid Java properties Unicode escape')
+                    character = chr(int(digits, 16))
+                    index += 4
+                else:
+                    character = {'t': '\t', 'n': '\n', 'r': '\r', 'f': '\f'}.get(character, character)
+            result.append(character)
+        return ''.join(result)
+
+    properties = {}
+    pending = None
+    for natural in re.split(r'\r\n|\r|\n', content):
+        line = natural.lstrip(' \t\f')
+        if pending is None and (not line or line.startswith(('#', '!'))):
+            continue
+        line = (pending or '') + line
+        trailing = len(line) - len(line.rstrip('\\'))
+        if trailing % 2:
+            pending = line[:-1]
+            continue
+        pending = None
+        index = 0
+        while index < len(line):
+            if line[index] == '\\':
+                index += 2
+            elif line[index] in '=:\t\f ':
+                break
+            else:
+                index += 1
+        key = unescape(line[:index])
+        offset = index
+        while offset < len(line) and line[offset] in ' \t\f':
+            offset += 1
+        if offset < len(line) and line[offset] in '=:':
+            offset += 1
+        while offset < len(line) and line[offset] in ' \t\f':
+            offset += 1
+        properties[key] = unescape(line[offset:])
+    require(pending is None, 'incomplete Java properties continuation')
+    return properties
+
+
+def validate_external_properties(content, config):
+    properties = java_properties(content)
+    require(properties.get('cluster.node.IP') == config['management_ip'],
+            'external configuration cluster.node.IP must match this management node')
+    require(properties.get('db.ha.enabled', 'false').lower() == 'false',
+            'external profile requires one endpoint; DB HA URI composition is not supported')
+    tls = {'useSSL': 'true', 'requireSSL': 'true', 'verifyServerCertificate': 'true',
+           'sslMode': 'VERIFY_IDENTITY'}
+    allowed = set(tls) | {'serverTimezone', 'prepStmtCacheSize', 'cachePrepStmts', 'prepStmtCacheSqlLimit',
+                          'sessionVariables', 'useUnicode', 'characterEncoding', 'zeroDateTimeBehavior',
+                          'rewriteBatchedStatements'}
+    for schema, database in (('cloud', 'cloud'), ('usage', 'cloud_usage')):
+        prefix = 'db.' + schema + '.'
+        require(prefix + 'uri' not in properties, 'external database URI overrides are not supported')
+        require(properties.get(prefix + 'host') == config['db_host'], 'external database properties host mismatch')
+        require(properties.get(prefix + 'driver') == 'jdbc:mysql'
+                and properties.get(prefix + 'port') == '3306'
+                and properties.get(prefix + 'name') == database,
+                'external database driver/port/schema differs from supported endpoint')
+        require(not properties.get(prefix + 'replicas', '').strip(), 'external database replica overrides are not supported')
+        require(re.fullmatch(r'ENC\([^\r\n()]+\)', properties.get(prefix + 'password', '')),
+                'both external database passwords must be encrypted')
+        require(bool(properties.get(prefix + 'url.params')),
+                'both external JDBC connections require explicit verified TLS settings')
+        try:
+            pairs = parse_qsl(properties.get(prefix + 'url.params', ''), keep_blank_values=True, strict_parsing=True)
+        except ValueError:
+            raise ValueError('invalid JDBC URL parameter syntax') from None
+        keys = [key.casefold() for key, _ in pairs]
+        require(len(keys) == len(set(keys)), 'duplicate JDBC URL parameters are not supported')
+        parameters = dict(pairs)
+        require(set(parameters) <= allowed, 'unreviewed JDBC URL parameter in external profile')
+        require(all(parameters.get(key) == value for key, value in tls.items()),
+                'both external JDBC connections require explicit verified TLS settings')
 
 
 def validate(config, secrets):
@@ -104,15 +201,10 @@ def validate(config, secrets):
             require(bool(section.get('gpgkey')), 'repository trust key required')
     private_file(config['backup_recipient_certificate'])
     if not config['initialize_database']:
-        db = private_file(config['db_properties_file']).read_text()
-        require('ENC(' in db, 'external database properties must contain encrypted credentials')
-        for prefix in ('db.cloud.host', 'db.usage.host'):
-            require(re.search(r'^' + re.escape(prefix) + r'\s*=\s*' + re.escape(config['db_host']) + r'\s*$', db, re.M),
-                    'external database properties host mismatch')
+        db = private_file(config['db_properties_file']).read_bytes().decode('iso-8859-1')
+        validate_external_properties(db, config)
         private_file(config['encryption_key_file'])
         private_file(config['db_tls_ca'])
-        require('useSSL=true' in db and 'verifyServerCertificate=true' in db,
-                'external JDBC configuration requires validated TLS settings and Java truststore')
     required = ['backup_db_password']
     if config['initialize_database']:
         required += ['db_password', 'db_admin_password', 'management_key', 'database_key']
@@ -255,7 +347,7 @@ class Installer:
                         'external database server series mismatch')
                 require(mysql(auth, "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name IN ('cloud','cloud_usage');") == '2',
                         'external database schemas missing or inaccessible')
-            write_private(db, Path(source_db).read_text())
+            write_private(db, Path(source_db).read_bytes())
             write_private(key, Path(source_key).read_text())
             # Preserve the existing node bootstrap's encrypted-config/permission contract;
             # firewall changes below are additionally scoped to operator-supplied CIDRs.

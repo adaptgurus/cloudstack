@@ -47,6 +47,14 @@ def digest(path):
     return result.hexdigest()
 
 
+def sync_directory(path):
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def verify(directory):
     directory = Path(directory)
     require(not directory.is_symlink() and directory.is_dir(), 'invalid backup directory')
@@ -105,9 +113,12 @@ def backup(config):
             for path in (payload, staging / 'manifest.json'):
                 with path.open('rb') as stream:
                     os.fsync(stream.fileno())
+            sync_directory(staging)
             final = root / ('backup-' + uuid.uuid4().hex)
             # Publish only after the encrypted payload and manifest have passed checks.
             os.rename(staging, final)
+            # Retention must not run until the new directory entry is durable.
+            sync_directory(root)
         retained = sorted((p for p in root.glob('backup-*') if p.is_dir() and not p.is_symlink()),
                           key=lambda p: p.stat().st_mtime, reverse=True)
         # Invalid backups never cause a valid older recovery point to be removed.

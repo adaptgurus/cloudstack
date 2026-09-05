@@ -81,6 +81,25 @@ class BackupTests(unittest.TestCase):
             self.create()
         self.assertEqual(len(list((self.root / 'backups').glob('backup-*'))), 2)
 
+    def test_publication_directory_sync_precedes_retention(self):
+        self.create()
+        self.create()
+        root = self.root / 'backups'
+        old = set(root.glob('backup-*'))
+        actual_sync = backup.sync_directory
+        synced = []
+        def fail_publication_sync(path):
+            synced.append(Path(path))
+            if Path(path) == root:
+                self.assertEqual(len(list(root.glob('backup-*'))), 3)
+                raise OSError('injected directory sync failure')
+            actual_sync(path)
+        with patch.object(backup, 'sync_directory', fail_publication_sync), self.assertRaises(OSError):
+            self.create()
+        self.assertEqual(len(synced), 2)
+        self.assertTrue(all(path.exists() for path in old))
+        self.assertEqual(len(list(root.glob('backup-*'))), 3)
+
     def test_tampered_payload_rejected(self):
         result = self.create()
         with (result / 'databases.sql.gz.cms').open('ab') as stream:

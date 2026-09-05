@@ -77,7 +77,7 @@ class InstallerTests(unittest.TestCase):
 
     def test_external_join_requires_matching_encrypted_tls_config(self):
         db = self.root / 'db.properties'
-        db.write_text('db.cloud.host=db.example\ndb.usage.host=db.example\ndb.cloud.password=ENC(ciphertext)\ndb.cloud.url.params=useSSL=true&verifyServerCertificate=true\n')
+        db.write_text(self.external_properties())
         db.chmod(0o600)
         config = dict(self.config, mode='external', initialize_database=False, db_host='db.example',
                       db_properties_file=str(db), encryption_key_file=str(self.cert), db_tls_ca=str(self.cert))
@@ -85,6 +85,81 @@ class InstallerTests(unittest.TestCase):
         db.write_text(db.read_text().replace('db.example', 'other.example'))
         with self.assertRaisesRegex(ValueError, 'host mismatch'):
             installer.validate(config, self.secrets)
+
+    def external_properties(self):
+        lines = ['cluster.node.IP=192.0.2.10']
+        for schema, name in [('cloud', 'cloud'), ('usage', 'cloud_usage')]:
+            prefix = 'db.' + schema + '.'
+            lines.extend(prefix + key + '=' + value for key, value in {
+                'host': 'db.example', 'port': '3306', 'driver': 'jdbc:mysql', 'name': name,
+                'password': 'ENC(ciphertext)',
+                'url.params': 'useSSL=true&requireSSL=true&verifyServerCertificate=true&sslMode=VERIFY_IDENTITY&serverTimezone=UTC'
+            }.items())
+        return '\n'.join(lines) + '\n'
+
+    def check_external(self, content):
+        installer.validate_external_properties(content, dict(self.config, db_host='db.example'))
+
+    def test_external_uri_override_always_rejected(self):
+        for key in ('db.cloud.uri', 'db.usage.uri', r'db.cloud.\u0075ri'):
+            for value in ('jdbc:mysql://other.example/cloud?useSSL=false', ''):
+                with self.subTest(key=key, value=value), self.assertRaisesRegex(ValueError, 'URI override'):
+                    self.check_external(self.external_properties() + key + '=' + value + '\n')
+
+    def test_external_tls_in_comments_does_not_count(self):
+        content = self.external_properties().replace('db.cloud.url.params=', '#db.cloud.url.params=')
+        with self.assertRaisesRegex(ValueError, 'explicit verified TLS'):
+            self.check_external(content)
+
+    def test_external_tls_required_for_usage_independently(self):
+        content = '\n'.join(line for line in self.external_properties().splitlines() if not line.startswith('db.usage.url.params'))
+        with self.assertRaisesRegex(ValueError, 'explicit verified TLS'):
+            self.check_external(content)
+
+    def test_external_last_property_controls_tls(self):
+        with self.assertRaisesRegex(ValueError, 'explicit verified TLS'):
+            self.check_external(self.external_properties() + 'db.cloud.url.params=useSSL=false\n')
+
+    def test_external_tls_downgrade_and_duplicate_parameters_rejected(self):
+        for change in ('sslMode=DISABLED', 'sslMode=VERIFY_CA', 'sslMode=VERIFY_IDENTITY&sslMode=DISABLED',
+                       'sslMode=VERIFY_IDENTITY&sslmode=DISABLED', 'sslMode=VERIFY_IDENTITY&socketFactory=OtherClass'):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.check_external(self.external_properties().replace('sslMode=VERIFY_IDENTITY', change))
+
+    def test_external_rejects_other_node_ip(self):
+        for content in (self.external_properties().replace('192.0.2.10', '192.0.2.11'),
+                        self.external_properties() + 'cluster.node.IP:192.0.2.11\n',
+                        self.external_properties().replace('cluster.node.IP=', '#cluster.node.IP=')):
+            with self.subTest(content=content), self.assertRaisesRegex(ValueError, 'cluster.node.IP'):
+                self.check_external(content)
+
+    def test_external_rejects_endpoint_redirection(self):
+        for key, value in [('db.ha.enabled', 'true'), ('db.cloud.replicas', 'other.example'),
+                           ('db.usage.driver', 'jdbc:custom'), ('db.cloud.name', 'cloud?useSSL=false')]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.check_external(self.external_properties() + key + '=' + value + '\n')
+
+    def test_java_properties_escape_continuation_and_precedence(self):
+        content = '#ignored=yes\r\n!also=ignored\n escaped\\ key : first\\nsecond\n'
+        content += 'dup=old\ndup new\njoined=useSSL=true&\\\n  requireSSL=true\n'
+        content += r'db.cloud.\u0075ri=redirect' + '\n'
+        result = installer.java_properties(content)
+        self.assertEqual(result, {'escaped key': 'first\nsecond', 'dup': 'new',
+                                 'joined': 'useSSL=true&requireSSL=true', 'db.cloud.uri': 'redirect'})
+
+    def test_external_valid_escaped_keys_and_continuations(self):
+        content = self.external_properties().replace('cluster.node.IP=', r'cluster.node.\u0049P : ')
+        content = content.replace('&requireSSL', '&\\\n  requireSSL')
+        self.check_external(content)
+
+    def test_java_properties_malformed_escape_rejected(self):
+        for content in (r'key=\uZZZZ', r'key=\u12', 'key=unfinished\\'):
+            with self.subTest(content=content), self.assertRaises(ValueError):
+                installer.java_properties(content)
+
+    def test_external_comment_encrypted_password_is_not_a_credential(self):
+        with self.assertRaisesRegex(ValueError, 'passwords must be encrypted'):
+            self.check_external(self.external_properties().replace('db.usage.password=', '#db.usage.password='))
 
     def test_journal_skips_successful_mutation(self):
         with patch.object(installer, 'STATE', self.root):
@@ -123,6 +198,12 @@ class InstallerTests(unittest.TestCase):
         installer.write_private(target, 'second')
         self.assertEqual(target.read_text(), 'second')
         self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+
+    def test_private_writer_preserves_java_properties_bytes(self):
+        target = self.root / 'latin1.properties'
+        content = b'comment=\xe9\n'
+        installer.write_private(target, content)
+        self.assertEqual(target.read_bytes(), content)
 
 
 if __name__ == '__main__':
