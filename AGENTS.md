@@ -25,6 +25,7 @@ git log -5 --oneline --decorate
 
 Read specialist documents only when the task requires them:
 
+- LayerSentry-managed RKE2/CAPI, DBaaS, APaaS, Streaming, Kubernetes package/storage/network/VIP/WAF work: `docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`
 - troubleshooting/regression/root-cause work: `docs/layersentry/LAYERSENTRY_DEBUGGING_RUNBOOK.md`
 - secure coding/trust-boundary/security-sensitive implementation: `docs/layersentry/LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
 - control-plane HA/XaaS/failure-domain/future-version work: `docs/layersentry/LAYERSENTRY_CONTROL_PLANE_XAAS_AND_FUTURE_UPGRADE_POLICY.md`
@@ -259,6 +260,8 @@ Required rules:
 
 For Backup/DR/storage changes, live validation must additionally prove the exact storage/provider path being claimed. Where point-in-time recovery is supported, test at least the latest recovery point and an older retained checkpoint on disposable/approved data, verify expected data and network mapping, and exercise a relevant negative/retry/idempotency case before stronger certification.
 
+For LayerSentry-managed Kubernetes/Data Services storage, VIP, CAPI, CSI, GPU, Gateway/WAF and air-gap changes, apply the additional destructive/data-safety/upgrade gates in `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`.
+
 ## DR architecture invariant
 
 The current selected DR direction is documented in `LAYERSENTRY_DRAAS_ARCHITECTURE.md` and its revalidation evidence.
@@ -276,6 +279,8 @@ Key rules:
 - planned failover/failback is certified before emergency automatic failover;
 - provider/topology capability determines which RPO tiers the UI may offer.
 
+The Kubernetes/Data Services module integrates with this DR architecture where application/cluster DR is implemented; it must not create a second conflicting DR authority.
+
 ## Support Cluster UUID
 
 LayerSentry requires a durable proprietary Support Cluster UUID for installation/support identity. It is an identifier, not an authentication secret.
@@ -288,9 +293,9 @@ Until it is implemented/discovered on the current lab, report it as `UNKNOWN`/`P
 
 - Customer experience is KVM-only; non-KVM upstream implementations remain in CloudStack core.
 - Native CloudStack KVM remains the primary VM/network/storage orchestration path; XaaS is selective for genuinely external systems/lifecycle extensions, not a replacement for native KVM.
-- DBaaS/APaaS are excluded from V1; do not recreate placeholders.
-- Future DBaaS belongs above Kubernetes rather than in CloudStack core.
-- UI hiding is UX only; CloudStack RBAC is the server-side security boundary.
+- **LayerSentry K8s, DBaaS, APaaS and Streaming are valid LayerSentry modules.** They are implemented above CloudStack through the dedicated CAPI/RKE2/package/operator architecture and must not be forced into CloudStack core. Read `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` for their authoritative module contract.
+- Native CloudStack CKS may remain available where selected, but LayerSentry-managed RKE2 is a separate lifecycle path; do not rewrite CKS into RKE2.
+- UI hiding is UX only; CloudStack RBAC is the server-side security boundary, with additional LayerSentry/Kubernetes authorization for module-specific privileged actions.
 - Feature visibility requires permission plus real configuration/provider/prerequisite state.
 - Customer terminology is presentation only; backend names/API semantics remain unchanged.
 - Production management nodes must consume CI-built verified UI artifacts rather than compile Vue locally.
@@ -299,8 +304,8 @@ Until it is implemented/discovered on the current lab, report it as `UNKNOWN`/`P
 - Do not claim survival of "all worst cases"; define and test the exact failure envelope. A three-member DB quorum cannot guarantee survival of arbitrary two-member/failure-domain loss.
 - If the LayerSentry control plane is virtualized on the estate it manages, it requires an out-of-band/rescue recovery path that does not depend on a healthy CloudStack API.
 - Future-version tooling must not assume CloudStack versions always start with `4.` or always have four numeric components; the announced post-4.23 line uses `24.0.0` naming.
-- Do not claim full air-gap CKS until the internal-registry/bootstrap path is implemented and proven.
-- NAS VM-level B&R is not the primary protection mechanism for CKS nodes.
+- Do not claim full air-gap native CKS until the internal-registry/bootstrap path is implemented and proven; LayerSentry-managed RKE2 air-gap has its own separate release/qualification gates.
+- NAS VM-level B&R is not the primary protection mechanism for Kubernetes nodes.
 - KVM Instance/VM-snapshot and Volume-snapshot safety limitations must be guarded and tested.
 
 ## Parallel-agent rules
@@ -309,10 +314,11 @@ Never let two writing agents use one worktree.
 
 Default ownership:
 
-- A — UI/Self-service: customer-facing UI/product-profile work.
+- A — UI/Self-service: customer-facing UI/product-profile work and shared visual components.
 - B — Release/Installer/Build: CI artifact, installer, manifest/SBOM/signature/digest, rollback/build settings.
-- C — Security/Validation: RBAC negative tests, SELinux/firewall/package/snapshot/CKS security and evidence tooling.
+- C — Security/Validation: RBAC negative tests, SELinux/firewall/package/snapshot/Kubernetes security and evidence tooling.
 - D — DR/HA/Upgrade: runner/Hyper-V/DR/HA/upgrade proof automation and evidence.
+- E — K8s/DBaaS/APaaS/Streaming: CAPI/RKE2, package plane, module storage/network/VIP/WAF, DBaaS/APaaS/Streaming integrations.
 
 Agents do not merge themselves into the shared integration branch unless explicitly assigned integration responsibility. Only the integration/lead path updates the shared progress ledger by default.
 
