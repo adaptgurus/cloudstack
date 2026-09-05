@@ -5,11 +5,13 @@
 This policy defines the validated LayerSentry direction for four connected product requirements:
 
 1. a fully KVM-only customer-facing product experience;
-2. a polished role-aware LayerSentry UI including a fast one-page provisioning experience;
+2. a polished role-aware LayerSentry UI including a fast one-page VM provisioning experience;
 3. mandatory `adaptgurus/cozystack` runner validation for every merge-candidate UI/feature change and every completed development module;
 4. provider-neutral DR provisioning with automatic Site/network/VLAN/IP/storage mapping while preserving Apache CloudStack 4.22.1.1 as the infrastructure authority.
 
 This is a stable architecture and acceptance contract. It does not by itself promote any runtime capability above its evidence-backed status in `LAYERSENTRY_PROGRESS_LEDGER.md`.
+
+LayerSentry-managed RKE2/Kubernetes, DBaaS, APaaS, Streaming and their Kubernetes-specific package/storage/VIP/Gateway/WAF workflows are valid product modules and are governed in detail by `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`. This policy continues to govern the shared UI quality, KVM-only profile, VM Quick Provision and DR concepts; it does not override the specialist Kubernetes/Data Services lifecycle contract.
 
 ## Validated architecture decision
 
@@ -37,6 +39,8 @@ CloudStack remains authoritative for VM lifecycle, async jobs, scheduling, accou
 
 LayerSentry may add an idempotent thin controller when a customer workflow spans multiple native API calls or an external system such as enterprise DNS/IPAM, storage-native replication or DR fencing. That controller must not become a second VM scheduler, quota system, RBAC database or storage allocator.
 
+For LayerSentry-managed RKE2, the specialist context selects CAPI/CAPC/CAPRKE2 after exact qualification rather than extending this VM orchestrator into a second Kubernetes lifecycle engine.
+
 ## KVM-only customer contract
 
 All normal LayerSentry customer-facing surfaces use KVM only.
@@ -49,7 +53,7 @@ This applies to:
 - Department Operator/User UI;
 - read-only/auditor UI;
 - VM/image/ISO/host/cluster/storage/network wizards;
-- Kubernetes workflows;
+- Kubernetes/Data Services workflows;
 - filters, search facets and selectors;
 - help text, tooltips, empty/error states and validation messages;
 - dashboards, cards and reports intended for customers;
@@ -67,7 +71,7 @@ LayerSentry is a product experience, not a reskinned CloudStack menu tree.
 
 ### Platform Administrator
 
-Primary areas:
+Primary areas may include when enabled/certified:
 
 - Dashboard;
 - Quick Provision;
@@ -76,7 +80,9 @@ Primary areas:
 - Network;
 - Images;
 - Kubernetes;
-- Object Storage when configured;
+- Data Services / DBaaS;
+- APaaS / Streaming;
+- Object Storage;
 - Infrastructure;
 - Backup & DR;
 - Activity/Alerts;
@@ -86,15 +92,16 @@ Dashboard content must prioritize actionable KVM host health, VM state, capacity
 
 ### Department Administrator
 
-Primary areas:
+Primary areas may include when delegated/enabled:
 
 - Dashboard;
 - Quick Provision;
 - Virtual Machines;
 - Volumes;
 - Networks/VPCs delegated to the department;
-- Kubernetes when enabled;
-- Buckets when enabled;
+- Kubernetes;
+- DBaaS/APaaS/Streaming services permitted to the department;
+- Buckets;
 - Backup/Recovery;
 - Activity.
 
@@ -119,15 +126,17 @@ Required quality gates:
 - informative empty states;
 - actionable validation/error states;
 - confirmation for destructive/high-impact actions;
-- progress/result presentation for CloudStack async jobs;
+- progress/result presentation for CloudStack async jobs and LayerSentry controller workflows;
 - consistent terminology and status badges;
-- no fabricated `Healthy`, `Protected`, `HA`, `DR Ready`, `Encrypted` or similar state.
+- no fabricated `Healthy`, `Protected`, `HA`, `DR Ready`, `Encrypted`, `CSI Ready` or `WAF Protected` state.
 
 ## Quick Provision — one-page SPA
 
-LayerSentry adds one fast provisioning surface, tentatively named **Quick Provision**. It is a single-page application view with progressive sections and a live plan summary. Advanced native CloudStack forms remain available to privileged roles where required.
+LayerSentry adds one fast **VM provisioning** surface, tentatively named **Quick Provision**. It is a single-page application view with progressive sections and a live plan summary. Advanced native CloudStack forms remain available to privileged roles where required.
 
 The SPA must not invent unsupported CloudStack API fields. It composes supported APIs and LayerSentry post-deploy operations.
+
+LayerSentry K8s/DBaaS/APaaS/Streaming use separate service-oriented GUI wizards defined by the specialist module context; do not force those lifecycles into the VM Quick Provision form.
 
 ### One-page sections
 
@@ -196,6 +205,8 @@ Examples of safe automation:
 
 The UI must show the resolved plan before deployment and allow only authorized overrides.
 
+For K8s/Data Services wizards the same UX rule applies, but eligibility additionally includes exact CAPI/RKE2/CNI/CSI/package/VIP/Gateway/WAF compatibility and offline artifact presence from the specialist context.
+
 ## Network Blueprint model
 
 Do not make ordinary users design physical networking in the VM wizard.
@@ -216,6 +227,8 @@ CloudStack remains authoritative for the actual network/VPC/VLAN/IP resource lif
 
 For VPC tiers and isolated networks, prefer configured VLAN ranges and CloudStack allocation rather than asking users to enter arbitrary physical VLAN IDs. Platform Administrators may receive a validated override when needed.
 
+Kubernetes Frontend/VIP/Gateway/WAF presentation may reuse Network Blueprint data, but its provider/lifecycle semantics come from the specialist K8s/Data Services context.
+
 ## DNS contract
 
 CloudStack-provided DHCP/DNS behavior and network DNS suffixes remain native where applicable.
@@ -226,16 +239,16 @@ Enterprise authoritative DNS record management is a separate optional LayerSentr
 - support idempotent create/update/delete/reconcile;
 - validate zones/names/IPs;
 - avoid SSRF and arbitrary endpoint access;
-- report partial failure separately from VM deployment;
+- report partial failure separately from VM/service deployment;
 - never expose provider credentials to browser clients.
 
-Failure to register an optional DNS record after a VM deploy must not falsely report that the VM itself failed to deploy. The workflow must show the exact partial state and retry path.
+Failure to register an optional DNS record after a VM/service deploy must not falsely report that the underlying VM/application itself failed to deploy. The workflow must show the exact partial state and retry path.
 
 ## Storage Profile and SAN contract
 
-Ordinary users choose a **Storage Profile**, not storage-array credentials, target IQNs or raw LUNs.
+Ordinary VM users choose a **Storage Profile**, not storage-array credentials, target IQNs or raw LUNs.
 
-Platform Administrators configure/certify the underlying CloudStack storage pools and map them to LayerSentry Storage Profiles.
+Platform Administrators configure/certify the underlying CloudStack storage pools and map them to LayerSentry VM Storage Profiles.
 
 For the CloudStack 4.22.1.1 KVM baseline, supported/certified paths may include, subject to exact deployment validation:
 
@@ -249,7 +262,9 @@ For the CloudStack 4.22.1.1 KVM baseline, supported/certified paths may include,
 
 Do not make LayerSentry 4.22.1.1 depend on CloudStack 4.23-only CLVM/CLVM_NG behavior. Re-evaluate that capability when a future LayerSentry release certifies CloudStack 4.23+ or its successor.
 
-Volume creation/placement/attachment remains through CloudStack native APIs. A Storage Profile can express validated policy/capabilities but is not a second storage scheduler.
+Volume creation/placement/attachment remains through CloudStack native APIs. A VM Storage Profile can express validated policy/capabilities but is not a second storage scheduler.
+
+Kubernetes StorageProfiles are a different abstraction and may map to CloudStack CSI, SharedFS/NFS CSI or OEM CSI according to the specialist context. Do not reuse this VM section to infer Kubernetes multi-attach or CSI semantics.
 
 ## Thin Provisioning Orchestrator / transaction model
 
@@ -281,6 +296,8 @@ Requirements:
 - exact partial-failure presentation;
 - server-side authorization for every privileged step;
 - audit trail with secret redaction.
+
+The Kubernetes/Data Services module has its own durable CAPI/controller state-machine contract. Do not copy the VM saga blindly into that lifecycle.
 
 ## Smart DR provisioning and replica model
 
@@ -380,6 +397,8 @@ native backup/recovery proof
 
 Automatic failover is prohibited until witness/quorum and safe source fencing/exclusivity are implemented and repeatedly tested.
 
+Kubernetes/Data Services application/cluster DR, when implemented, integrates with the same provider-neutral DR/fencing authority and its workload-native backup/storage mechanisms; it must not create a second conflicting DR control plane.
+
 ## Cozystack runner validation contract
 
 `adaptgurus/cozystack` is the mandatory durable live-validation path for LayerSentry runtime-affecting work unless an explicitly approved replacement is recorded.
@@ -395,7 +414,7 @@ Before integration of a runtime-affecting UI/feature change, run the relevant fa
 - feature-policy/prerequisite tests;
 - KVM-only rendered navigation/selector audit;
 - terminology/wrong-label audit;
-- no DBaaS/APaaS V1 regression;
+- K8s/DBaaS/APaaS/Streaming visibility and wording match the current specialist module scope; no stale exclusion or fake-ready placeholder;
 - affected role/RBAC/direct-route negatives;
 - error/empty/loading state tests;
 - changed API contract tests;
@@ -422,7 +441,7 @@ For UI modules include, as applicable:
 - browser refresh/deep-link/cache behavior;
 - failure/partial-state behavior.
 
-For storage/network/DR/backend modules include the exact provider/API path, idempotency/retry/negative tests and rollback/recovery evidence.
+For storage/network/DR/backend/Kubernetes modules include the exact provider/API/controller path, idempotency/retry/negative tests and rollback/recovery evidence.
 
 A module must not be labeled complete, `LIVE_VERIFIED` or stronger solely from source review, screenshots, HTTP 200 or one happy-path execution.
 
@@ -444,17 +463,17 @@ Every runner acceptance record captures:
 
 Do not test an artifact and then claim a later untested commit inherits the result.
 
-## Definition of done for the new experience
+## Definition of done for the base unified experience
 
 The unified provisioning/UI/DR work is not complete until all of the following applicable gates are met:
 
 - no customer-facing non-KVM hypervisor leakage;
 - polished role-aware screens and icons for all supported personas;
-- Quick Provision one-page flow implemented with supported CloudStack semantics;
+- Quick Provision one-page VM flow implemented with supported CloudStack semantics;
 - capability-gated safe automatic defaults;
-- Storage Profiles backed by certified storage pools/providers including the intended SAN path;
+- VM Storage Profiles backed by certified storage pools/providers including the intended SAN path;
 - Network Blueprints with VPC/VLAN/IP/DNS behavior live-tested;
-- multi-step provisioning idempotency and partial-failure handling proven;
+- multi-step VM provisioning idempotency and partial-failure handling proven;
 - Protection Plan integration proven;
 - native cross-Zone B&R proven before advanced DR claims;
 - DR Site Pair/network/IP mapping proven;
@@ -465,6 +484,8 @@ The unified provisioning/UI/DR work is not complete until all of the following a
 - security/RBAC/browser/upgrade/regression tests passed for the certified release;
 - production release gates in the Super Master Context satisfied.
 
+K8s/DBaaS/APaaS/Streaming have additional independent definition-of-done gates in `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`; success of this base VM/DR UI policy does not certify those modules, and their addition does not invalidate these existing gates.
+
 ## Production-readiness rule
 
-Adding this policy is architecture/source-governance progress only. None of the new Quick Provision, DR mapping, provider replication, universal runner gate or polished-role experience may be called implemented or production-ready until the corresponding code and evidence exist.
+Adding this policy or the Kubernetes/Data Services specialist context is architecture/source-governance progress only. None of the new Quick Provision, DR mapping, provider replication, universal runner gate, polished-role experience, K8s/DBaaS/APaaS/Streaming capability may be called implemented or production-ready until the corresponding code and evidence exist.
