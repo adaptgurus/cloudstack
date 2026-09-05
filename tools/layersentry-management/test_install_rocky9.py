@@ -44,6 +44,14 @@ class InstallerTests(unittest.TestCase):
     def test_combined_configuration(self):
         installer.validate(self.config, self.secrets)
 
+    def test_connect_timeout_is_scoped_away_from_mysqldump(self):
+        defaults = self.root / 'client.cnf'
+        installer.defaults_file(defaults, 'localhost', 'backup_user', 'UnitTestOnly_42')
+        content = defaults.read_text()
+        client, mysql = content.split('[mysql]\n', 1)
+        self.assertNotIn('connect-timeout', client)
+        self.assertEqual('connect-timeout=15\n', mysql)
+
     def test_preflight_requires_checkpoint_tooling(self):
         state = installer.Installer.__new__(installer.Installer)
         state.c = self.config

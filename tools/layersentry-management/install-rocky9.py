@@ -226,9 +226,12 @@ def mysql(defaults, sql):
 def defaults_file(path, host, user, password, ca=None, socket=None):
     # Values are validated before this writer; no CLI password arguments.
     write_private(path, '[client]\nuser=' + user + '\npassword=' + password
-                  + '\nhost=' + host + '\nconnect-timeout=15\n'
+                  + '\nhost=' + host + '\n'
                   + ('socket=' + socket + '\n' if socket else '')
-                  + ('ssl-mode=VERIFY_IDENTITY\nssl-ca=' + ca + '\n' if ca else ''))
+                  + ('ssl-mode=VERIFY_IDENTITY\nssl-ca=' + ca + '\n' if ca else '')
+                  # MySQL 8.4 mysqldump rejects connect-timeout in the shared
+                  # client group even though the interactive client accepts it.
+                  + '[mysql]\nconnect-timeout=15\n')
 
 
 def initialize_insecure_mysql_datadir(datadir=None):
