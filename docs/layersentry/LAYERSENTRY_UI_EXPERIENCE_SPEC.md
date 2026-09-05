@@ -152,6 +152,14 @@ Every list, card, form and detail page distinguishes:
 - `partial`: completed infrastructure step plus failed post-step and reconciliation path;
 - `complete`: confirmed API/job result, never inferred from a click or HTTP shell response.
 
+All rendered state and exclusion surfaces—including forbidden routes, invalid
+resource-state actions, missing or unusable providers, unsupported profile
+choices, validation failures and global exception pages—use the LayerSentry
+name, visual system and customer terminology. They must retain safe upstream
+CloudStack error codes/messages, request or job identifiers and diagnostic
+detail needed for troubleshooting; no exclusion may fall back to customer-
+visible Apache CloudStack branding or conceal the actual failure cause.
+
 ## Responsive and accessibility contract
 
 - Current Chrome and Firefox, desktop and tablet widths; mobile supports urgent operational tasks while wide tables scroll within their region.
