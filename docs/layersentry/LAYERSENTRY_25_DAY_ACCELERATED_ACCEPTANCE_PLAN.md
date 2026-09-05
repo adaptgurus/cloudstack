@@ -8,6 +8,8 @@
 
 This is the fastest defensible path to a bounded release candidate. It is not implementation evidence or a promise of `PRODUCTION_CERTIFIED`. Parallel coding cannot eliminate serial infrastructure changes, replication, failure observation, recovery or soak time.
 
+This plan predates the dedicated LayerSentry-managed RKE2/DBaaS/APaaS/Streaming workstream. Those modules are valid product scope under `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`, but they are **not included in the effort/calendar promised by this historical 25-day base acceptance plan unless the plan is explicitly re-baselined**. Do not interpret schedule exclusion as product exclusion.
+
 ## 1. Day 25 target and bounded scope
 
 Target deliverables:
@@ -15,15 +17,15 @@ Target deliverables:
 - verified immutable UI/release artifact; no npm build on Management VMs;
 - fresh install, resume, repair, staged promotion and tested rollback;
 - KVM-only customer profile, role-aware UI, direct-API RBAC negatives and simplified VM flow;
-- feature-gated CKS, Bucket and Backup & Recovery surfaces;
+- feature-gated native CKS, Bucket and Backup & Recovery surfaces;
 - automated configuration of three pre-provisioned Management VMs and two LB VMs;
-- integration and evidence for an operator-built three-member DB topology;
+- integration and evidence for an operator-built three-member DB topology used by the CloudStack management plane;
 - native B&R, one older recovery point and cross-Zone recovery;
 - minimum two-Site DR: mapping, isolated Test Recovery, planned failover, reverse replication and failback;
 - supported N-1 -> N upgrade, interruption/resume and recovery evidence;
 - Rocky 9 SELinux, firewalld, repository, browser and support-evidence checks.
 
-Conditional/deferred unless included before Day 1: DBaaS/APaaS (V1 excluded), multiple DR providers, storage-native low-RPO replication without an installed provider, automatic failover without witness/exclusive lease/fencing, physical OOBM without hardware, arbitrary two-node survival, full air-gap CKS and scale beyond the tested matrix. Deferred items remain `PENDING`, `NOT_TESTED` or `BLOCKED`.
+Conditional/deferred from **this 25-day base plan** unless explicitly re-baselined: LayerSentry-managed RKE2/DBaaS/APaaS/Streaming, multiple DR providers, storage-native low-RPO replication without an installed provider, automatic failover without witness/exclusive lease/fencing, physical OOBM without hardware, arbitrary two-node survival, full air-gap native CKS and scale beyond the tested matrix. Deferred items remain `PENDING`, `NOT_TESTED` or `BLOCKED`; they are not removed from the product roadmap/scope by this schedule.
 
 ## 2. Day 0 infrastructure entry gate
 
@@ -46,11 +48,13 @@ Secrets and live addresses stay in approved runtime stores and volatile evidence
 | Stream | Parallel responsibility |
 | --- | --- |
 | B | build, artifact/manifest/SBOM/provenance/signing, installer, Management/LB automation, upgrade |
-| A | KVM profile, dashboards, VM/CKS/Bucket/B&R UX, browser/accessibility/availability states |
+| A | KVM profile, dashboards, VM/native-CKS/Bucket/B&R UX, browser/accessibility/availability states |
 | C | RBAC/API/tampering, SELinux/firewalld/repositories, redaction and artifact negatives |
 | D | inventory, B&R, DB/Management/LB failures, two-Site DR, upgrade and timing evidence |
 
-Research, source, unit tests and documentation run in isolated worktrees. The root reviews and integrates B -> A -> C -> D. One named live-test controller serializes every shared-environment deployment, restart, VM/network/storage/DB mutation, backup/restore, upgrade, failover/failback and fencing action.
+Workstream E (LayerSentry K8s/DBaaS/APaaS/Streaming) uses a separate dedicated plan/critical path unless this document is deliberately re-baselined. Its source work may proceed in parallel when it does not consume/conflict with the shared live acceptance environment.
+
+Research, source, unit tests and documentation run in isolated worktrees. The base-plan integration sequence remains B -> A -> C -> D. One named live-test controller serializes every shared-environment deployment, restart, VM/network/storage/DB mutation, backup/restore, upgrade, failover/failback and fencing action.
 
 ## 4. Day-by-day critical path
 
@@ -70,7 +74,7 @@ Research, source, unit tests and documentation run in isolated worktrees. The ro
 | 12 | SELinux enforcing, firewalld, package policy, artifact/archive tampering and secret-redaction negatives. | tested security matrix `LIVE_VERIFIED` or exceptions listed |
 | 13 | Platform/Department/User/read-only UI, direct URL/API, object-ID and cross-domain/account negatives. | server-side RBAC matrix passes |
 | 14 | KVM VM lifecycle, image/profile/network/volume/console and error states; Chrome + Firefox. | customer/VM workflow `LIVE_VERIFIED` |
-| 15 | CKS/Bucket/B&R gates: prove enabled backend/API behavior or truthful unavailable state. | feature-by-feature evidence status |
+| 15 | Native CKS/Bucket/B&R gates: prove enabled backend/API behavior or truthful unavailable state. | feature-by-feature evidence status |
 | 16 | Native B&R backup/restore/data/schedule/retention/source-record negative tests. | native restore `LIVE_VERIFIED`; timings captured |
 | 17 | Restore selected older point; validate data/application and required source-record retention. | old-point recovery passes with lineage |
 | 18 | Cross-Zone recovery with explicit network/storage mappings and destination validation. | Backup DR `LIVE_VERIFIED`; RPO/RTO recorded |
@@ -101,6 +105,8 @@ Rollback classes: UI switches to a previous verified artifact; Management packag
 ## 6. Manual DB HA dependency and test gate
 
 The operator owns DB installation, membership and topology mutations. LayerSentry owns compatibility preflight, JDBC behavior, observation, CloudStack tests, backup/restore and evidence. Exact 4.22.1.1 compatibility must be established from pinned documentation/source and live results; do not choose MySQL 8.0 or 8.4 only because a context mentions it.
+
+This section concerns the **CloudStack management-plane database**, not LayerSentry DBaaS workload engines.
 
 Required tests: normal primary writes through the stable endpoint; one secondary loss/rejoin; primary loss/election and CloudStack reconnection; Management restart during failover; quorum-loss fail-closed behavior; partition and proof against dual writers; backup/full restore and PITR only if supported; repeated failover; latency/transaction integrity; exact upgrade/recovery path. Three members do not survive arbitrary two-member or two-failure-domain loss.
 
