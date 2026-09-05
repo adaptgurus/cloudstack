@@ -399,11 +399,8 @@ class Installer:
         active = subprocess.run(['systemctl', 'is-active', '--quiet', 'mysqld'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
         require(active.returncode != 0, 'database service must be stopped before bootstrap recovery')
-        recovery = RUNTIME_DIR / 'layersentry-mysql-recovery'
-        require(not recovery.exists(), 'database recovery runtime directory already exists')
-        recovery.mkdir(mode=0o700)
-        run(['chown', 'mysql:mysql', str(recovery)])
-        socket = recovery / 'mysql.sock'
+        socket = MYSQL_DATADIR / 'mysql.sock'
+        require(not socket.exists(), 'database recovery socket already exists')
         restricted = (combined_mysql_configuration(self.c) + 'skip_networking=ON\nmysqlx=OFF\n'
                       + 'socket=' + str(socket) + '\n')
         write_private('/etc/my.cnf.d/layersentry.cnf', restricted, 0o644)
@@ -438,8 +435,6 @@ class Installer:
             subprocess.run(['systemctl', 'disable', '--now', 'mysqld'],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
             raise
-        finally:
-            shutil.rmtree(recovery, ignore_errors=True)
         del self.journal['stages']['database']
         self.save()
 
