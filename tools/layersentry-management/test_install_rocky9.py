@@ -44,6 +44,14 @@ class InstallerTests(unittest.TestCase):
     def test_combined_configuration(self):
         installer.validate(self.config, self.secrets)
 
+    def test_preflight_requires_checkpoint_tooling(self):
+        state = installer.Installer.__new__(installer.Installer)
+        state.c = self.config
+        with patch.object(installer.os, 'geteuid', return_value=0), \
+                patch.object(installer.shutil, 'which', side_effect=lambda name: None if name == 'tar' else '/usr/bin/' + name), \
+                self.assertRaisesRegex(ValueError, 'required host command missing: tar'):
+            state.preflight()
+
     def test_blank_mysql_datadir_is_initialized_insecurely_for_immediate_rotation(self):
         datadir = self.root / 'mysql'
         datadir.mkdir()

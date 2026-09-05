@@ -269,6 +269,9 @@ class Installer:
 
     def preflight(self):
         require(os.geteuid() == 0, 'run as root')
+        for command in ('curl', 'dnf', 'firewall-cmd', 'getenforce', 'ip', 'openssl',
+                        'restorecon', 'rpm', 'systemctl', 'tar'):
+            require(shutil.which(command), 'required host command missing: ' + command)
         release = dict(line.split('=', 1) for line in Path('/etc/os-release').read_text().splitlines() if '=' in line)
         require(release.get('ID', '').strip('"') == 'rocky'
                 and release.get('VERSION_ID', '').strip('"').split('.')[0] == '9', 'Rocky Linux 9 required')
