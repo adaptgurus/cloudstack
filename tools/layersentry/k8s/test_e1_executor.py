@@ -115,6 +115,12 @@ class FakeKubernetes:
         status = {**stored.get("status", {}), "ready": ready, "conditions": [{
                 "type": "Ready", "status": "True" if ready else "False", "observedGeneration": generation,
             }]}
+        if resource['kind'] in ('GitRepository', 'Kustomization'):
+            status['observedGeneration'] = generation
+            if resource['kind'] == 'GitRepository':
+                status['artifact'] = {'revision': 'sha1:' + stored['spec']['ref']['commit']}
+            else:
+                status['lastAppliedRevision'] = 'sha1:' + 'a' * 40
         return {**stored, "status": status}
 
     def list_owned(self, api_version, kind, namespace, project_id):

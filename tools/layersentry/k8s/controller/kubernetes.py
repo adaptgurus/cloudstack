@@ -54,6 +54,12 @@ _KINDS = {
     ("kustomize.toolkit.fluxcd.io/v1", "Kustomization"): (
         "apis", "kustomize.toolkit.fluxcd.io", "v1", "kustomizations", True,
     ),
+    ("source.toolkit.fluxcd.io/v1", "OCIRepository"): (
+        "apis", "source.toolkit.fluxcd.io", "v1", "ocirepositories", True,
+    ),
+    ("helm.toolkit.fluxcd.io/v2", "HelmRelease"): (
+        "apis", "helm.toolkit.fluxcd.io", "v2", "helmreleases", True,
+    ),
 }
 
 
@@ -120,6 +126,7 @@ class KubernetesClient:
     def request(
         self, method: str, path: str, *, body: Mapping[str, Any] | None = None,
         content_type: str = "application/json",
+        accept: str = "application/json",
     ) -> Mapping[str, Any]:
         if not path.startswith("/") or ".." in path:
             raise InvalidRequestError("invalid Kubernetes API path")
@@ -128,7 +135,7 @@ class KubernetesClient:
             self.origin + path, data=encoded, method=method,
             headers={
                 "Authorization": "Bearer " + self._token(),
-                "Accept": "application/json",
+                "Accept": accept,
                 "Content-Type": content_type,
             },
         )
@@ -143,12 +150,16 @@ class KubernetesClient:
                 raise NotFoundError("Kubernetes resource not found") from exc
             if exc.code == 409:
                 raise ConflictError("Kubernetes resource conflict") from exc
+            if exc.code >= 500 and method in {"POST", "PUT", "PATCH", "DELETE"}:
+                raise AmbiguousMutationError("Kubernetes server could not confirm mutation outcome") from exc
             raise InvalidRequestError(f"Kubernetes API rejected request with HTTP {exc.code}") from exc
         except (TimeoutError, urllib.error.URLError) as exc:
             if method in {"POST", "PUT", "PATCH", "DELETE"}:
                 raise AmbiguousMutationError("Kubernetes mutation outcome is unknown") from exc
             raise InvalidRequestError("Kubernetes API is unavailable") from exc
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            if method in {"POST", "PUT", "PATCH", "DELETE"}:
+                raise AmbiguousMutationError("Kubernetes mutation response was unreadable") from exc
             raise InvalidRequestError("Kubernetes API returned invalid JSON") from exc
 
     def apply(self, resource: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -159,9 +170,23 @@ class KubernetesClient:
             content_type="application/apply-patch+yaml",
         )
 
+    def create(self, resource: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Create-only prevents adopting a foreign object in a GET/apply race."""
+        path, _ = self._resource_path(resource)
+        return self.request('POST', path.rsplit('/', 1)[0], body=resource)
+
     def get(self, resource: Mapping[str, Any]) -> Mapping[str, Any]:
         path, _ = self._resource_path(resource)
         return self.request("GET", path)
+
+    def get_capi_kubeconfig_metadata(self, namespace: str, cluster_name: str) -> Mapping[str, Any]:
+        if not all(isinstance(value, str) and _DNS_LABEL.fullmatch(value) for value in (namespace, cluster_name)):
+            raise InvalidRequestError('CAPI credential identity is invalid')
+        value = self.request('GET', f'/api/v1/namespaces/{namespace}/secrets/{cluster_name}-kubeconfig',
+                             accept='application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1')
+        if value.get('kind') != 'PartialObjectMetadata' or value.get('apiVersion') != 'meta.k8s.io/v1' or 'data' in value or 'stringData' in value:
+            raise InvalidRequestError('metadata-only credential observation was not honored')
+        return value
 
     def list_owned(self, api_version: str, kind: str, namespace: str, project_id: str,
                    cluster_name: str | None = None) -> list[Mapping[str, Any]]:
@@ -220,3 +245,12 @@ class KubernetesClient:
     def delete(self, resource: Mapping[str, Any]) -> Mapping[str, Any]:
         path, _ = self._resource_path(resource)
         return self.request("DELETE", path, body={"apiVersion": "v1", "kind": "DeleteOptions"})
+
+    def delete_observed(self, resource: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Delete only the exact observed incarnation, without removing finalizers."""
+        path, _ = self._resource_path(resource)
+        metadata = resource.get('metadata', {})
+        if not all(isinstance(metadata.get(key), str) and metadata[key] for key in ('uid', 'resourceVersion')):
+            raise InvalidRequestError('observed deletion requires UID and resourceVersion')
+        return self.request('DELETE', path, body={'apiVersion':'v1','kind':'DeleteOptions',
+                            'preconditions':{key:metadata[key] for key in ('uid','resourceVersion')}})
