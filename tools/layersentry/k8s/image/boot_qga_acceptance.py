@@ -193,10 +193,26 @@ def seed_user_data(identity):
 
 def guest_checks(identity):
     # QGA remains confined and only reads the root-owned, nonsecret fixture report.
-    script = ("import pathlib,stat,sys; p=pathlib.Path(" + repr(CHECK_REPORT) + " ); "
-              "s=p.lstat() if p.exists() else None; "
-              "assert s is None or (stat.S_ISREG(s.st_mode) and s.st_uid==0 and not s.st_mode & 0o022 and s.st_size<=65536); "
-              "sys.stdout.write(p.read_text() if s is not None else '{}')")
+    script = r"""
+import json,pathlib,stat
+report=pathlib.Path('/usr/share/layersentry/node-image/cpuqc-report.json')
+key=report.with_name('ssh_host_ed25519_key.pub')
+if not report.exists() or not key.exists():
+ print('{}')
+else:
+ for path,limit in [(report,65536),(key,4096)]:
+  info=path.lstat()
+  assert stat.S_ISREG(info.st_mode) and info.st_uid==0 and info.st_nlink==1 and not info.st_mode & 0o022 and info.st_size<=limit
+  for parent in path.parents:
+   info=parent.lstat()
+   assert stat.S_ISDIR(info.st_mode) and info.st_uid==0 and not info.st_mode & 0o022
+ facts=json.loads(report.read_text())
+ exported=key.read_text().split()
+ assert len(exported)==2 and exported[0]=='ssh-ed25519'
+ assert facts['sshHostEd25519PublicKey'].split()[:2]==exported
+ facts['hostPublicKeyExportVerified']=True
+ print(json.dumps(facts,sort_keys=True))
+"""
     deadline = time.monotonic() + 240
     process = agent(identity, {'execute': 'guest-exec', 'arguments': {'path': '/usr/bin/python3', 'arg': ['-c', script], 'capture-output': True}})
     while time.monotonic() < deadline:

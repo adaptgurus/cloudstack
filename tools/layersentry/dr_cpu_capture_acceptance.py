@@ -93,10 +93,11 @@ import hashlib,json,os,pathlib,sys
 stage,operation=sys.argv[1:]
 values={'FULL':0x31,'INC1':0x52,'INC2':0}
 assert stage in values and operation in ['write','read']
-root=pathlib.Path('/tmp/layersentry-dr-qualification')
+root=pathlib.Path('/var/tmp/layersentry-dr-qualification')
 if operation=='write':
  root.mkdir(mode=0o700,exist_ok=True)
  assert not root.is_symlink() and root.stat().st_uid==0
+ assert root.stat().st_dev==pathlib.Path('/').stat().st_dev, 'marker must be on captured root filesystem'
  for name,data in [('stage.txt',(stage+'\n').encode()),('payload.bin',bytes([values[stage]])*(1024*1024))]:
   path=root/name
   fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_NOFOLLOW,0o600)
