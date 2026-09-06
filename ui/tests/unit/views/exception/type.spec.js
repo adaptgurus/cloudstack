@@ -15,22 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-const types = {
-  403: {
-    code: '403',
-    title: 'Access restricted',
-    desc: 'LayerSentry could not authorize this page or action for the current session. Return to an authorized area or ask your administrator to review the required CloudStack permissions.'
-  },
-  404: {
-    code: '404',
-    title: 'Page not found',
-    desc: 'LayerSentry could not find this page or resource. It may have been removed, the address may be incorrect, or the current scope may no longer expose it.'
-  },
-  500: {
-    code: '500',
-    title: 'Request could not be completed',
-    desc: 'LayerSentry encountered an unexpected application error. Return to the dashboard and retry the operation after checking any available activity or job details.'
-  }
-}
+import types from '@/views/exception/type'
 
-export default types
+describe('LayerSentry exception copy', () => {
+  it('keeps exact status codes while using product-safe recovery language', () => {
+    expect(types['403'].code).toBe('403')
+    expect(types['404'].code).toBe('404')
+    expect(types['500'].code).toBe('500')
+    expect(types['403'].desc).toContain('LayerSentry')
+    expect(types['404'].desc).toContain('LayerSentry')
+    expect(types['500'].desc).toContain('LayerSentry')
+  })
+})
