@@ -3,37 +3,17 @@ package model
 import "time"
 
 type Category string
-const (
- CategoryDatabase Category = "database"
- CategoryApplication Category = "application"
-)
-
+const ( CategoryDatabase Category = "database"; CategoryApplication Category = "application" )
 type OperationStatus string
-const (
- OpRequested OperationStatus = "REQUESTED"
- OpPreflight OperationStatus = "PREFLIGHT"
- OpPlanned OperationStatus = "PLANNED"
- OpWaitingConfirmation OperationStatus = "WAITING_CONFIRMATION"
- OpRunning OperationStatus = "RUNNING"
- OpVerifying OperationStatus = "VERIFYING"
- OpSucceeded OperationStatus = "SUCCEEDED"
- OpFailedSafe OperationStatus = "FAILED_SAFE"
- OpFailedNeedsRecovery OperationStatus = "FAILED_NEEDS_RECOVERY"
- OpRollingBack OperationStatus = "ROLLING_BACK"
- OpRolledBack OperationStatus = "ROLLED_BACK"
- OpUnknown OperationStatus = "UNKNOWN"
- OpCancelled OperationStatus = "CANCELLED"
-)
-
+const ( OpRequested OperationStatus = "REQUESTED"; OpPreflight OperationStatus = "PREFLIGHT"; OpPlanned OperationStatus = "PLANNED"; OpWaitingConfirmation OperationStatus = "WAITING_CONFIRMATION"; OpRunning OperationStatus = "RUNNING"; OpVerifying OperationStatus = "VERIFYING"; OpSucceeded OperationStatus = "SUCCEEDED"; OpFailedSafe OperationStatus = "FAILED_SAFE"; OpFailedNeedsRecovery OperationStatus = "FAILED_NEEDS_RECOVERY"; OpRollingBack OperationStatus = "ROLLING_BACK"; OpRolledBack OperationStatus = "ROLLED_BACK"; OpUnknown OperationStatus = "UNKNOWN"; OpCancelled OperationStatus = "CANCELLED" )
 type StorageAssignment struct { Device string `json:"device"`; MountPoint string `json:"mount_point"`; Purpose string `json:"purpose"`; Filesystem string `json:"filesystem"`; Format bool `json:"format"`; ConfirmFormat bool `json:"confirm_format"` }
 type NetworkSpec struct { ListenAddress string `json:"listen_address"`; Port int `json:"port"`; AllowedCIDRs []string `json:"allowed_cidrs"` }
 type MaintenancePolicy struct { Mode string `json:"mode"`; Day string `json:"day,omitempty"`; Window string `json:"window,omitempty"`; AutoPatch bool `json:"auto_patch"`; ReleaseLineLocked bool `json:"release_line_locked"` }
 type BackupPolicy struct { Enabled bool `json:"enabled"`; Schedule string `json:"schedule,omitempty"`; Retention int `json:"retention,omitempty"` }
 type ClusterSpec struct { Role string `json:"role,omitempty"`; Peers []string `json:"peers,omitempty"`; JoinTokenRef string `json:"join_token_ref,omitempty"` }
-
 type ServiceRequest struct { SchemaVersion int `json:"schema_version"`; RequestID string `json:"request_id"`; ServiceID string `json:"service_id"`; OperationID string `json:"operation_id"`; IdempotencyKey string `json:"idempotency_key"`; Category Category `json:"category"`; Provider string `json:"provider"`; ReleaseLine string `json:"release_line"`; ResolvedVersion string `json:"resolved_version,omitempty"`; Topology string `json:"topology"`; Storage []StorageAssignment `json:"storage,omitempty"`; Network NetworkSpec `json:"network"`; Maintenance MaintenancePolicy `json:"maintenance"`; Backup BackupPolicy `json:"backup"`; Cluster ClusterSpec `json:"cluster,omitempty"`; SecretRefs map[string]string `json:"secret_refs,omitempty"` }
 type PlanStep struct { Name string `json:"name"`; Action string `json:"action"`; Destructive bool `json:"destructive"`; Detail string `json:"detail"` }
-type Plan struct { ID string `json:"id"`; ServiceID string `json:"service_id"`; Provider string `json:"provider"`; ResolvedVersion string `json:"resolved_version"`; Digest string `json:"digest"`; CreatedAt time.Time `json:"created_at"`; Steps []PlanStep `json:"steps"` }
+type Plan struct { ID string `json:"id"`; ServiceID string `json:"service_id"`; Provider string `json:"provider"`; ResolvedVersion string `json:"resolved_version"`; Digest string `json:"digest"`; CreatedAt time.Time `json:"created_at"`; Request ServiceRequest `json:"request"`; Steps []PlanStep `json:"steps"` }
 type Operation struct { ID string `json:"id"`; ServiceID string `json:"service_id"`; IdempotencyKey string `json:"idempotency_key"`; RequestDigest string `json:"request_digest"`; PlanDigest string `json:"plan_digest,omitempty"`; Status OperationStatus `json:"status"`; Stage string `json:"stage,omitempty"`; Error string `json:"error,omitempty"`; CreatedAt time.Time `json:"created_at"`; UpdatedAt time.Time `json:"updated_at"` }
 type ServiceState struct { ID string `json:"id"`; Provider string `json:"provider"`; Category Category `json:"category"`; ReleaseLine string `json:"release_line"`; ResolvedVersion string `json:"resolved_version"`; Topology string `json:"topology"`; Storage []StorageAssignment `json:"storage,omitempty"`; Network NetworkSpec `json:"network"`; Maintenance MaintenancePolicy `json:"maintenance"`; Backup BackupPolicy `json:"backup"`; Cluster ClusterSpec `json:"cluster,omitempty"`; SecretRefs map[string]string `json:"secret_refs,omitempty"`; ConfigDigest string `json:"config_digest"`; PlanDigest string `json:"plan_digest"`; Status string `json:"status"`; UpdatedAt time.Time `json:"updated_at"` }
 type HealthResult struct { Healthy bool `json:"healthy"`; Version string `json:"version,omitempty"`; Checks map[string]string `json:"checks,omitempty"`; Error string `json:"error,omitempty"` }
