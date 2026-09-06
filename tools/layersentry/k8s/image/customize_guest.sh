@@ -1,6 +1,7 @@
 #!/bin/bash
 # Runs only inside the offline libguestfs appliance against a fresh build copy.
 set -euo pipefail
+trap 'printf "Image customization failed at line %s\n" "$LINENO" >&2' ERR
 bundle=/opt/layersentry-node-inputs
 cd "$bundle"
 python3 - <<'PY'
@@ -20,8 +21,8 @@ dnf -y --disablerepo='*' --setopt=localpkg_gpgcheck=1 --setopt=install_weak_deps
 tar -xzf rke2.linux-amd64.tar.gz -C /usr/local
 install -d -m 0755 /var/lib/rancher/rke2/agent/images /etc/rancher/rke2 /etc/sysconfig
 install -m 0644 rke2-images.linux-amd64.tar.zst /var/lib/rancher/rke2/agent/images/rke2-images.linux-amd64.tar.zst
-ln -s /usr/local/lib/systemd/system/rke2-server.service /etc/systemd/system/rke2-server.service
-ln -s /usr/local/lib/systemd/system/rke2-agent.service /etc/systemd/system/rke2-agent.service
+install -m 0644 /usr/local/lib/systemd/system/rke2-server.service /etc/systemd/system/rke2-server.service
+install -m 0644 /usr/local/lib/systemd/system/rke2-agent.service /etc/systemd/system/rke2-agent.service
 printf '%s\n' 'RKE2_SELINUX=true' > /etc/sysconfig/rke2-server
 printf '%s\n' 'RKE2_SELINUX=true' > /etc/sysconfig/rke2-agent
 chmod 0600 /etc/sysconfig/rke2-server /etc/sysconfig/rke2-agent
@@ -75,6 +76,12 @@ rm -f /var/lib/dbus/machine-id
 ln -s /etc/machine-id /var/lib/dbus/machine-id
 rm -rf /var/lib/cloud/instances /var/lib/cloud/instance
 rm -f /root/.bash_history /var/log/secure /var/log/lastlog /var/log/wtmp /var/log/btmp
+test -z "$(find /etc/ssh -maxdepth 1 -name 'ssh_host_*' -print -quit)"
+test ! -e /root/.ssh/authorized_keys
+test ! -e /etc/rancher/rke2/config.yaml
+test ! -e /var/lib/rancher/rke2/server
+test ! -s /etc/machine-id
+python3 -c 'from cloudinit.sources import DataSourceCloudStack, DataSourceNoCloud'
 install -m 0644 inputs.lock.json /usr/share/layersentry/node-image/inputs.lock.json
 cd /
 rm -rf "$bundle"
