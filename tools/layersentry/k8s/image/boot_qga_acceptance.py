@@ -16,6 +16,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 PREFIX = Path('/var/lib/libvirt/images')
+LOG_ROOT = Path('/var/log/libvirt/qemu')
 URI = 'qemu:///system'
 
 
@@ -76,8 +77,8 @@ def xml_for(manifest):
     ET.SubElement(devices, 'controller', type='virtio-serial', index='0')
     channel = ET.SubElement(devices, 'channel', type='unix')
     ET.SubElement(channel, 'target', type='virtio', name='org.qemu.guest_agent.0')
-    serial = ET.SubElement(devices, 'serial', type='file')
-    ET.SubElement(serial, 'source', path=manifest['consolePath'], append='on')
+    serial = ET.SubElement(devices, 'serial', type='pty')
+    ET.SubElement(serial, 'log', file=manifest['consolePath'], append='off')
     ET.SubElement(serial, 'target', port='0')
     return ET.tostring(root, encoding='unicode')
 
@@ -94,9 +95,12 @@ def load_ownership(path):
         raise ValueError('ownership manifest must be private and root-owned')
     if record['domainName'] != 'layersentry-cpuqc-' + identity:
         raise ValueError('domain name/UUID mismatch')
-    for key, name in [('diskPath', 'runtime.qcow2'), ('seedPath', 'seed.iso'), ('consolePath', 'console.log')]:
+    for key, name in [('diskPath', 'runtime.qcow2'), ('seedPath', 'seed.iso')]:
         if record[key] != str(expected / name) or (expected / name).is_symlink():
             raise ValueError('owned artifact path mismatch')
+    log = LOG_ROOT / (record['domainName'] + '-console.log')
+    if record['consolePath'] != str(log) or log.is_symlink():
+        raise ValueError('owned console log path mismatch')
     if not re.fullmatch(r'[a-f0-9]{64}', record['sourceSha256']):
         raise ValueError('invalid source digest')
     return record
@@ -122,6 +126,7 @@ def cleanup(path):
             virsh('destroy', identity)
         if identity in virsh('list', '--all', '--uuid').splitlines():
             raise ValueError('owned domain was unexpectedly persistent; manual review required')
+    Path(record['consolePath']).unlink(missing_ok=True)
     shutil.rmtree(path.parent)
 
 
@@ -200,6 +205,8 @@ def boot(args):
     run(['qemu-img', 'check', '-f', 'qcow2', str(image)], timeout=180)
     if run(['getenforce']).strip() != 'Enforcing':
         raise ValueError('host SELinux must remain Enforcing')
+    if LOG_ROOT.resolve(strict=True) != LOG_ROOT or LOG_ROOT.stat().st_uid != 0 or LOG_ROOT.stat().st_mode & 0o022:
+        raise ValueError('native libvirt log directory must be trusted and root-owned')
     virsh('list', '--all', '--uuid')
     iso = shutil.which('xorriso') or shutil.which('genisoimage')
     if not iso:
@@ -209,12 +216,15 @@ def boot(args):
     args.evidence.mkdir(mode=0o700, parents=True)
     identity = str(uuid.uuid4())
     work = PREFIX / ('layersentry-cpuqc-' + identity)
+    console_path = LOG_ROOT / (work.name + '-console.log')
+    if console_path.exists() or console_path.is_symlink():
+        raise ValueError('refusing existing console log overwrite')
     work.mkdir(mode=0o750)
     os.chown(work, 0, grp.getgrnam('qemu').gr_gid)
     record = {'schemaVersion': '1.0', 'domainUuid': identity, 'domainName': work.name,
               'sourceSha256': args.sha256, 'sourcePath': str(image),
               'diskPath': str(work / 'runtime.qcow2'), 'seedPath': str(work / 'seed.iso'),
-              'consolePath': str(work / 'console.log'), 'networkInterfaces': 0, 'firmware': 'bios',
+              'consolePath': str(console_path), 'networkInterfaces': 0, 'firmware': 'bios',
               'productionQualified': False, 'retainForDrQualification': False}
     ownership = work / 'ownership.json'
     ownership.write_text(json.dumps(record, indent=2) + '\n')
@@ -232,8 +242,6 @@ def boot(args):
         for key in ['diskPath', 'seedPath']:
             os.chown(record[key], 0, grp.getgrnam('qemu').gr_gid)
             os.chmod(record[key], 0o640)
-        Path(record['consolePath']).touch(mode=0o640)
-        os.chown(record['consolePath'], 0, grp.getgrnam('qemu').gr_gid)
         run(['restorecon', '-RF', str(work)])
         xml = work / 'domain.xml'
         xml.write_text(xml_for(record))
