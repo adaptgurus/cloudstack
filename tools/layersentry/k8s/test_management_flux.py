@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock
 
 from controller.model import InvalidRequestError
-from management.flux import FluxInstaller,route,contains,desired_resource,ready,NAMESPACE
+from management.flux import FluxInstaller,route,contains,desired_resource,ready,NAMESPACE,resource_matches
 from management.install import ManagementAPI
 
 
@@ -132,6 +132,41 @@ class FluxTests(unittest.TestCase):
                 self.complete();path=route(self.docs[index])[1];before=copy.deepcopy(self.rows[path]);mutate(self.rows[path])
                 with self.assertRaises(InvalidRequestError):self.installer.inspect(self.api,self.journal)
                 self.rows[path]=before
+
+    def test_injected_execution_fields_are_not_native_defaults(self):
+        self.complete();path=route(self.docs[3])[1];original=copy.deepcopy(self.rows[path])
+        for key,value in {'command':['/bin/sh','-c','unapproved'],'envFrom':[{'secretRef':{'name':'foreign'}}],'env':[{'name':'UNAPPROVED','value':'yes'}],'lifecycle':{'postStart':{'exec':{'command':['unapproved']}}},'workingDir':'/unapproved'}.items():
+            with self.subTest(field=key):
+                self.rows[path]=copy.deepcopy(original);self.rows[path]['spec']['template']['spec']['containers'][0][key]=value
+                with self.assertRaises(InvalidRequestError):self.installer.inspect(self.api,self.journal)
+        for key,value in {'runtimeClassName':'foreign','dnsConfig':{'nameservers':['192.0.2.3']},'hostAliases':[{'ip':'192.0.2.3','hostnames':['api']}],'imagePullSecrets':[{'name':'foreign'}]}.items():
+            with self.subTest(field=key):
+                self.rows[path]=copy.deepcopy(original);self.rows[path]['spec']['template']['spec'][key]=value
+                with self.assertRaises(InvalidRequestError):self.installer.inspect(self.api,self.journal)
+
+    def test_audited_template_defaults_and_quantity_normalization_are_accepted(self):
+        desired=copy.deepcopy(self.docs[3]);pod=desired['spec']['template']['spec']
+        pod['serviceAccountName']='helm-controller';container=pod['containers'][0]
+        container.update(resources={'limits':{'cpu':'1000m','memory':'1Gi'}},env=[{'name':'NS','valueFrom':{'fieldRef':{'fieldPath':'metadata.namespace'}}},{'name':'MEM','valueFrom':{'resourceFieldRef':{'containerName':'manager','resource':'limits.memory'}}}],readinessProbe={'httpGet':{'path':'/readyz','port':9440}})
+        actual=copy.deepcopy(desired);pod=actual['spec']['template']['spec']
+        pod.update(dnsPolicy='ClusterFirst',restartPolicy='Always',schedulerName='default-scheduler',securityContext={},terminationGracePeriodSeconds=30,serviceAccount='helm-controller')
+        actual['spec']['template']['metadata']={'creationTimestamp':None}
+        container=pod['containers'][0];container.update(terminationMessagePath='/dev/termination-log',terminationMessagePolicy='File',imagePullPolicy='IfNotPresent')
+        container['resources']['limits']['cpu']='1'
+        container['env'][0]['valueFrom']['fieldRef']['apiVersion']='v1'
+        container['env'][1]['valueFrom']['resourceFieldRef']['divisor']='0'
+        container['readinessProbe'].update(timeoutSeconds=1,periodSeconds=10,successThreshold=1,failureThreshold=3)
+        container['readinessProbe']['httpGet']['scheme']='HTTP'
+        self.assertTrue(resource_matches(actual,desired))
+        container['env'][1]['valueFrom']['resourceFieldRef']['divisor']='2'
+        self.assertFalse(resource_matches(actual,desired))
+
+    def test_pod_only_token_projection_is_not_a_deployment_template_default(self):
+        desired=copy.deepcopy(self.docs[3]);actual=copy.deepcopy(desired)
+        actual['spec']['template']['spec']['volumes']=[{'name':'kube-api-access-forged','projected':{'sources':[{'serviceAccountToken':{'path':'token'}}]}}]
+        self.assertFalse(resource_matches(actual,desired))
+        actual=copy.deepcopy(desired);actual['spec']['template']['metadata']={'annotations':{'sidecar.istio.io/inject':'true'}}
+        self.assertFalse(resource_matches(actual,desired))
 
     def test_injected_cluster_role_aggregation_or_host_authority_rejected(self):
         self.complete()

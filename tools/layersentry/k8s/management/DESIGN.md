@@ -131,3 +131,33 @@ controller deployment, restart, namespace-negative, remote package, storage and
 recovery tests pass. No production/signature/live gate is changed. Failed installation
 retains credentials and exact owned transport for resume; incompatible existing
 resources require explicit operator recovery, never automatic delete/upgrade.
+
+
+### Deployment execution drift and exact native default audit
+
+Root review identified that recursive desired-subset matching accepted extra
+execution fields such as command, envFrom or lifecycle. The deployment observer
+now compares the execution template exactly after narrowly normalizing Kubernetes
+1.36.4 defaults. It does not compare the entire Deployment specification blindly.
+Default DNS/restart/scheduler/security-context/grace fields, container termination
+fields, native probe defaults, fieldRef v1 and serviceAccount alias conversion are
+audited in upstream source. ResourceFieldSelector zero divisor means one at runtime;
+the exact approved CPU limit 1000m serializes canonically as 1. Other added template
+fields, metadata, credentials, execution hooks, DNS/routing or privilege inputs fail.
+
+ServiceAccount admission's shouldIgnore explicitly limits injection to Pods (and
+the ephemeralcontainers subresource); projected token volumes are not native
+Deployment-template additions. Actual Pod projections remain untouched because
+this observer reads Deployments only. A fabricated projected volume in a Deployment
+template must fail, rather than being broadly whitelisted as an admission default.
+
+Exact sources:
+- https://github.com/kubernetes/kubernetes/blob/v1.36.4/pkg/apis/core/v1/defaults.go
+- https://github.com/kubernetes/kubernetes/blob/v1.36.4/pkg/apis/core/v1/conversion.go
+- https://github.com/kubernetes/kubernetes/blob/v1.36.4/pkg/api/v1/resource/helpers.go
+- https://github.com/kubernetes/kubernetes/blob/v1.36.4/plugin/pkg/admission/serviceaccount/admission.go
+- https://github.com/kubernetes/api/blob/v0.36.4/core/v1/types.go
+
+This remains source validation until API-admitted manifests are observed on the
+authorized management cluster. An unrecognized admission change fails visibly and
+requires exact-source review; the installer never ignores arbitrary extra fields.
