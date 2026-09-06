@@ -29,8 +29,13 @@ for (const host of targets) {
       const page = await context.newPage()
       page.setDefaultTimeout(30000)
       page.setDefaultNavigationTimeout(45000)
-      let pageErrors = 0
-      page.on('pageerror', () => { pageErrors++ })
+      const pageErrors = []
+      record.browserErrors = pageErrors
+      page.on('pageerror', error => {
+        const message = String(error.message).split(password).join('[redacted]').split(username).join('[redacted]')
+          .replace(/([?&](?:sessionkey|apikey|secretkey|token|password)=)[^&\s]*/gi, '$1[redacted]')
+        pageErrors.push({ name: error.name, message: message.slice(0, 1000) })
+      })
       await context.route('**/client/api**', async route => {
         const request = route.request()
         const query = new URL(request.url()).searchParams
@@ -65,7 +70,7 @@ for (const host of targets) {
       await page.locator('.layout-content').first().waitFor({ state: 'visible' })
       for (const name of ['dashboard', 'vm', 'volume', 'guestnetwork', 'template', 'event']) {
         stage = `GUI_${name.toUpperCase()}`
-        const errorsBefore = pageErrors
+        const errorsBefore = pageErrors.length
         const readsBefore = record.failedReads.length
         await page.goto(`http://${host}:8080/client/#/${name}`)
         await page.waitForLoadState('networkidle')
@@ -73,15 +78,16 @@ for (const host of targets) {
         record.pages.push(entry)
         if (!page.url().includes(`#/${name}`)) throw new Error('ROUTE_REDIRECTED')
         if (await page.locator('.ant-alert-error:visible').count()) throw new Error('VISIBLE_PAGE_ERROR')
-        if (pageErrors > errorsBefore || record.failedReads.length > readsBefore) throw new Error('PAGE_READ_FAILED')
+        if (pageErrors.length > errorsBefore || record.failedReads.length > readsBefore) throw new Error('PAGE_READ_FAILED')
         const main = page.locator('main, [role="main"], .layout-content').first()
         await main.waitFor({ state: 'visible' })
         if (!(await main.innerText()).trim()) throw new Error('EMPTY_SHELL')
         await page.screenshot({ path: path.join(output, `${host}-${browserName}-${name}.png`), fullPage: true })
         entry.status = 'PASS'
       }
+      stage = 'GUI_RUNTIME_AUDIT'
       if (record.blockedMutations.length) throw new Error('UNEXPECTED_MUTATION_ATTEMPT')
-      if (pageErrors) throw new Error('BROWSER_RUNTIME_ERROR')
+      if (pageErrors.length) throw new Error('BROWSER_RUNTIME_ERROR')
       record.status = 'READ_ONLY_GUI_BASELINE_PASS'
       record.productionReadiness = 'NOT_VERIFIED'
       await context.close()
