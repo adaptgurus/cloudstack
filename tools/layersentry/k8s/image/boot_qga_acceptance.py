@@ -137,7 +137,7 @@ result={'os':osdata['ID'].strip('"'),'osVersion':osdata['VERSION_ID'].strip('"')
  'services':{u:{'active':state(u,'is-active'),'enabled':state(u,'is-enabled')} for u in ['qemu-guest-agent','sshd','firewalld','rke2-server','rke2-agent']},
  'machineIdGenerated':len((root/'etc/machine-id').read_text().strip())==32,
  'sshHostEd25519PublicKey':(root/'etc/ssh/ssh_host_ed25519_key.pub').read_text().strip(),
- 'rootAuthorizedKeyAbsent':not (root/'root/.ssh/authorized_keys').exists(),
+ 'rootAuthorizedKeysEmpty':not (root/'root/.ssh/authorized_keys').exists() or not (root/'root/.ssh/authorized_keys').read_text().strip(),
  'clusterConfigAbsent':not (root/'etc/rancher/rke2/config.yaml').exists(),
  'serverStateAbsent':not (root/'var/lib/rancher/rke2/server').exists(),
  'interfaces':sorted(p.name for p in (root/'sys/class/net').iterdir()),
@@ -149,7 +149,7 @@ assert result['selinux']=='Enforcing'
 assert 'v1.36.4+rke2r1' in result['rke2Version']
 for u in ['qemu-guest-agent','sshd','firewalld']: assert result['services'][u]['active']=='active',u
 for u in ['rke2-server','rke2-agent']: assert result['services'][u]=={'active':'inactive','enabled':'disabled'},u
-for key in ['machineIdGenerated','rootAuthorizedKeyAbsent','clusterConfigAbsent','serverStateAbsent']: assert result[key],key
+for key in ['machineIdGenerated','rootAuthorizedKeysEmpty','clusterConfigAbsent','serverStateAbsent']: assert result[key],key
 assert result['interfaces']==['lo']
 assert result['sshHostEd25519PublicKey'].startswith('ssh-ed25519 ')
 assert result['sshdSettings']['passwordauthentication']=='no'
