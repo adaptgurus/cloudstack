@@ -49,6 +49,20 @@
       "signingKey": "Rocky-9"
     },
     {
+      "file": "NetworkManager-team-1.54.3-5.el9_8.x86_64.rpm",
+      "sha256": "db8bd91a8772d8231cd09f0e754a6921080dc84b6ed290350bc62f5a5221d1b9",
+      "size": 35616,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/n/NetworkManager-team-1.54.3-5.el9_8.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
+      "file": "NetworkManager-tui-1.54.3-5.el9_8.x86_64.rpm",
+      "sha256": "4bca716095dfc8fc9009f50225b5ced8a30d8dc567446097a0a7e0793d24baa7",
+      "size": 251150,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/n/NetworkManager-tui-1.54.3-5.el9_8.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
       "file": "acl-2.4.0-1.el9_8.x86_64.rpm",
       "sha256": "ec46754c9646187acea06332851f70a6714769c7cee332504862b8027cf07ff0",
       "size": 75877,
@@ -60,6 +74,13 @@
       "sha256": "f86eaeb883bf10655478306b8aafbb5f14f1b1e37270b177ad59d600a4a86a9e",
       "size": 38911,
       "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/a/alternatives-1.24-2.el9.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
+      "file": "attr-2.6.0-1.el9_8.x86_64.rpm",
+      "sha256": "d23df955aee6f893dec80bb51cbb844dd8153b80d941f8febe072a3c523b0334",
+      "size": 63929,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/a/attr-2.6.0-1.el9_8.x86_64.rpm",
       "signingKey": "Rocky-9"
     },
     {
@@ -546,6 +567,13 @@
       "signingKey": "Rocky-9"
     },
     {
+      "file": "glibc-langpack-en-2.34-275.el9_8.x86_64.rpm",
+      "sha256": "9f11192f3faa1a29def4b866ac89dd1a520d6a563f93e48a5cf7b81ed066c77f",
+      "size": 569958,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/g/glibc-langpack-en-2.34-275.el9_8.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
       "file": "glibc-minimal-langpack-2.34-275.el9_8.x86_64.rpm",
       "sha256": "6722cd0ca8bcf59d038e81a4ec9683c93d3f89e3014db83b197433a1ad002586",
       "size": 27397,
@@ -847,6 +875,13 @@
       "signingKey": "Rocky-9"
     },
     {
+      "file": "libcbor-0.7.0-5.el9.x86_64.rpm",
+      "sha256": "fbd08dea1bf97946a9d5eec80861b6ee87383738498898c85a5908153ed182d5",
+      "size": 57496,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libcbor-0.7.0-5.el9.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
       "file": "libcollection-0.7.0-53.el9.x86_64.rpm",
       "sha256": "f0be13d05591f229b7cdbf0bcd55b43705d3aeb4fe9ca1925a408fa8a34f2361",
       "size": 45503,
@@ -865,6 +900,13 @@
       "sha256": "79664279c893ed1ee07526e6c9c79d06a31316c38ac07dbb157b16a81cf8171b",
       "size": 290508,
       "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libcurl-7.76.1-40.el9_8.5.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
+      "file": "libdaemon-0.14-23.el9.x86_64.rpm",
+      "sha256": "2976629fe52f7bff3ebe5635170eee91a988592788dd462a88a2b92efa49ae89",
+      "size": 31863,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libdaemon-0.14-23.el9.x86_64.rpm",
       "signingKey": "Rocky-9"
     },
     {
@@ -914,6 +956,13 @@
       "sha256": "1bdb4b3b047169bc728c2612b71c31b79bb6f823f50134629bf650dcbf21565a",
       "size": 37521,
       "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libffi-3.4.2-8.el9.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
+      "file": "libfido2-1.13.0-2.el9.x86_64.rpm",
+      "sha256": "0b27f3f6f492f29f0c86f9d203f719846c52bb9d1c3329cc9e5ebfd2bd702431",
+      "size": 99372,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libfido2-1.13.0-2.el9.x86_64.rpm",
       "signingKey": "Rocky-9"
     },
     {
@@ -1054,6 +1103,13 @@
       "sha256": "1e6f1d341a72c7a4e07ea4c13038184d349903481f1aae8a2fd6d328a88d57a5",
       "size": 366979,
       "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libnl3-3.11.0-1.el9.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
+      "file": "libnl3-cli-3.11.0-1.el9.x86_64.rpm",
+      "sha256": "af2f19bf668693a455d0160926e10501e880529fb573f84f3b87c70ae49e4420",
+      "size": 193258,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libnl3-cli-3.11.0-1.el9.x86_64.rpm",
       "signingKey": "Rocky-9"
     },
     {
@@ -1208,6 +1264,13 @@
       "sha256": "c8be3c9ad78268e5fcf4cc7368dcaf803108e674e5704d69934e73b9680f0b28",
       "size": 74720,
       "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libtasn1-4.16.0-10.el9_8.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
+      "file": "libteam-1.31-16.el9_1.x86_64.rpm",
+      "sha256": "4c072fa54a5af2770c23d59ead51bfa0fe2bf7c0efb03e4fc82cdb1ed10d1923",
+      "size": 48255,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libteam-1.31-16.el9_1.x86_64.rpm",
       "signingKey": "Rocky-9"
     },
     {
@@ -1400,6 +1463,13 @@
       "signingKey": "Rocky-9"
     },
     {
+      "file": "newt-0.52.21-11.el9.x86_64.rpm",
+      "sha256": "608c034c30ee82d1e022ba1ea8f3a22829a08a30b4ce137e1020c4735bca800c",
+      "size": 102423,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/n/newt-0.52.21-11.el9.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
       "file": "nfs-utils-2.5.4-42.el9.x86_64.rpm",
       "sha256": "2feec8d0c1683e8bed0eea9a1ca511f74574bfe88493dbd25da060f86b944020",
       "size": 444644,
@@ -1446,6 +1516,13 @@
       "sha256": "2030ee4f45e43a3e1cb306cdb0a69ed56af256b2f88dfdabff0b13cda6b6413b",
       "size": 431290,
       "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/o/openssh-9.9p1-9.el9_8.rocky.0.1.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
+      "file": "openssh-clients-9.9p1-9.el9_8.rocky.0.1.x86_64.rpm",
+      "sha256": "7b8e6060604c1d6a48a7336772982c2e0bf5d619c27914f988dcda622b3a1a10",
+      "size": 786794,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/o/openssh-clients-9.9p1-9.el9_8.rocky.0.1.x86_64.rpm",
       "signingKey": "Rocky-9"
     },
     {
@@ -1715,6 +1792,13 @@
       "signingKey": "Rocky-9"
     },
     {
+      "file": "python3-libxml2-2.9.13-14.el9_8.4.x86_64.rpm",
+      "sha256": "f3a9558f77fce78a128277e035cc946de6844cfc5b9ded003a8b8a7d89fda3d4",
+      "size": 230605,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/p/python3-libxml2-2.9.13-14.el9_8.4.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
       "file": "python3-markupsafe-1.1.1-12.el9.x86_64.rpm",
       "sha256": "84a34118418d2c0554c2add71d7368dbdeb2f99977697b93b62c8db8bb66e879",
       "size": 32439,
@@ -1974,6 +2058,13 @@
       "signingKey": "Rocky-9"
     },
     {
+      "file": "slang-2.3.2-11.el9.x86_64.rpm",
+      "sha256": "ce9de0b6765d6bc5a13dc0d70649c60f99b5566b8b779bc9d715170375192947",
+      "size": 382399,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/s/slang-2.3.2-11.el9.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
       "file": "smartmontools-7.2-10.el9.x86_64.rpm",
       "sha256": "9c9383c9715c0b0e8c4c99860ec9939979b66b8abb2d5cbc8fd6f3f40558896e",
       "size": 563444,
@@ -2048,6 +2139,13 @@
       "sha256": "522f68468a356808a837f3545594cd859188b64ccd272de932010bb9bd53e1a4",
       "size": 555099,
       "url": "https://download.rockylinux.org/pub/rocky/9.8/AppStream/x86_64/os/Packages/t/tcpdump-4.99.0-9.el9.x86_64.rpm",
+      "signingKey": "Rocky-9"
+    },
+    {
+      "file": "teamd-1.31-16.el9_1.x86_64.rpm",
+      "sha256": "6348243c3dacec559dee1d79fd69e6396bd4fdbe7d37e33adae14dff0e61ee38",
+      "size": 114445,
+      "url": "https://download.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/t/teamd-1.31-16.el9_1.x86_64.rpm",
       "signingKey": "Rocky-9"
     },
     {
