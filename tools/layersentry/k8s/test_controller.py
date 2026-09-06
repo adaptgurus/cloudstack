@@ -143,6 +143,16 @@ class ControllerTest(unittest.TestCase):
             with self.assertRaises(InvalidRequestError):
                 service.list_operations(ACTOR, "project-1", limit=limit)
 
+    def test_image_catalog_route_rejects_missing_scope_and_foreign_project(self):
+        app = BFFApplication(self.service(), StaticAuthenticator())
+        for query in ("projectId=project-1", "projectId=project-1&zoneId=", "projectId=project-1&zoneId=z&zoneId=z"):
+            status, _ = self._request(app, "GET", "/v1/kubernetes/images", query=query)
+            self.assertEqual(status, 400)
+        status, _ = self._request(app, "GET", "/v1/kubernetes/images", query="projectId=foreign&zoneId=z")
+        self.assertEqual(status, 403)
+        status, _ = self._request(app, "GET", "/v1/kubernetes/images", query="projectId=project-1&zoneId=z")
+        self.assertEqual(status, 403)  # No permissive catalog adapter default.
+
     def test_bff_collection_query_validation_and_authorization(self):
         app = BFFApplication(self.service(), StaticAuthenticator())
         for query in ("", "projectId=", "projectId=project-1&projectId=project-foreign",

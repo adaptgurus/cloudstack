@@ -197,7 +197,7 @@ export default {
     },
     discoveryWarning () {
       if (!this.draft.zone_id || this.loadingDiscovery) return ''
-      const missing = [[this.networks, 'implemented networks'], [this.frontends, 'reserved project IPs'], [this.offerings, 'fixed compute profiles'], [this.images, 'ready KVM images']].filter(([rows]) => !rows.length).map(([, label]) => label)
+      const missing = [[this.networks, 'implemented networks'], [this.frontends, 'reserved project IPs'], [this.offerings, 'fixed compute profiles'], [this.images, 'qualified Kubernetes images']].filter(([rows]) => !rows.length).map(([, label]) => label)
       return missing.length ? `This Site has no selectable ${missing.join(', ')}. Select another Site or ask your platform administrator to complete its prerequisites.` : ''
     },
     requestLocked () { return this.submitting || !!this.uncertainAttempt },
@@ -285,13 +285,14 @@ export default {
         const [networks, frontends, offerings, images] = await Promise.all([
           read('listNetworks', 'network', {}), read('listPublicIpAddresses', 'publicipaddress', {}),
           read('listServiceOfferings', 'serviceoffering', { issystem: false }),
-          read('listTemplates', 'template', { templatefilter: 'executable', hypervisor: 'KVM' })
+          kubernetesRequest('/images' + scopeQuery(this.projectId, { zoneId: zoneid }), { signal: this.aborter.signal })
         ])
         if (!current()) return
         this.networks = networks.filter(n => n.zoneid === zoneid && n.state === 'Implemented')
         this.frontends = frontends.filter(ip => ip.zoneid === zoneid && ip.projectid === this.projectId && ip.state === 'Allocated')
         this.offerings = offerings.filter(o => o.issystem !== true && o.iscustomized !== true && o.state !== 'Inactive')
-        this.images = images.filter(image => image.isready === true && image.hypervisor === 'KVM')
+        if (!Array.isArray(images.images)) throw new Error('Invalid image catalog')
+        this.images = images.images.filter(image => image.isready === true && image.hypervisor === 'KVM')
       } catch (error) { if (current()) this.error = 'Site resources could not be discovered. Refresh the Site before provisioning.' } finally { if (current()) this.loadingDiscovery = false }
     },
     async loadRuntime (generation) {

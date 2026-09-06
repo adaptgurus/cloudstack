@@ -169,12 +169,14 @@ class ControllerService:
     def __init__(
         self, store: SagaStore, authorizer: Authorizer, executor: StepExecutor,
         gates: ReleaseGates, storage_profiles: Sequence[StorageProfile] = (),
+        qualified_images: Mapping[str, str] | None = None,
     ):
         self.store = store
         self.authorizer = authorizer
         self.executor = executor
         self.gates = gates
         self.storage_profiles = tuple(storage_profiles)
+        self.qualified_images = dict(qualified_images or {})
 
     def readiness(self, actor: Actor) -> Mapping[str, Any]:
         self.authorizer.require(actor, "kubernetes.readiness.read", "*")

@@ -81,6 +81,25 @@ def environ(method="GET", origin="", cookie=True, header_key=SESSION_KEY):
 
 
 class CloudStackSessionAuthenticatorTest(unittest.TestCase):
+    def test_image_catalog_intersects_caller_inventory_and_exact_qualified_checksums(self):
+        actor = Actor("session", "", "", ("project-1",), ())
+        row = {"id": "good", "name": "Qualified image", "isready": True, "hypervisor": "KVM", "checksum": "{SHA-256}" + "a" * 64}
+        rows = [row, {**row, "id": "unqualified"}, {**row, "id": "drift", "checksum": "bad"}]
+        opener = RecordingOpener([{"listtemplatesresponse": {"template": rows, "count": 3}}])
+        auth = CloudStackSessionAuthenticator(config(), opener=opener)
+        result = auth.qualified_node_images(environ(), actor, "project-1", "zone-1",
+            {"good": "a" * 64, "drift": "a" * 64, "hidden-other-project": "b" * 64})
+        self.assertEqual([item["id"] for item in result], ["good"])
+        self.assertNotIn("checksum", result[0])
+        args = urllib.parse.parse_qs(opener.requests[0][0].data.decode())
+        self.assertEqual(args["projectid"], ["project-1"])
+        self.assertEqual(args["zoneid"], ["zone-1"])
+        self.assertEqual(args["page"], ["1"])
+        for response in ({"template": [row], "count": 2}, {"template": [row, row]}, {"template": [None]}):
+            auth = CloudStackSessionAuthenticator(config(), opener=RecordingOpener([{"listtemplatesresponse": response}]))
+            with self.assertRaises(AuthorizationError):
+                auth.qualified_node_images(environ(), actor, "project-1", "zone-1", {"good": "a" * 64})
+
     def test_selected_resource_scope_uses_only_callers_session_and_project(self):
         from controller.service import parse_cluster_request
         from test_controller import cluster_payload

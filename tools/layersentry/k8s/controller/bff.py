@@ -99,6 +99,21 @@ class BFFApplication:
             path = str(environ.get("PATH_INFO", ""))
             if method == "GET" and path == "/v1/kubernetes/readiness":
                 return self._response(start_response, HTTPStatus.OK, self.service.readiness(actor))
+            if method == "GET" and path == "/v1/kubernetes/images":
+                try:
+                    query = urllib.parse.parse_qs(str(environ.get("QUERY_STRING", "")),
+                        strict_parsing=True, keep_blank_values=True, max_num_fields=2)
+                except ValueError as exc:
+                    raise InvalidRequestError("image query is malformed") from exc
+                if set(query) != {"projectId", "zoneId"} or any(len(v) != 1 or not v[0] for v in query.values()):
+                    raise InvalidRequestError("projectId and zoneId must occur exactly once")
+                project_id = query["projectId"][0]
+                self.service.authorizer.require(actor, "kubernetes.cluster.read", project_id)
+                reader = getattr(self.authenticator, "qualified_node_images", None)
+                if reader is None:
+                    raise AuthorizationError("native image scope verification is not configured")
+                images = reader(environ, actor, project_id, query["zoneId"][0], self.service.qualified_images)
+                return self._response(start_response, HTTPStatus.OK, {"images": images})
             if method == "GET" and path in {"/v1/kubernetes/operations", "/v1/kubernetes/clusters"}:
                 try:
                     query = urllib.parse.parse_qs(str(environ.get("QUERY_STRING", "")),

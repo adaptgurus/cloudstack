@@ -254,6 +254,34 @@ class CloudStackSessionAuthenticator:
             raise AuthenticationError("CloudStack project scope is ambiguous")
         return tuple(sorted(project_ids))
 
+    def qualified_node_images(self, environ: Mapping[str, Any], actor: Actor, project_id: str,
+                              zone_id: str, bindings: Mapping[str, str]) -> list[Mapping[str, Any]]:
+        if not project_id or project_id not in actor.project_ids:
+            raise AuthorizationError("CloudStack project access is denied")
+        if not isinstance(zone_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,64}", zone_id):
+            raise InvalidRequestError("Site ID is invalid")
+        if not bindings:
+            return []
+        session_id, session_key = self._cookies(environ)
+        response = self._call("listTemplates", session_id, session_key,
+            {"projectid": project_id, "zoneid": zone_id, "templatefilter": "executable", "page": 1, "pagesize": 1000})
+        rows = response.get("template", [])
+        count = response.get("count", len(rows) if isinstance(rows, list) else None)
+        if (not isinstance(rows, list) or len(rows) > 1000 or type(count) is not int or count != len(rows)
+                or any(not isinstance(row, Mapping) or not isinstance(row.get("id"), str) for row in rows)
+                or len({row["id"] for row in rows}) != len(rows)):
+            raise AuthorizationError("CloudStack image inventory is incomplete")
+        result = []
+        for row in rows:
+            expected = bindings.get(row["id"])
+            if (isinstance(expected, str) and re.fullmatch(r"[0-9a-f]{64}", expected)
+                    and row.get("checksum") == "{SHA-256}" + expected
+                    and row.get("isready") is True and row.get("hypervisor") == "KVM"):
+                result.append({"id": row["id"], "name": row.get("name", row["id"]),
+                               "displaytext": row.get("displaytext", row.get("name", row["id"])),
+                               "isready": True, "hypervisor": "KVM"})
+        return result
+
     def require_cluster_access(self, environ: Mapping[str, Any], actor: Actor, request) -> None:
         """Verify submitted resource IDs using the caller, before privileged reconciliation."""
         project_id = request.project_id

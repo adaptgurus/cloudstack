@@ -202,7 +202,8 @@ def build_runtime(config_path: Path | str) -> ControllerRuntime:
     )
     executor = E1Executor(kubernetes, resolver, contract.gates, flux)
     store = SagaStore(config.state_database)
-    service = ControllerService(store, CloudStackCapabilityAuthorizer(), executor, contract.gates)
+    service = ControllerService(store, CloudStackCapabilityAuthorizer(), executor, contract.gates,
+                                qualified_images=config.profile.qualified_images)
     authenticator = CloudStackSessionAuthenticator(config.session)
     return ControllerRuntime(config, contract, store, service, BFFApplication(service, authenticator))
 

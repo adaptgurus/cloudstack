@@ -120,3 +120,12 @@ it('clears readiness if polling loses authorization', async () => {
   expect(wrapper.vm.serverReady).toBe(false)
   expect(wrapper.vm.pollingPaused).toBe(true)
 })
+
+it('discovers only server-qualified images for the current project and Site', async () => {
+  const image = { id: 'qualified', name: 'RKE2', isready: true, hypervisor: 'KVM' }
+  kubernetesRequest.mockResolvedValue({ images: [image] })
+  wrapper.vm.draft.zone_id = 'site-one'
+  await wrapper.vm.loadSiteDiscovery()
+  expect(kubernetesRequest).toHaveBeenCalledWith('/images?projectId=project-one&zoneId=site-one', expect.any(Object))
+  expect(wrapper.vm.images).toEqual([image])
+})

@@ -22,7 +22,7 @@ export class KubernetesRequestError extends Error {
 
 // This JSON boundary deliberately has no CloudStack request interceptors.
 export async function kubernetesRequest (path, { method = 'GET', body, idempotencyKey, signal, timeout = 15000 } = {}) {
-  if (!/^\/(readiness|clusters|operations)(\/[a-zA-Z0-9-]+)*(\?[^#]*)?$/.test(path)) throw new Error('Invalid Kubernetes API path')
+  if (!/^\/(readiness|clusters|operations|images)(\/[a-zA-Z0-9-]+)*(\?[^#]*)?$/.test(path)) throw new Error('Invalid Kubernetes API path')
   const sessionKey = Cookies.get('sessionkey')
   if (!sessionKey) throw new KubernetesRequestError('Sign in again to access Kubernetes services.', { status: 401 })
   const mutation = method !== 'GET'
