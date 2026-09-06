@@ -25,6 +25,7 @@ import (
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/secrets"
     nginxprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/nginx"
     pgprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/postgresql"
+    runtimeprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/runtime"
 )
 
 const root = "/var/lib/layersentryd"
@@ -81,11 +82,17 @@ func buildRuntime() (*runtimeState, error) {
         return nil, err
     }
     reg := provider.NewRegistry()
-    if err = reg.Register(pgprovider.New(runner, sec, backupKeys)); err != nil {
-        return nil, err
+    providers := []provider.Provider{
+        pgprovider.New(runner, sec, backupKeys),
+        nginxprovider.New(runner),
+        runtimeprovider.New(runner, runtimeprovider.Spec{ID: "nodejs-runtime", Package: "nodejs", RepoID: "appstream", AllowedReleaseLines: map[string]string{"22": "22"}, Description: "Rocky AppStream Node.js runtime"}),
+        runtimeprovider.New(runner, runtimeprovider.Spec{ID: "python-runtime", Package: "python3.12", RepoID: "appstream", AllowedReleaseLines: map[string]string{"3.12": "3.12"}, Description: "Rocky AppStream Python 3.12 runtime"}),
+        runtimeprovider.New(runner, runtimeprovider.Spec{ID: "podman-runtime", Package: "podman", RepoID: "appstream", AllowedReleaseLines: map[string]string{"rocky9": ""}, Description: "Rocky AppStream Podman runtime; no OCI workload is started by this package-only provider"}),
     }
-    if err = reg.Register(nginxprovider.New(runner)); err != nil {
-        return nil, err
+    for _, p := range providers {
+        if err = reg.Register(p); err != nil {
+            return nil, err
+        }
     }
     clusterClient := &cluster.Client{Secrets: sec}
     eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, Cluster: clusterClient, LockPath: root + "/state/mutation.lock"}
