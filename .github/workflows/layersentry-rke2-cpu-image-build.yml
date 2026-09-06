@@ -32,6 +32,9 @@ jobs:
           bash -n tools/layersentry/k8s/image/customize_guest.sh
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends qemu-utils libguestfs-tools linux-image-generic
+          # Record the installed CLI contract before the expensive image build.
+          virt-customize --help
+          virt-cat --help
           # The hosted kernel image must be readable by the unprivileged appliance builder.
           sudo chmod a+r /boot/vmlinuz-*
           test -c /dev/kvm

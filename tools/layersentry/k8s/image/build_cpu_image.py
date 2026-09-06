@@ -52,13 +52,14 @@ def build(inputs, output):
     for key in lock['trust']:
         if sha256(inputs / 'trust' / key['file']) != key['sha256']:
             raise InputError('staged trust key mismatch')
-    for tool in ['qemu-img', 'virt-customize', 'virt-cat', 'virt-ls', 'gpg']:
+    for tool in ['qemu-img', 'virt-customize', 'virt-cat', 'gpg']:
         if not shutil.which(tool):
             raise InputError('required image builder tool missing: ' + tool)
     validate_binary_archive(inputs / 'rke2.linux-amd64.tar.gz')
     output.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='.cpu-image-', dir=output.parent))
     env = dict(os.environ, LIBGUESTFS_BACKEND='direct')
+    image_complete = False
     try:
         gpg_dir = work / 'gpg'
         gpg_dir.mkdir(mode=0o700)
@@ -78,13 +79,14 @@ def build(inputs, output):
         shutil.copyfile(inputs / 'inputs.lock.json', payload / 'inputs.lock.json')
         log = work / 'customize.log'
         with log.open('wb') as stream:
-            run(['virt-customize', '--format', 'qcow2', '-a', str(image), '--no-network', '--memsize', '4096', '--smp', '2', '--copy-in', f'{payload}:/opt', '--run', str(ROOT / 'customize_guest.sh'), '--selinux-relabel'], timeout=2400, stdout=stream, env=env)
+            run(['virt-customize', '--format=qcow2', '-a', str(image), '--no-network', '--memsize', '4096', '--smp', '2', '--copy-in', f'{payload}:/opt', '--run', str(ROOT / 'customize_guest.sh'), '--selinux-relabel'], timeout=2400, stdout=stream, env=env)
         run(['qemu-img', 'check', '-f', 'qcow2', str(image)])
+        image_complete = True
         inventory = work / 'rpm-inventory.tsv'
         version = work / 'rke2-version.txt'
         for destination, guest_path in [(inventory, '/usr/share/layersentry/node-image/rpm-inventory.tsv'), (version, '/usr/share/layersentry/node-image/rke2-version.txt')]:
             with destination.open('wb') as stream:
-                run(['virt-cat', '--format', 'qcow2', '-a', str(image), guest_path], timeout=180, stdout=stream, env=env)
+                run(['virt-cat', '--format=qcow2', '-a', str(image), guest_path], timeout=180, stdout=stream, env=env)
         if 'v1.36.4+rke2r1' not in version.read_text():
             raise InputError('installed RKE2 version mismatch')
         with (work / 'qemu-image-info.json').open('wb') as stream:
@@ -100,10 +102,25 @@ def build(inputs, output):
         shutil.rmtree(gpg_dir)
         work.rename(output)
         print(json.dumps(manifest, sort_keys=True))
-    except BaseException:
-        # Keep failure logs for diagnosis, but never publish a partial image as output.
+    except BaseException as error:
+        # Preserve an intact sealed image only after customization and qemu-img
+        # check passed. It remains diagnostic, never a qualified candidate.
         if (work / 'customize.log').exists():
             shutil.copyfile(work / 'customize.log', output.parent / 'failed-customize.log')
+        if image_complete:
+            diagnostic = output.parent / (output.name + '-diagnostic')
+            if diagnostic.exists() or diagnostic.is_symlink():
+                raise InputError('refusing existing diagnostic output overwrite') from error
+            shutil.rmtree(payload, ignore_errors=True)
+            shutil.rmtree(gpg_dir, ignore_errors=True)
+            metadata = {'schemaVersion': '1.0', 'status': 'BUILD_COMPLETE_EVIDENCE_FAILED',
+                        'qualificationStatus': 'NOT_TESTED', 'runtimeQualified': False, 'signed': False,
+                        'sourceCommit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True, timeout=30).strip(),
+                        'inputLockSha256': sha256(ROOT / 'cpu-rocky9-rke2-lock.json'),
+                        'sha256': sha256(image), 'sizeBytes': image.stat().st_size,
+                        'failureType': type(error).__name__, 'failure': str(error)}
+            (work / 'diagnostic-manifest.json').write_text(json.dumps(metadata, indent=2) + '\n')
+            work.rename(diagnostic)
         raise
     finally:
         if work.exists():
