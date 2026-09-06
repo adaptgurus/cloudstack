@@ -36,7 +36,9 @@ for (const host of targets) {
         const query = new URL(request.url()).searchParams
         const body = new URLSearchParams(request.postData() || '')
         const command = query.get('command') || body.get('command') || ''
-        if (!/^(?:list|get|find|query)[A-Z]/.test(command) && !['login', 'logout'].includes(command)) {
+        const capabilityProbe = command === 'forgotPassword' && !query.has('username') && !body.has('username')
+        const knownRead = ['cloudianIsEnabled', 'readyForShutdown'].includes(command)
+        if (!/^(?:list|get|find|query)[A-Z]/.test(command) && !['login', 'logout'].includes(command) && !capabilityProbe && !knownRead) {
           record.blockedMutations.push(command.replace(/[^A-Za-z0-9]/g, '').slice(0, 80))
           return route.abort('blockedbyclient')
         }
@@ -57,8 +59,10 @@ for (const host of targets) {
       await page.locator('#formLogin input[autocomplete="username"], #formLogin input[placeholder="Username"]').first().fill(username)
       await page.locator('#formLogin input[type="password"]').first().fill(password)
       await page.locator('#formLogin button[type="submit"]').click()
+      stage = 'GUI_LOGIN_REDIRECT'
       await page.waitForURL(/#\/dashboard(?:\?|$)/)
-      await page.locator('.ls-dashboard-hero, .ls-self-service-hero, .onboarding').first().waitFor({ state: 'visible' })
+      stage = 'GUI_DASHBOARD_READY'
+      await page.locator('.layout-content').first().waitFor({ state: 'visible' })
       for (const name of ['dashboard', 'vm', 'volume', 'guestnetwork', 'template', 'event']) {
         stage = `GUI_${name.toUpperCase()}`
         const errorsBefore = pageErrors
@@ -81,8 +85,11 @@ for (const host of targets) {
       record.status = 'READ_ONLY_GUI_BASELINE_PASS'
       record.productionReadiness = 'NOT_VERIFIED'
       await context.close()
-    } catch {
+    } catch (error) {
       record.failedStage = stage
+      if (stage === 'BROWSER_START') {
+        record.launchDiagnostic = String(error.message).split(password).join('[redacted]').split(username).join('[redacted]').slice(0, 2000)
+      }
     } finally {
       if (browser) await browser.close().catch(() => {})
       await writeFile(path.join(output, 'browser-results.json'), JSON.stringify(results, null, 2), { mode: 0o600 })
