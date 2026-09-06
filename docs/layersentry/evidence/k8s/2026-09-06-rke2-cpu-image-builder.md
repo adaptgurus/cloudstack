@@ -23,3 +23,7 @@ Builder metadata is unsigned and reports candidate build status, exact source/in
 ## Rollback and remaining gates
 
 The source image is immutable and never changed; a failed build discards only its output copy. Publish/register no image in this task. Release promotion requires retaining the exact QCOW2 and input bundle, SBOM/provenance/license and vulnerability evidence, signing and exact Rocky runtime tests. Three-node HA and independent failure domains are not established by an image build.
+
+## First hosted build: base-package dependency correction
+
+Run `34048266503`, job `101527132207`, at source `18a1dd33f2e3beafee4d5f6d9bd89c2e4f73b51c` verified the input downloads and Rocky signature, entered offline customization, then failed DNF resolution. The dated GenericCloud base includes NetworkManager team/tui, glibc English locale, attr, Python libxml2 and OpenSSH clients tied to older exact versions of libraries updated by the requested package closure. Those reverse dependencies were not part of the original 298-package forward dependency set. The causal correction adds their matching signed Rocky package cohort to the content lock. No package erasure, skip-broken resolution, fallback version or guest network access is permitted. The failed build copy was discarded and its logs retained in artifact `9993811525`.
