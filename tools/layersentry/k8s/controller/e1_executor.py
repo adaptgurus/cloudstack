@@ -24,7 +24,7 @@ from typing import Any, Mapping, Protocol
 from layersentry_k8s_policy import ReleaseGates
 
 from .e1_resources import ResolvedInfrastructure, build_cluster_resources
-from .flux_resources import FluxBaseline, build_flux_baseline
+from .flux_resources import FluxBaseline, build_flux_baseline, baseline_ready, git_source_ready, desired_matches
 from .kubernetes import KubernetesClient
 from .model import InvalidRequestError, NotFoundError, Operation
 from .service import StepOutcome, StepResult, parse_cluster_request
@@ -88,9 +88,15 @@ class E1Executor:
             desired_spec = resource.get("spec", {})
             actual_spec = actual.get("spec", {})
             return (
+                labels.get("layersentry.io/project") == project_id
+                and
                 actual_spec.get("url") == desired_spec.get("url")
                 and actual_spec.get("ref", {}).get("commit") == desired_spec.get("ref", {}).get("commit")
             )
+        if resource.get("kind") == "Kustomization":
+            return (labels.get("layersentry.io/project") == project_id
+                    and labels.get("layersentry.io/cluster") == resource['metadata']['labels']['layersentry.io/cluster']
+                    and desired_matches(resource['spec'], actual.get('spec', {})))
         return labels.get("layersentry.io/project") == project_id
 
     def _apply(self, resources, project_id: str, detail: str) -> StepResult:
@@ -232,10 +238,12 @@ class E1Executor:
                 actual = self.kubernetes.get(desired)
                 if not _ready_condition(actual, "Available") and not _ready_condition(actual):
                     pending.append(f"{desired['kind']}/{desired['metadata']['name']}")
-            flux = build_flux_baseline(
+            source, flux = build_flux_baseline(
                 operation.target_name, self._resolved(operation).namespace, operation.project_id, self.flux,
-            )[1]
-            if not _ready_condition(self.kubernetes.get(flux)):
+            )
+            if not git_source_ready(source, self.kubernetes.get(source), self.flux.commit):
+                pending.append(f"GitRepository/{source['metadata']['name']}")
+            if not baseline_ready(flux, self.kubernetes.get(flux), self.flux.commit):
                 pending.append(f"Kustomization/{flux['metadata']['name']}")
             if pending:
                 return StepResult(StepOutcome.PENDING, detail="waiting for: " + ", ".join(pending))

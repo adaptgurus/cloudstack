@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "status": "SOURCE_AUDITED",
+  "runtimeQualified": false,
+  "productionCertified": false,
+  "fluxVersion": "2.9.5",
+  "sourceControllerVersion": "1.9.5",
+  "helmControllerVersion": "1.6.4",
+  "kustomizeControllerVersion": "1.9.5",
+  "releaseManifest": {
+    "url": "https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml",
+    "sha256": "cc3dcd743af16215838b6937e1fce83745bf24c0dcc6c59737c59df15429caaf"
+  },
+  "nativeKinds": {
+    "OCIRepository": "source.toolkit.fluxcd.io/v1",
+    "HelmRelease": "helm.toolkit.fluxcd.io/v2",
+    "GitRepository": "source.toolkit.fluxcd.io/v1",
+    "Kustomization": "kustomize.toolkit.fluxcd.io/v1"
+  },
+  "qualificationLimits": [
+    "Generated objects checked against exact release OpenAPI schemas; this does not execute Kubernetes CEL/admission or Flux controllers.",
+    "No Flux controller images, management installation or live remote reconciliation are qualified by this source schema lock.",
+    "No OpenEverest/OpenBao/Harbor/Strimzi chart, values profile or engine lifecycle has been marked qualified."
+  ]
+}
