@@ -55,6 +55,9 @@ _ACTION_CAPABILITIES = {
         "listProjects", "deployVirtualMachine", "destroyVirtualMachine",
     ),
     "kubernetes.cluster.delete": ("listProjects", "destroyVirtualMachine"),
+    "kubernetes.package.read": ("listProjects", "listVirtualMachines"),
+    "kubernetes.package.install": ("listProjects", "deployVirtualMachine", "createVolume"),
+    "kubernetes.package.delete": ("listProjects", "destroyVirtualMachine"),
 }
 
 

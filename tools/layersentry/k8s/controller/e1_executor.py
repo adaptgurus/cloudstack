@@ -165,7 +165,16 @@ class E1Executor:
                 return StepResult(StepOutcome.FAILED, detail="Cluster ownership/project verification failed")
             if actual.get("metadata", {}).get("deletionTimestamp"):
                 return StepResult(StepOutcome.PENDING, detail="CAPI Cluster deletion is in progress")
-            self.kubernetes.delete(resource)
+            # Retain workload connectivity and credentials until native Helm
+            # uninstall has completed. Query all project-owned package objects,
+            # including releases no longer present in the current catalog.
+            for version, kind in (("helm.toolkit.fluxcd.io/v2", "HelmRelease"),
+                                  ("source.toolkit.fluxcd.io/v1", "OCIRepository")):
+                rows = self.kubernetes.list_owned(version, kind, request["namespace"], operation.project_id)
+                if any(row.get("metadata", {}).get("labels", {}).get("layersentry.io/cluster") == request["cluster_name"]
+                       for row in rows):
+                    return StepResult(StepOutcome.FAILED, detail="uninstall owned packages before deleting this cluster")
+            self.kubernetes.delete_observed(actual)
             return StepResult(StepOutcome.PENDING, detail="CAPI Cluster deletion requested; CAPC remains VM authority")
         if action == "resolve-certified-release":
             if not self.gates.kubernetes_ready():

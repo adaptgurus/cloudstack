@@ -99,7 +99,7 @@ class FakeKubernetes:
         self.applied.append(resource)
         stored = deepcopy(resource)
         stored["metadata"] = {
-            **stored["metadata"], "uid": "uid-" + resource["metadata"]["name"], "generation": 1,
+            **stored["metadata"], "uid": "uid-" + resource["metadata"]["name"], "generation": 1, "resourceVersion": "1",
         }
         if "replicas" in stored.get("spec", {}):
             stored["status"] = {"availableReplicas": stored["spec"]["replicas"]}
@@ -135,6 +135,12 @@ class FakeKubernetes:
         if "replicas" in patch.get("spec", {}):
             stored.setdefault("status", {})["availableReplicas"] = patch["spec"]["replicas"]
         return deepcopy(stored)
+
+    def delete_observed(self, resource):
+        current = self.objects[self._key(resource)]
+        assert current["metadata"]["uid"] == resource["metadata"]["uid"]
+        assert current["metadata"]["resourceVersion"] == resource["metadata"]["resourceVersion"]
+        return self.delete(resource)
 
     def delete(self, resource):
         self.objects.pop(self._key(resource), None)
@@ -236,6 +242,26 @@ class E1ExecutorTest(unittest.TestCase):
         deletion, _ = enabled.submit_cluster_delete(ACTOR, delete_payload, "e1-delete-enabled-01")
         self.assertEqual(enabled.advance(deletion.id).status, OperationStatus.RUNNING)
         self.assertEqual(enabled.advance(deletion.id).status, OperationStatus.DELETED)
+
+    def test_cluster_delete_keeps_workload_credentials_until_packages_are_gone(self):
+        gates = ReleaseGates(tuple_reconciliation=True, endpoint_6443=True, endpoint_9345=True,
+                             flux_remote_reconcile=True, capc_volume_ownership_safe=True)
+        service = ControllerService(self.store, Authorizer(), E1Executor(self.kubernetes, Resolver(), gates, self.flux), gates)
+        cluster = {"apiVersion":"cluster.x-k8s.io/v1beta2", "kind":"Cluster",
+                   "metadata":{"name":"cluster-a", "namespace":"tenant-a", "labels":{
+                       "layersentry.io/managed":"true", "layersentry.io/project":"project-1"}}, "spec":{}}
+        self.kubernetes.apply(cluster)
+        release = {"apiVersion":"helm.toolkit.fluxcd.io/v2", "kind":"HelmRelease",
+                   "metadata":{"name":"cluster-a-database", "namespace":"tenant-a", "labels":{
+                       "layersentry.io/managed":"true", "layersentry.io/project":"project-1",
+                       "layersentry.io/cluster":"cluster-a"}}, "spec":{}}
+        self.kubernetes.apply(release)
+        operation,_ = service.submit_cluster_delete(ACTOR, {
+            "cluster_name":"cluster-a", "namespace":"tenant-a", "project_id":"project-1",
+            "confirm_cluster_name":"cluster-a", "retain_workload_volumes":True}, "delete-with-package-01")
+        self.assertEqual(service.advance(operation.id).status, OperationStatus.FAILED)
+        self.assertIn(self.kubernetes._key(cluster), self.kubernetes.objects)
+        self.assertIn(self.kubernetes._key(release), self.kubernetes.objects)
 
     def test_status_rejects_project_label_tampering(self):
         create, _ = self.service.submit_cluster_create(ACTOR, payload(), "e1-status-base-create")

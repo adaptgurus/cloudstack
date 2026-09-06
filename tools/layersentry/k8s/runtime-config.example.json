@@ -26,5 +26,6 @@
   "flux": {
     "path": "./clusters/e1",
     "sourceNamespace": "flux-system"
-  }
+  },
+  "packages": null
 }

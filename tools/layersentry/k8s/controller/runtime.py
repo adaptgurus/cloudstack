@@ -33,6 +33,8 @@ from .e1_executor import E1Executor
 from .flux_resources import FluxBaseline
 from .kubernetes import KubernetesClient, KubernetesConfig
 from .model import ConflictError, InvalidRequestError
+from .package_catalog import PackageCatalog
+from .package_executor import PackageExecutor
 from .service import ControllerService
 from .store import SagaStore
 
@@ -86,6 +88,9 @@ class RuntimeConfig:
     profile: ClusterProfile
     flux_path: str
     flux_namespace: str
+    package_catalog: Path | None = None
+    package_catalog_digest: str | None = None
+    previous_package_catalogs: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -128,7 +133,7 @@ def load_runtime_config(path: Path | str) -> RuntimeConfig:
         root = json.loads(config_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise InvalidRequestError("runtime configuration is unreadable or invalid") from exc
-    root = _object(root, "root", _ROOT_KEYS)
+    root = _object(root, "root", _ROOT_KEYS | ({"packages"} if isinstance(root, Mapping) and "packages" in root else set()))
     if root["schemaVersion"] != "1.0":
         raise InvalidRequestError("unsupported runtime configuration schemaVersion")
     release_manifest = _absolute_file(root["releaseManifest"], "releaseManifest")
@@ -182,9 +187,29 @@ def load_runtime_config(path: Path | str) -> RuntimeConfig:
     flux = _object(root["flux"], "flux", _FLUX_KEYS)
     if not all(isinstance(flux[key], str) and flux[key] for key in _FLUX_KEYS):
         raise InvalidRequestError("runtime Flux fields must be non-empty strings")
+    package_path, package_digest = None, None
+    previous_catalogs = []
+    if root.get("packages") is not None:
+        packages = _object(root["packages"], "packages", {"catalogFile", "catalogSha256"} |
+                           ({"previousCatalogs"} if isinstance(root["packages"], Mapping) and "previousCatalogs" in root["packages"] else set()))
+        package_path = _absolute_file(packages["catalogFile"], "packages.catalogFile")
+        package_digest = packages["catalogSha256"]
+        if not isinstance(package_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", package_digest):
+            raise InvalidRequestError("runtime package catalog digest is invalid")
+        history = packages.get("previousCatalogs", [])
+        if not isinstance(history, list) or len(history) > 16:
+            raise InvalidRequestError("runtime approved package catalog history exceeds its bound")
+        seen = {package_digest}
+        for entry in history:
+            entry = _object(entry, "previousCatalog", {"catalogFile", "catalogSha256"})
+            digest = entry["catalogSha256"]
+            if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest) or digest in seen:
+                raise InvalidRequestError("runtime historical package digest is invalid or duplicated")
+            seen.add(digest)
+            previous_catalogs.append((_absolute_file(entry["catalogFile"], "previousCatalog.catalogFile"), digest))
     return RuntimeConfig(
         release_manifest, state_database, cloudstack, session, kubernetes_config,
-        cluster_profile, flux["path"], flux["sourceNamespace"],
+        cluster_profile, flux["path"], flux["sourceNamespace"], package_path, package_digest, tuple(previous_catalogs),
     )
 
 
@@ -202,8 +227,13 @@ def build_runtime(config_path: Path | str) -> ControllerRuntime:
     )
     executor = E1Executor(kubernetes, resolver, contract.gates, flux)
     store = SagaStore(config.state_database)
-    service = ControllerService(store, CloudStackCapabilityAuthorizer(), executor, contract.gates,
-                                qualified_images=config.profile.qualified_images)
+    authorizer = CloudStackCapabilityAuthorizer()
+    packages = (PackageExecutor(kubernetes, authorizer,
+                PackageCatalog(config.package_catalog, config.package_catalog_digest), contract.gates,
+                previous_catalogs=tuple(PackageCatalog(path, digest) for path, digest in config.previous_package_catalogs))
+                if config.package_catalog is not None else None)
+    service = ControllerService(store, authorizer, executor, contract.gates,
+                                qualified_images=config.profile.qualified_images, package_executor=packages)
     authenticator = CloudStackSessionAuthenticator(config.session)
     return ControllerRuntime(config, contract, store, service, BFFApplication(service, authenticator))
 

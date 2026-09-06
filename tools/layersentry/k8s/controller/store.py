@@ -123,6 +123,18 @@ class SagaStore:
                     raise ConflictError("idempotency key is already bound to a different request")
                 connection.commit()
                 return current, False
+            # Serialize accepted work for the same project/cluster before any
+            # remote mutation. UNKNOWN retains its reservation across restart.
+            if kind.startswith("kubernetes."):
+                active = connection.execute(
+                    "SELECT id FROM operations WHERE project_id=? AND target_name=? "
+                    "AND kind LIKE 'kubernetes.%' AND status NOT IN (?,?,?) LIMIT 1",
+                    (project_id, target_name, OperationStatus.READY.value,
+                     OperationStatus.DELETED.value, OperationStatus.FAILED.value),
+                ).fetchone()
+                if active is not None:
+                    connection.rollback()
+                    raise ConflictError("another operation still owns this cluster; reconcile it before submitting new work")
             connection.execute(
                 """INSERT INTO operations
                 (id,idempotency_key,request_sha256,kind,target_name,project_id,actor_subject,
@@ -139,6 +151,16 @@ class SagaStore:
             row = connection.execute("SELECT * FROM operations WHERE id=?", (operation_id,)).fetchone()
             connection.commit()
         return self._decode(row), True
+
+    def accepted_request(self, idempotency_key, request_sha256, actor_subject):
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM operations WHERE idempotency_key=?", (idempotency_key,)).fetchone()
+        if row is None:
+            return None
+        operation = self._decode(row)
+        if operation.request_sha256 != request_sha256 or operation.actor_subject != actor_subject:
+            raise ConflictError("idempotency key is already bound to a different request")
+        return operation
 
     def get(self, operation_id: str) -> Operation:
         with self._connect() as connection:

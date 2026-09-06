@@ -125,6 +125,30 @@ class PackageTests(unittest.TestCase):
         with self.assertRaises(AuthorizationError):self.executor.reconcile(ACTOR,REQUEST)
         self.assertEqual(self.native.writes,[])
 
+    def test_added_execution_overrides_are_not_reported_as_approved_readiness(self):
+        source,release=self.install()
+        release_key=self.native.key(release)
+        approved=deepcopy(self.native.rows[release_key])
+        for field,value in [('valuesFrom',[{'kind':'ConfigMap','name':'unapproved'}]),
+                            ('postRenderers',[{'kustomize':{'patches':[]}}]),
+                            ('serviceAccountName','privileged-account')]:
+            self.native.rows[release_key]=deepcopy(approved)
+            self.native.rows[release_key]['spec'][field]=value
+            with self.assertRaisesRegex(InvalidRequestError,'desired state drifted'):
+                self.executor.reconcile(ACTOR,REQUEST,inspect_only=True)
+        self.native.rows[release_key]=deepcopy(approved)
+        self.native.rows[release_key]['spec']['values']['unapprovedPrivilegedWorkload']=True
+        with self.assertRaisesRegex(InvalidRequestError,'desired state drifted'):
+            self.executor.reconcile(ACTOR,REQUEST,inspect_only=True)
+        self.native.rows[release_key]=approved
+        source_row=self.native.rows[self.native.key(source)]
+        source_row['spec']['provider']='generic'
+        self.assertEqual(self.executor.reconcile(ACTOR,REQUEST,inspect_only=True).outcome,StepOutcome.CONVERGED)
+        source_row['spec']['insecure']=True
+        with self.assertRaisesRegex(InvalidRequestError,'desired state drifted'):
+            self.executor.reconcile(ACTOR,REQUEST,inspect_only=True)
+        self.assertEqual(len(self.native.writes),2)
+
     def test_cross_project_cluster_and_raw_secret_request_are_rejected(self):
         cluster=self.native.rows[('Cluster','tenant-a','cluster-a')];cluster['metadata']['labels']['layersentry.io/project']='project-b'
         with self.assertRaises(InvalidRequestError):self.executor.reconcile(ACTOR,REQUEST)

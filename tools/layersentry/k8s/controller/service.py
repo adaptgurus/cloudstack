@@ -169,7 +169,7 @@ class ControllerService:
     def __init__(
         self, store: SagaStore, authorizer: Authorizer, executor: StepExecutor,
         gates: ReleaseGates, storage_profiles: Sequence[StorageProfile] = (),
-        qualified_images: Mapping[str, str] | None = None,
+        qualified_images: Mapping[str, str] | None = None, package_executor=None,
     ):
         self.store = store
         self.authorizer = authorizer
@@ -177,10 +177,60 @@ class ControllerService:
         self.gates = gates
         self.storage_profiles = tuple(storage_profiles)
         self.qualified_images = dict(qualified_images or {})
+        self.package_executor = package_executor
 
     def readiness(self, actor: Actor) -> Mapping[str, Any]:
         self.authorizer.require(actor, "kubernetes.readiness.read", "*")
         return release_readiness(self.gates)
+
+    def package_catalog(self, actor: Actor, project_id: str):
+        self.authorizer.require(actor, "kubernetes.package.read", project_id)
+        if self.package_executor is None:
+            return {"packages": [], "blockers": ["No release-approved package catalog is configured"]}
+        return self.package_executor.catalog_status()
+
+    def submit_package(self, actor: Actor, payload: Mapping[str, Any], idempotency_key: str, *, deleting=False):
+        if self.package_executor is None:
+            raise InvalidRequestError("no release-approved package catalog is configured")
+        # Strict schema and upstream capability/project authorization precede
+        # native reads. Acceptance binds the current catalog and Cluster UID.
+        from .package_resources import select_request
+        request, catalog_digest = select_request(payload)
+        action = "delete" if deleting else "install"
+        kind = "kubernetes.package." + action
+        fingerprint = self._mutation_identity(actor, kind, {"request": request, "catalogSha256": catalog_digest}, idempotency_key)
+        self.authorizer.require(actor, kind, request["projectId"])
+        existing = self.store.accepted_request(idempotency_key, fingerprint, actor.subject)
+        if existing is not None:
+            return existing, False
+        binding = self.package_executor.prepare(actor, request, action, catalog_digest=catalog_digest)
+        return self.store.create_or_get(
+            idempotency_key=idempotency_key, request_sha256=fingerprint,
+            kind=kind, target_name=request["clusterName"], project_id=request["projectId"],
+            actor_subject=actor.subject, request={"packageRequest": request, "binding": binding},
+            plan=[{"owner": "Flux", "action": action, "resource": request["package"]}],
+        )
+
+    def package_status(self, actor: Actor, payload: Mapping[str, Any]):
+        if self.package_executor is None:
+            raise InvalidRequestError("no release-approved package catalog is configured")
+        from .package_resources import select_request
+        request, digest = select_request(payload)
+        result = self.package_executor.reconcile(actor, request, inspect_only=True, catalog_digest=digest)
+        return {"status": result.outcome.value, "resources": dict(result.resources), "detail": result.detail}
+
+    def _execute_step(self, operation, step, *, observing=False):
+        if operation.kind.startswith("kubernetes.package."):
+            if self.package_executor is None:
+                return StepResult(StepOutcome.FAILED, detail="accepted package catalog is no longer configured")
+            # Both paths observe immutable native state before a create/delete;
+            # accepted requests cannot silently bind to a new catalog/cluster.
+            try:
+                return self.package_executor.reconcile_operation(operation, step)
+            except InvalidRequestError as exc:
+                return StepResult(StepOutcome.FAILED, detail=str(exc))
+        return (self.executor.observe_ambiguous(operation, step) if observing
+                else self.executor.reconcile(operation, step))
 
     def submit_cluster_create(
         self, actor: Actor, payload: Mapping[str, Any], idempotency_key: str,
@@ -293,6 +343,11 @@ class ControllerService:
         self.authorizer.require(actor, "kubernetes.operation.read", operation.project_id)
         return operation
 
+    def observe_operation(self, actor: Actor, operation_id: str):
+        operation = self.get_operation(actor, operation_id)
+        self.authorizer.require(actor, operation.kind, operation.project_id)
+        return self.reconcile_unknown(operation_id)
+
     def list_operations(self, actor: Actor, project_id: str, limit: int = 50, after: str | None = None):
         if not project_id:
             raise InvalidRequestError("projectId is required")
@@ -319,7 +374,7 @@ class ControllerService:
             )
         step = operation.plan[operation.step_index]
         try:
-            result = self.executor.reconcile(operation, step)
+            result = self._execute_step(operation, step)
         except AmbiguousMutationError as exc:
             return self.store.update(
                 operation, status=OperationStatus.UNKNOWN, step_index=operation.step_index,
@@ -334,7 +389,7 @@ class ControllerService:
             raise InvalidRequestError("operation is not in UNKNOWN state")
         if operation.step_index >= len(operation.plan):
             raise InvalidRequestError("operation has no ambiguous step")
-        result = self.executor.observe_ambiguous(operation, operation.plan[operation.step_index])
+        result = self._execute_step(operation, operation.plan[operation.step_index], observing=True)
         if result.outcome == StepOutcome.AMBIGUOUS:
             return self.store.update(
                 operation, status=OperationStatus.UNKNOWN, step_index=operation.step_index,
@@ -376,7 +431,7 @@ class ControllerService:
             if next_index == len(operation.plan):
                 status = (
                     OperationStatus.DELETED
-                    if operation.kind == "kubernetes.cluster.delete"
+                    if operation.kind in {"kubernetes.cluster.delete", "kubernetes.package.delete"}
                     else OperationStatus.READY
                 )
             else:

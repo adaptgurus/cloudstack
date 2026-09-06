@@ -103,6 +103,21 @@ class RuntimeConfigTest(unittest.TestCase):
             with self.assertRaisesRegex(InvalidRequestError, "qualifiedImages"):
                 load_runtime_config(self.config)
 
+    def test_package_catalog_revision_history_is_bounded_and_exact(self):
+        self.values["packages"] = {"catalogFile":str(self.release), "catalogSha256":"a"*64,
+                                  "previousCatalogs":[{"catalogFile":str(self.release), "catalogSha256":"b"*64}]}
+        self.write()
+        config=load_runtime_config(self.config)
+        self.assertEqual(config.previous_package_catalogs, ((self.release,"b"*64),))
+        self.values["packages"]["previousCatalogs"][0]["catalogSha256"]="a"*64
+        self.write()
+        with self.assertRaisesRegex(InvalidRequestError,"duplicated"):
+            load_runtime_config(self.config)
+        self.values["packages"]["previousCatalogs"]=[{}]*17
+        self.write()
+        with self.assertRaisesRegex(InvalidRequestError,"bound"):
+            load_runtime_config(self.config)
+
     def test_state_parent_must_not_be_writable_by_other_principals(self):
         os.chmod(self.state, 0o777)
         self.write()

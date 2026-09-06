@@ -6,7 +6,7 @@ import json
 from copy import deepcopy
 
 from .flux_resources import bounded_name
-from .package_catalog import NAME,VERSION
+from .package_catalog import NAME,VERSION,SHA,FLUX_TUPLE
 from .model import InvalidRequestError
 
 
@@ -18,6 +18,15 @@ def normalize_request(request):
     if not isinstance(request['version'],str) or not VERSION.fullmatch(request['version']):
         raise InvalidRequestError('package version must be exact')
     return dict(request)
+
+
+def select_request(payload):
+    if not isinstance(payload,dict):raise InvalidRequestError('package request must be an object')
+    request=dict(payload)
+    digest=request.pop('catalogSha256',None)
+    if digest is not None and (not isinstance(digest,str) or not SHA.fullmatch(digest)):
+        raise InvalidRequestError('package catalog revision must be an exact SHA-256')
+    return normalize_request(request),digest
 
 
 def verify_remote_credentials(kubernetes,cluster,project_id):
@@ -42,7 +51,11 @@ def verify_remote_credentials(kubernetes,cluster,project_id):
 def build_package_resources(request,entry,catalog_digest,cluster_uid):
     request=normalize_request(request)
     if not isinstance(cluster_uid,str) or not cluster_uid or len(cluster_uid)>128:raise InvalidRequestError('observed CAPI cluster UID is required')
-    binding=hashlib.sha256(json.dumps({'request':request,'catalog':catalog_digest,'clusterUid':cluster_uid},sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    if not isinstance(catalog_digest,str) or not SHA.fullmatch(catalog_digest):raise InvalidRequestError('approved catalog digest is required')
+    # The journal pins the full catalog revision. Native object ownership pins
+    # the full approved profile so unrelated catalog additions do not retarget
+    # an existing release or strand its dependents/uninstall path.
+    binding=hashlib.sha256(json.dumps({'request':request,'approvedProfile':entry,'fluxVersions':FLUX_TUPLE,'clusterUid':cluster_uid},sort_keys=True,separators=(',',':')).encode()).hexdigest()
     name=bounded_name(request['clusterName'],entry['package'])
     labels={'layersentry.io/managed':'true','layersentry.io/project':request['projectId'],'layersentry.io/cluster':request['clusterName'],'layersentry.io/package':entry['package']}
     metadata={'name':name,'namespace':request['namespace'],'labels':labels,'annotations':{'layersentry.io/package-binding':binding,'layersentry.io/cluster-uid':cluster_uid}}

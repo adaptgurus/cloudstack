@@ -92,6 +92,17 @@ class BFFApplication:
             raise InvalidRequestError("request body must be a JSON object")
         return payload
 
+    @staticmethod
+    def _query(environ, fields, optional=frozenset()):
+        try:
+            query = urllib.parse.parse_qs(str(environ.get("QUERY_STRING", "")),
+                strict_parsing=True, keep_blank_values=True, max_num_fields=len(fields)+len(optional))
+        except ValueError as exc:
+            raise InvalidRequestError("query string is malformed") from exc
+        if not fields.issubset(query) or set(query)-fields-optional or any(len(value) != 1 or not value[0] for value in query.values()):
+            raise InvalidRequestError("required query fields must occur exactly once")
+        return {key: value[0] for key, value in query.items()}
+
     def __call__(self, environ: Mapping[str, Any], start_response: Callable):
         try:
             actor = self.authenticator.authenticate(environ)
@@ -99,6 +110,24 @@ class BFFApplication:
             path = str(environ.get("PATH_INFO", ""))
             if method == "GET" and path == "/v1/kubernetes/readiness":
                 return self._response(start_response, HTTPStatus.OK, self.service.readiness(actor))
+            if path == "/v1/kubernetes/packages" and method == "GET":
+                query = self._query(environ, {"projectId"})
+                return self._response(start_response, HTTPStatus.OK,
+                                      self.service.package_catalog(actor, query["projectId"]))
+            package_match = re.fullmatch(r"/v1/kubernetes/clusters/([a-z0-9][a-z0-9-]{0,62})/packages", path)
+            if package_match and method in {"POST", "DELETE", "GET"}:
+                if method == "GET":
+                    payload = self._query(environ, {"namespace", "projectId", "package", "version", "profile"}, {"catalogSha256"})
+                    payload["clusterName"] = package_match.group(1)
+                    return self._response(start_response, HTTPStatus.OK,
+                                          self.service.package_status(actor, payload))
+                payload = self._body(environ)
+                if payload.get("clusterName") != package_match.group(1):
+                    raise InvalidRequestError("clusterName must exactly match the request path")
+                operation, created = self.service.submit_package(
+                    actor, payload, str(environ.get("HTTP_IDEMPOTENCY_KEY", "")), deleting=method == "DELETE")
+                return self._response(start_response, HTTPStatus.ACCEPTED if created else HTTPStatus.OK,
+                                      {"operation": operation.public_dict()})
             if method == "GET" and path == "/v1/kubernetes/images":
                 try:
                     query = urllib.parse.parse_qs(str(environ.get("QUERY_STRING", "")),
@@ -174,6 +203,12 @@ class BFFApplication:
                     actor, namespace=query["namespace"][0], name=match.group(1), project_id=query["projectId"][0],
                 )
                 return self._response(start_response, HTTPStatus.OK, {"cluster": status})
+            observation = re.fullmatch(r"/v1/kubernetes/operations/([0-9a-f-]{36})/reconcile", path)
+            if method == "POST" and observation:
+                if self._body(environ) != {}:
+                    raise InvalidRequestError("operation observation accepts only an empty JSON object")
+                operation = self.service.observe_operation(actor, observation.group(1))
+                return self._response(start_response, HTTPStatus.OK, {"operation": operation.public_dict()})
             prefix = "/v1/kubernetes/operations/"
             if method == "GET" and path.startswith(prefix) and "/" not in path[len(prefix):]:
                 operation_id = path[len(prefix):]
