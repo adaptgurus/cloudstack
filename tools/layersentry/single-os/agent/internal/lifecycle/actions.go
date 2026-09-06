@@ -12,6 +12,7 @@ import (
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/config"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/firewall"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lock"
+ "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lvm"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/model"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/mounts"
 )
@@ -34,6 +35,7 @@ func(e *Engine)Action(ctx context.Context,serviceID string,r ActionRequest)(mode
  case "repair":
   plan:=planFromState(op,st);plan.Digest="";if plan.Digest,err=config.PlanDigest(plan);err!=nil{return fail(err,false)};if err=e.Store.SavePlan(plan);err!=nil{return fail(err,false)};op.PlanDigest=plan.Digest;_ = e.Store.SaveOperation(op)
   if e.Runner==nil{return fail(errors.New("privileged executor unavailable for recovery"),false)}
+  if len(st.LVM)>0{if e.LVMRunner==nil{return fail(errors.New("LVM recovery executor unavailable"),false)};if err=(lvm.Manager{Runner:e.LVMRunner}).EnsureMounted(ctx,st.ID,st.LVM);err!=nil{return fail(err,false)}}
   if err=(mounts.Manager{Runner:e.Runner}).EnsureMounted(ctx,st.Storage);err!=nil{return fail(err,false)}
   if err=p.Configure(ctx,op,plan);err!=nil{return fail(err,isAmbiguous(err))}
   if st.Topology=="cluster"&&st.Cluster.EnrollmentPeer!=""{err=p.Join(ctx,op,plan)}else{err=p.Initialize(ctx,op,plan)};if err!=nil{return fail(err,isAmbiguous(err))}
@@ -47,6 +49,6 @@ func(e *Engine)Action(ctx context.Context,serviceID string,r ActionRequest)(mode
  if err!=nil{return fail(err,isAmbiguous(err))};if r.Action!="stop"&&r.Action!="backup"{h,herr:=p.Health(ctx,st);if herr!=nil{return fail(herr,false)};if !h.Healthy{return fail(fmt.Errorf("post-%s health failed: %s",r.Action,h.Error),false)}}
  switch r.Action{case "stop":st.Status="stopped";case "start","restart","repair","restore","upgrade":st.Status="installed"};if r.Action!="backup"{st.RecoveryRequired=false;st.FailureStage="";st.LastOperationID=op.ID;_ = e.Store.SaveService(st)};op.Status=model.OpSucceeded;op.Stage="complete";op.Error="";_ = e.Store.SaveOperation(op);return op,nil
 }
-func requestFromState(op model.Operation,st model.ServiceState,idempotency string)model.ServiceRequest{return model.ServiceRequest{SchemaVersion:1,RequestID:op.ID,ServiceID:st.ID,OperationID:op.ID,IdempotencyKey:idempotency,Category:st.Category,Provider:st.Provider,ReleaseLine:st.ReleaseLine,Topology:st.Topology,Storage:st.Storage,Network:st.Network,Maintenance:st.Maintenance,Backup:st.Backup,Cluster:st.Cluster,SecretRefs:st.SecretRefs}}
+func requestFromState(op model.Operation,st model.ServiceState,idempotency string)model.ServiceRequest{return model.ServiceRequest{SchemaVersion:1,RequestID:op.ID,ServiceID:st.ID,OperationID:op.ID,IdempotencyKey:idempotency,Category:st.Category,Provider:st.Provider,ReleaseLine:st.ReleaseLine,Topology:st.Topology,Storage:st.Storage,LVM:st.LVM,Network:st.Network,Maintenance:st.Maintenance,Backup:st.Backup,Cluster:st.Cluster,SecretRefs:st.SecretRefs}}
 func planFromState(op model.Operation,st model.ServiceState)model.Plan{req:=requestFromState(op,st,op.IdempotencyKey);return model.Plan{ID:op.ID,ServiceID:st.ID,Provider:st.Provider,ResolvedVersion:st.ResolvedVersion,CreatedAt:time.Now().UTC(),Request:req}}
 func(e *Engine)uninstallLocked(ctx context.Context,st model.ServiceState,p interface{Uninstall(context.Context,model.Operation,model.ServiceState,bool)error;ResidueAudit(context.Context,model.ServiceState)(map[string]string,error)},op model.Operation,destroy bool)(model.Operation,error){markFail:=func(stage string,err error)(model.Operation,error){op.Status=model.OpFailedNeedsRecovery;op.Stage=stage;op.Error=redact(err.Error());st.Status="failed-needs-recovery";st.RecoveryRequired=true;st.FailureStage=stage;st.LastOperationID=op.ID;_ = e.Store.SaveService(st);_ = e.Store.SaveOperation(op);return op,err};if err:=p.Uninstall(ctx,op,st,destroy);err!=nil{return markFail("uninstall",err)};if e.Runner!=nil&&st.Network.Port>0{if err:=(firewall.Manager{Runner:e.Runner}).Remove(ctx,st.ID);err!=nil{return markFail("firewall-cleanup",err)}};res,err:=p.ResidueAudit(ctx,st);if err!=nil{return markFail("residue-audit",err)};for _,v:=range res{if v=="present"||v=="active"{return markFail("residue-audit",errors.New("managed residue remains"))}};st.Status="uninstalled-data-preserved";st.RecoveryRequired=false;st.FailureStage="";st.LastOperationID=op.ID;_ = e.Store.SaveService(st);op.Status=model.OpSucceeded;op.Stage="complete";op.Error="";_ = e.Store.SaveOperation(op);return op,nil}
