@@ -37,6 +37,13 @@ class MaterializeTest(unittest.TestCase):
         self.assertEqual(manifest["upstreamCommit"], "a84477e922d62b82387ab55134fafc9c0b5aaf64")
         self.assertEqual(manifest["activation"]["projectPVCGrow"], "disabled-until-live-qualified")
 
+    def test_loads_pinned_cloudstack_ccm_manifest(self):
+        path = Path(__file__).parent / "cloudstack-ccm" / "manifest.json"
+        manifest = load_manifest(path)
+        self.assertEqual(manifest["upstreamCommit"], "4740dbcacc7fc5892354b03b2f0be7ebf5c92584")
+        self.assertEqual(manifest["postPatch"]["kubernetesLibraries"], "0.36.0")
+        self.assertEqual(manifest["status"], "NOT_TESTED")
+
     def test_rejects_manifest_without_patches(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"

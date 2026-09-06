@@ -113,6 +113,8 @@ def evaluate_component_readiness(manifest: Mapping[str, Any]) -> ComponentReadin
     csi_image = _image(csi.get("image"), "downstream CloudStack CSI", blockers)
     if ccm.get("version") != "1.2.0" or not _COMMIT.fullmatch(str(ccm.get("upstreamCommit", ""))):
         blockers.append("CloudStack CCM exact source is unresolved")
+    if not _SHA256.fullmatch(str(ccm.get("downstreamPatchSha256", ""))):
+        blockers.append("CloudStack CCM downstream patch digest is unresolved")
     if ccm.get("kubernetes136Qualified") is not True:
         blockers.append("CloudStack CCM v1.2.0 is not qualified with Kubernetes 1.36")
     if csi.get("projectLifecycleQualified") is not True:

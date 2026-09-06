@@ -37,6 +37,10 @@ class ComponentReadinessTest(unittest.TestCase):
         self.assertIsNone(result.csi_image)
         self.assertTrue(any("Kubernetes 1.36" in item for item in result.blockers))
         self.assertTrue(any("Flux catalog commit" in item for item in result.blockers))
+        self.assertEqual(
+            MANIFEST["cloudstackCcm"]["downstreamPatchSha256"],
+            "a6689998f2a46b9622ac69f97f8e67e231f075ffa8cca16a85a97fd0f4893726",
+        )
         with self.assertRaises(InvalidRequestError):
             result.require_deployable()
         contract = load_release_contract(ROOT / "release-candidate-lane-b.json")

@@ -58,7 +58,10 @@ def materialize(source: Path, manifest_path: Path, *, apply: bool) -> dict[str, 
     source = source.resolve(strict=True)
     manifest_path = manifest_path.resolve(strict=True)
     manifest = load_manifest(manifest_path)
-    if not (source / ".git").is_dir():
+    # A normal clone stores .git as a directory; an isolated `git worktree`
+    # stores it as a control file. Both are valid and rev-parse below remains
+    # the authoritative repository check.
+    if not (source / ".git").exists():
         raise OverlayError("source directory is not a Git worktree")
 
     head = _run(("git", "rev-parse", "HEAD"), source).stdout.strip()
