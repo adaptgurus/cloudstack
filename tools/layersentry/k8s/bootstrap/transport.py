@@ -37,10 +37,18 @@ from controller.model import InvalidRequestError
 from .native import protected_file
 
 _GUEST_PUBLIC_KEY = '''import json,os,stat
-p='/etc/ssh/ssh_host_ed25519_key.pub'
-s=os.lstat(p)
-if not stat.S_ISREG(s.st_mode) or s.st_uid != 0 or s.st_gid != 0 or s.st_mode & 0o022 or s.st_size > 4096: raise SystemExit(2)
-print(json.dumps({'hostKey':open(p).read().strip()}))
+p='/usr/share/layersentry/node-image/ssh_host_ed25519_key.pub'
+for parent in ('/usr','/usr/share','/usr/share/layersentry','/usr/share/layersentry/node-image'):
+ s=os.lstat(parent)
+ if not stat.S_ISDIR(s.st_mode) or s.st_uid!=0 or s.st_gid!=0 or s.st_mode & 0o022:raise SystemExit(2)
+fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+try:
+ s=os.fstat(fd)
+ if not stat.S_ISREG(s.st_mode) or s.st_uid!=0 or s.st_gid!=0 or s.st_mode & 0o022 or s.st_nlink!=1 or not 0<s.st_size<=4096:raise SystemExit(2)
+ with os.fdopen(fd,'r',encoding='ascii',closefd=False) as stream:key=stream.read(4097).strip()
+ if len(key)>4096 or len(key.splitlines())!=1:raise SystemExit(3)
+ print(json.dumps({'hostKey':key}))
+finally:os.close(fd)
 '''
 
 _HOST_OBSERVE = '''import base64,json,subprocess,sys,time,uuid
