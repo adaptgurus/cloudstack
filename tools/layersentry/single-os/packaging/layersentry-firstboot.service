@@ -1,0 +1,20 @@
+[Unit]
+Description=LayerSentry Single-OS clone-safe first boot
+DefaultDependencies=no
+After=local-fs.target
+Before=layersentryd.service
+ConditionPathExists=!/var/lib/layersentryd/identity/node-id
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/layersentryd firstboot
+UMask=0077
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
