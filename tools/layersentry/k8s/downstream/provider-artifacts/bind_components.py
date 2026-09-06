@@ -28,7 +28,7 @@ def concrete(text):
 
 def bind(component, source, evidence, kustomize=None):
     verification = json.loads((evidence / f'{component}-verification.json').read_text())
-    digest = verification['imageManifestDigest']
+    digest = verification['imageIndexDigest']
     if verification.get('status') != 'CI_VERIFIED' or not re.fullmatch(r'sha256:[a-f0-9]{64}', digest):
         raise ValueError('image must pass OCI verification before manifest binding')
     image = f'layersentry.local/{component}@{digest}'
@@ -61,10 +61,10 @@ def bind(component, source, evidence, kustomize=None):
     binding = {
         'schemaVersion': '1.0', 'component': component, 'status': 'CI_VERIFIED',
         'productionCertified': False, 'liveVerified': False, 'signed': False,
-        'image': image, 'archiveSha256': verification['archiveSha256'],
+        'image': image, 'runtimeImageManifestDigest': verification['imageManifestDigest'], 'archiveSha256': verification['archiveSha256'],
         'manifest': filename, 'manifestSha256': hashlib.sha256(target.read_bytes()).hexdigest(),
         'layersentrySourceCommit': verification['layersentrySourceCommit'],
-        'requirements': ['Import the retained OCI archive into every scheduled node or mirror it preserving its digest.',
+        'requirements': ['Import the retained OCI archive on every scheduled node: ctr -n k8s.io images import --all-platforms --digests --base-name layersentry.local/' + component + ' ' + component + '.oci.tar; verify the exact index digest image exists. Or mirror preserving the index digest.',
                          'Install pinned CAPI core, CAPRKE2 and cert-manager dependencies before CAPC.',
                          'Provide scoped CloudStack credentials through the provider native Secret contract; no credentials are included.'],
     }

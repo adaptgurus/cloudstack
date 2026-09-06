@@ -29,15 +29,19 @@ executes non-root, read-only, network-disabled smoke checks. Verification
 binds that executable image config to the OCI runtime manifest and checks all
 blob hashes, descriptor sizes and attestation subjects. CAPC installation YAML
 is rendered from the patched CRDs, with finite concrete provider defaults and
-the actual verified image digest. CCM keeps upstream RBAC and its native
+the actual verified OCI index digest, retaining runtime manifest/config identity separately. CCM keeps upstream RBAC and its native
 `cloudstack-secret` reference; no Secret data is emitted.
 
 Images use the logical local name `layersentry.local/<component>@sha256:...`.
 Import each retained OCI archive into every scheduled node's containerd
-`k8s.io` namespace, or mirror it preserving the digest and explicitly rewrite
+`k8s.io` namespace with `images import --all-platforms --digests --base-name
+layersentry.local/<component> <component>.oci.tar`, then verify the exact
+index-digest image record exists, or mirror it preserving the digest and explicitly rewrite
 its repository before installation. The archive tag is `<component>:qualification`
 under that same repository. Build output is unsigned and retained 14 days by
 GitHub; it is not a production release or durable distribution channel.
 Install pinned CAPI core, CAPRKE2 and cert-manager separately before CAPC;
 this workflow does not install anything. Live Rocky provider reconciliation,
 VM/LB/disk ownership and CCM activation remain required acceptance gates.
+
+The archive index/manifest distinction follows the official [containerd import implementation](https://github.com/containerd/containerd/blob/v2.2.0/cmd/ctr/commands/images/import.go). Component YAML pins the named index, which includes the verified amd64 runtime and its attestations; it does not assume importing a named index creates a separate subordinate runtime-digest image record.

@@ -28,8 +28,9 @@ def fixture(path, *, subject_wrong=False, sbom_missing=False, corrupt=False):
         predicates.append(('https://spdx.dev/Document', {'packages': [{'name': 'fixture'}]}))
     layers = [blob({'predicateType': kind, 'subject': [subject], 'predicate': value}, 'application/vnd.in-toto+json') for kind, value in predicates]
     attestation = blob({'schemaVersion': 2, 'config': blob({'architecture': 'unknown', 'os': 'unknown'}), 'layers': layers})
+    root = blob({'schemaVersion': 2, 'manifests': [image, attestation]}, 'application/vnd.oci.image.index.v1+json')
     with tarfile.open(path, 'w') as tar:
-        values = {'oci-layout': b'{"imageLayoutVersion":"1.0.0"}', 'index.json': json.dumps({'manifests': [image, attestation]}).encode()}
+        values = {'oci-layout': b'{"imageLayoutVersion":"1.0.0"}', 'index.json': json.dumps({'schemaVersion': 2, 'manifests': [root]}).encode()}
         values.update({'blobs/sha256/' + digest.split(':')[1]: data for digest, data in blobs.items()})
         if corrupt:
             values['blobs/sha256/' + config['digest'].split(':')[1]] = b'corrupt'

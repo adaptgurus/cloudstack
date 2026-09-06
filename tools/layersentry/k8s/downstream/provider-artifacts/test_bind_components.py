@@ -21,7 +21,7 @@ class BindingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'deployment.yaml').write_text('kind: Deployment\nimage: apache/cloudstack-kubernetes-provider:v1.2.0\n')
-            verification = {'status': 'CI_VERIFIED', 'imageManifestDigest': 'sha256:' + 'a'*64,
+            verification = {'status': 'CI_VERIFIED', 'imageIndexDigest': 'sha256:' + 'a'*64, 'imageManifestDigest': 'sha256:' + 'd'*64,
                             'archiveSha256': 'b'*64, 'layersentrySourceCommit': 'c'*40}
             evidence = root / 'cloudstack-ccm-verification.json'
             evidence.write_text(json.dumps(verification))
@@ -39,7 +39,7 @@ class BindingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'deployment.yaml').write_text('image: apache/cloudstack-kubernetes-provider:v1.2.0\nimage: unsafe:latest\n')
-            (root / 'cloudstack-ccm-verification.json').write_text(json.dumps({'status': 'CI_VERIFIED', 'imageManifestDigest': 'sha256:' + 'a'*64}))
+            (root / 'cloudstack-ccm-verification.json').write_text(json.dumps({'status': 'CI_VERIFIED', 'imageIndexDigest': 'sha256:' + 'a'*64, 'imageManifestDigest': 'sha256:' + 'd'*64}))
             with self.assertRaises(ValueError):
                 binding.bind('cloudstack-ccm', root, root)
 
