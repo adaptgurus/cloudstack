@@ -15,6 +15,7 @@ import (
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/auth"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/backupcrypto"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/bootstrap"
+    "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/cluster"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/journal"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lifecycle"
@@ -34,6 +35,7 @@ type runtimeState struct {
     store      *journal.Store
     secrets    *secrets.Store
     backupKeys *backupcrypto.Keyring
+    enrollment *cluster.Manager
     eng        *lifecycle.Engine
 }
 
@@ -74,6 +76,10 @@ func buildRuntime() (*runtimeState, error) {
     if err != nil {
         return nil, err
     }
+    enrollment, err := cluster.Open(root + "/enrollment/tokens")
+    if err != nil {
+        return nil, err
+    }
     reg := provider.NewRegistry()
     if err = reg.Register(pgprovider.New(runner, sec, backupKeys)); err != nil {
         return nil, err
@@ -81,8 +87,9 @@ func buildRuntime() (*runtimeState, error) {
     if err = reg.Register(nginxprovider.New(runner)); err != nil {
         return nil, err
     }
-    eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, LockPath: root + "/state/mutation.lock"}
-    return &runtimeState{runner: runner, reg: reg, store: st, secrets: sec, backupKeys: backupKeys, eng: eng}, nil
+    clusterClient := &cluster.Client{Secrets: sec}
+    eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, Cluster: clusterClient, LockPath: root + "/state/mutation.lock"}
+    return &runtimeState{runner: runner, reg: reg, store: st, secrets: sec, backupKeys: backupKeys, enrollment: enrollment, eng: eng}, nil
 }
 
 func serve() error {
@@ -100,7 +107,9 @@ func serve() error {
         Secrets:       rt.secrets,
         Journal:       rt.store,
         Registry:      rt.reg,
+        Enrollment:    rt.enrollment,
         BootstrapFile: root + "/identity/bootstrap-token",
+        TLSCertFile:   root + "/identity/tls.crt",
         AllowedOrigin: os.Getenv("LAYERSENTRY_ALLOWED_ORIGIN"),
     }
     handler, err := srv.Handler()
@@ -126,7 +135,7 @@ func maintenanceRun() error {
     if err != nil {
         return err
     }
-    return (maintenance.Runner{Store: rt.store, Engine: rt.eng, Secrets: rt.secrets}).Run(context.Background())
+    return (maintenance.Runner{Store: rt.store, Engine: rt.eng, Secrets: rt.secrets, Enrollment: rt.enrollment}).Run(context.Background())
 }
 
 func privilegedHelper() error {
