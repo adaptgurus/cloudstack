@@ -23,6 +23,8 @@ identity headers are never trusted by the default authenticator.
 from __future__ import annotations
 
 import json
+import re
+import urllib.parse
 from http import HTTPStatus
 from typing import Any, Callable, Mapping, Protocol
 
@@ -31,6 +33,7 @@ from .service import ControllerService
 
 
 MAX_BODY_BYTES = 1024 * 1024
+_CLUSTER_PATH = re.compile(r"^/v1/kubernetes/clusters/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(/scale)?$")
 
 
 class Authenticator(Protocol):
@@ -95,6 +98,28 @@ class BFFApplication:
                 )
                 status = HTTPStatus.ACCEPTED if created else HTTPStatus.OK
                 return self._response(start_response, status, {"operation": operation.public_dict()})
+            match = _CLUSTER_PATH.fullmatch(path)
+            if match and method in {"POST", "DELETE"}:
+                payload = dict(self._body(environ))
+                if payload.get("cluster_name") != match.group(1):
+                    raise InvalidRequestError("cluster_name must exactly match the request path")
+                key = str(environ.get("HTTP_IDEMPOTENCY_KEY", ""))
+                if method == "POST" and match.group(2) == "/scale":
+                    operation, created = self.service.submit_cluster_scale(actor, payload, key)
+                elif method == "DELETE" and match.group(2) is None:
+                    operation, created = self.service.submit_cluster_delete(actor, payload, key)
+                else:
+                    return self._response(start_response, HTTPStatus.NOT_FOUND, {"error": "route not found"})
+                status = HTTPStatus.ACCEPTED if created else HTTPStatus.OK
+                return self._response(start_response, status, {"operation": operation.public_dict()})
+            if match and method == "GET" and match.group(2) is None:
+                query = urllib.parse.parse_qs(str(environ.get("QUERY_STRING", "")), strict_parsing=True)
+                if set(query) != {"namespace", "projectId"} or any(len(value) != 1 for value in query.values()):
+                    raise InvalidRequestError("namespace and projectId query parameters are required exactly once")
+                status = self.service.cluster_status(
+                    actor, namespace=query["namespace"][0], name=match.group(1), project_id=query["projectId"][0],
+                )
+                return self._response(start_response, HTTPStatus.OK, {"cluster": status})
             prefix = "/v1/kubernetes/operations/"
             if method == "GET" and path.startswith(prefix) and "/" not in path[len(prefix):]:
                 operation_id = path[len(prefix):]

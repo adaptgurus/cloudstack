@@ -161,6 +161,10 @@ class KubernetesClient:
         path, _ = self._resource_path(resource)
         return self.request("GET", path)
 
+    def patch_merge(self, resource: Mapping[str, Any], patch: Mapping[str, Any]) -> Mapping[str, Any]:
+        path, _ = self._resource_path(resource)
+        return self.request("PATCH", path, body=patch, content_type="application/merge-patch+json")
+
     def delete(self, resource: Mapping[str, Any]) -> Mapping[str, Any]:
         path, _ = self._resource_path(resource)
         return self.request("DELETE", path, body={"apiVersion": "v1", "kind": "DeleteOptions"})

@@ -49,6 +49,7 @@ def resolved(**overrides):
         project_id="project-id", project_name="project-a", zone_id="zone-id", zone_name="site-a",
         network_id="network-id", network_name="workload-a",
         control_plane_offering_id="cp-offering-id", control_plane_template_id="image-id",
+        endpoint_public_ip_id="public-ip-id",
         worker_offering_ids={"workers": "worker-offering-id"},
         worker_template_ids={"workers": "image-id"},
     )

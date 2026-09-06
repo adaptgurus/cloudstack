@@ -86,6 +86,12 @@ class KubernetesClientTest(unittest.TestCase):
         with self.assertRaises(AmbiguousMutationError):
             client.apply(RESOURCE)
 
+    def test_scale_patch_uses_merge_patch_without_force(self):
+        client = self.client()
+        client.patch_merge(RESOURCE, {"spec": {"replicas": 5}})
+        self.assertNotIn("fieldManager", client.opener.request.full_url)
+        self.assertEqual(client.opener.request.get_header("Content-type"), "application/merge-patch+json")
+
     def test_unknown_kind_and_unsafe_origin_fail_closed(self):
         with self.assertRaisesRegex(InvalidRequestError, "unsupported"):
             KubernetesClient._resource_path({

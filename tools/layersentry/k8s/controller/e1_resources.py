@@ -50,6 +50,7 @@ class ResolvedInfrastructure:
     network_name: str
     control_plane_offering_id: str
     control_plane_template_id: str
+    endpoint_public_ip_id: str
     worker_offering_ids: Mapping[str, str]
     worker_template_ids: Mapping[str, str]
 

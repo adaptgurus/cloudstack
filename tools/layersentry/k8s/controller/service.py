@@ -47,6 +47,7 @@ from .store import SagaStore
 
 
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{15,127}$")
+_RESOURCE_NAME = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _CREATE_FIELDS = {
     "name", "zone_id", "network_id", "cluster_class", "channel", "cni",
     "control_plane_replicas", "control_plane_service_offering_id",
@@ -57,6 +58,7 @@ _NODE_POOL_FIELDS = {
     "storage_profile_ids", "direct_node_disks", "node_disk_set_id", "gpu",
 }
 _SECRET_FIELD = re.compile(r"(password|secret|token|private.?key|api.?key)", re.IGNORECASE)
+_SAFE_SECRET_REFERENCE_FIELDS = {"cloudstack_secret_name", "cloudstack_secret_namespace"}
 
 
 class Authorizer(Protocol):
@@ -92,6 +94,8 @@ class StepExecutor(Protocol):
 
     def observe_ambiguous(self, operation: Operation, step: Mapping[str, Any]) -> StepResult: ...
 
+    def cluster_status(self, namespace: str, name: str, project_id: str) -> Mapping[str, Any]: ...
+
 
 def _canonical(value: Mapping[str, Any]) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
@@ -112,7 +116,8 @@ def _integer(value: Any, field_name: str) -> int:
 def _contains_secret_field(value: Any) -> bool:
     if isinstance(value, Mapping):
         return any(
-            _SECRET_FIELD.search(str(key)) or _contains_secret_field(nested)
+            (_SECRET_FIELD.search(str(key)) and str(key) not in _SAFE_SECRET_REFERENCE_FIELDS)
+            or _contains_secret_field(nested)
             for key, nested in value.items()
         )
     if isinstance(value, (list, tuple)):
@@ -197,6 +202,88 @@ class ControllerService:
             request=normalized, plan=steps,
         )
 
+    @staticmethod
+    def _mutation_identity(actor: Actor, action: str, payload: Mapping[str, Any], idempotency_key: str) -> str:
+        if not _IDEMPOTENCY_KEY.fullmatch(idempotency_key or ""):
+            raise InvalidRequestError("Idempotency-Key must contain 16-128 safe characters")
+        return hashlib.sha256(_canonical({
+            "actor": actor.subject, "action": action, "request": payload,
+        })).hexdigest()
+
+    def submit_cluster_scale(
+        self, actor: Actor, payload: Mapping[str, Any], idempotency_key: str,
+    ) -> tuple[Operation, bool]:
+        allowed = {"cluster_name", "namespace", "node_pool", "replicas", "project_id"}
+        if not isinstance(payload, Mapping):
+            raise InvalidRequestError("request body must be a JSON object")
+        _reject_unknown(payload, allowed, "scale")
+        for name in ("cluster_name", "namespace", "node_pool"):
+            if not isinstance(payload.get(name), str) or not _RESOURCE_NAME.fullmatch(payload[name]):
+                raise InvalidRequestError(f"{name} is invalid")
+        replicas = _integer(payload.get("replicas"), "replicas")
+        if replicas < 1:
+            raise InvalidRequestError("replicas must be at least 1")
+        project_id = payload.get("project_id")
+        if not isinstance(project_id, str) or not project_id:
+            raise InvalidRequestError("project_id is required")
+        self.authorizer.require(actor, "kubernetes.cluster.scale", project_id)
+        normalized = dict(payload)
+        fingerprint = self._mutation_identity(actor, "kubernetes.cluster.scale", normalized, idempotency_key)
+        step = {
+            "owner": "CAPI", "action": "scale-worker-pool",
+            "resource": f"{payload['cluster_name']}-{payload['node_pool']}",
+            "idempotency_key": f"cluster:{payload['cluster_name']}:scale:{payload['node_pool']}:{replicas}",
+            "destructive": False, "prerequisites": [],
+        }
+        return self.store.create_or_get(
+            idempotency_key=idempotency_key, request_sha256=fingerprint,
+            kind="kubernetes.cluster.scale", target_name=payload["cluster_name"],
+            project_id=project_id, actor_subject=actor.subject, request=normalized, plan=[step],
+        )
+
+    def submit_cluster_delete(
+        self, actor: Actor, payload: Mapping[str, Any], idempotency_key: str,
+    ) -> tuple[Operation, bool]:
+        allowed = {"cluster_name", "namespace", "project_id", "confirm_cluster_name", "retain_workload_volumes"}
+        if not isinstance(payload, Mapping):
+            raise InvalidRequestError("request body must be a JSON object")
+        _reject_unknown(payload, allowed, "delete")
+        for name in ("cluster_name", "namespace"):
+            if not isinstance(payload.get(name), str) or not _RESOURCE_NAME.fullmatch(payload[name]):
+                raise InvalidRequestError(f"{name} is invalid")
+        if payload.get("confirm_cluster_name") != payload["cluster_name"]:
+            raise InvalidRequestError("confirm_cluster_name must exactly match cluster_name")
+        if payload.get("retain_workload_volumes") is not True:
+            raise InvalidRequestError("E1 deletion requires retain_workload_volumes=true")
+        if not self.gates.capc_volume_ownership_safe:
+            raise InvalidRequestError("cluster deletion is blocked until CAPC volume ownership is live-verified")
+        project_id = payload.get("project_id")
+        if not isinstance(project_id, str) or not project_id:
+            raise InvalidRequestError("project_id is required")
+        self.authorizer.require(actor, "kubernetes.cluster.delete", project_id)
+        normalized = dict(payload)
+        fingerprint = self._mutation_identity(actor, "kubernetes.cluster.delete", normalized, idempotency_key)
+        step = {
+            "owner": "CAPI", "action": "delete-cluster", "resource": payload["cluster_name"],
+            "idempotency_key": f"cluster:{payload['cluster_name']}:delete",
+            "destructive": True, "prerequisites": [],
+        }
+        return self.store.create_or_get(
+            idempotency_key=idempotency_key, request_sha256=fingerprint,
+            kind="kubernetes.cluster.delete", target_name=payload["cluster_name"],
+            project_id=project_id, actor_subject=actor.subject, request=normalized, plan=[step],
+        )
+
+    def cluster_status(
+        self, actor: Actor, *, namespace: str, name: str, project_id: str,
+    ) -> Mapping[str, Any]:
+        if not _RESOURCE_NAME.fullmatch(namespace or "") or not _RESOURCE_NAME.fullmatch(name or ""):
+            raise InvalidRequestError("namespace or cluster name is invalid")
+        if not project_id:
+            raise InvalidRequestError("project_id is required")
+        self.authorizer.require(actor, "kubernetes.cluster.read", project_id)
+        return self.executor.cluster_status(namespace, name, project_id)
+
     def get_operation(self, actor: Actor, operation_id: str) -> Operation:
         operation = self.store.get(operation_id)
         self.authorizer.require(actor, "kubernetes.operation.read", operation.project_id)
@@ -254,7 +341,14 @@ class ControllerService:
         detail = result.detail or f"{step.get('owner')}:{step.get('action')} {result.outcome.value}"
         if result.outcome == StepOutcome.CONVERGED:
             next_index = operation.step_index + 1
-            status = OperationStatus.READY if next_index == len(operation.plan) else OperationStatus.RUNNING
+            if next_index == len(operation.plan):
+                status = (
+                    OperationStatus.DELETED
+                    if operation.kind == "kubernetes.cluster.delete"
+                    else OperationStatus.READY
+                )
+            else:
+                status = OperationStatus.RUNNING
             return self.store.update(
                 operation, status=status, step_index=next_index, resources=resources, detail=detail,
             )

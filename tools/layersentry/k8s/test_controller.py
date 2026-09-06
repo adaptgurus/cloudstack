@@ -78,6 +78,9 @@ class QueueExecutor:
         self.calls += 1
         return self.outcomes.pop(0)
 
+    def cluster_status(self, namespace, name, project_id):
+        return {"namespace": namespace, "name": name, "projectId": project_id, "ready": False}
+
 
 class StaticAuthenticator:
     def authenticate(self, environ):
@@ -177,12 +180,37 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(status, 202)
         self.assertEqual(response["operation"]["status"], "REQUESTED")
 
+    def test_bff_scale_status_and_path_tampering(self):
+        app = BFFApplication(self.service(), StaticAuthenticator())
+        scale = {
+            "cluster_name": "cluster-a", "namespace": "tenant-a", "node_pool": "workers",
+            "replicas": 5, "project_id": "project-1",
+        }
+        status, response = self._request(
+            app, "POST", "/v1/kubernetes/clusters/cluster-a/scale", scale, "bff-scale-cluster-01",
+        )
+        self.assertEqual(status, 202)
+        self.assertEqual(response["operation"]["kind"], "kubernetes.cluster.scale")
+
+        status, response = self._request(
+            app, "POST", "/v1/kubernetes/clusters/cluster-b/scale", scale, "bff-scale-tamper-01",
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("request path", response["error"])
+
+        status, response = self._request(
+            app, "GET", "/v1/kubernetes/clusters/cluster-a", query="namespace=tenant-a&projectId=project-1",
+        )
+        self.assertEqual(status, 200)
+        self.assertFalse(response["cluster"]["ready"])
+
     @staticmethod
-    def _request(app, method, path, payload=None, key=None):
+    def _request(app, method, path, payload=None, key=None, query=""):
         raw = b"" if payload is None else json.dumps(payload).encode()
         environ = {
             "REQUEST_METHOD": method, "PATH_INFO": path, "CONTENT_TYPE": "application/json",
             "CONTENT_LENGTH": str(len(raw)), "wsgi.input": io.BytesIO(raw),
+            "QUERY_STRING": query,
         }
         if key:
             environ["HTTP_IDEMPOTENCY_KEY"] = key
