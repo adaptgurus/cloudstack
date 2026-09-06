@@ -24,11 +24,12 @@ import (
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/provider"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/providerexec"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/secrets"
+	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/valkeyexec"
 	apacheprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/apache"
+	keyvalueprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/keyvalue"
 	mysqlprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/mysqlfamily"
 	nginxprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/nginx"
 	pgprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/postgresql"
-	redisprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/redis"
 	runtimeprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/runtime"
 	tomcatprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/tomcat"
 )
@@ -72,6 +73,7 @@ func buildRuntime() (*runtimeState, error) {
 	coreRunner := privileged.NewClient(privileged.DefaultSocket)
 	providerRunner := providerexec.NewClient(providerexec.DefaultSocket)
 	runner := providerexec.Router{Core: coreRunner, Provider: providerRunner}
+	valkeyRunner := valkeyexec.NewClient(valkeyexec.DefaultSocket)
 	st, err := journal.New(root)
 	if err != nil {
 		return nil, err
@@ -93,7 +95,8 @@ func buildRuntime() (*runtimeState, error) {
 		pgprovider.New(runner, sec, backupKeys),
 		mysqlprovider.MySQL(runner, sec, backupKeys),
 		mysqlprovider.MariaDB(runner, sec, backupKeys),
-		redisprovider.New(runner, sec, backupKeys),
+		keyvalueprovider.Redis(runner, sec, backupKeys),
+		keyvalueprovider.Valkey(valkeyRunner, sec, backupKeys),
 		nginxprovider.New(runner),
 		apacheprovider.New(runner),
 		tomcatprovider.New(runner),
@@ -164,17 +167,18 @@ func privilegedHelper() error {
 	runner := executor.OSRunner{Timeout: 5 * time.Minute, MaxOutput: 1 << 20}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
 	go func() { errCh <- privileged.Serve(ctx, privileged.DefaultSocket, "layersentry", runner) }()
 	go func() { errCh <- providerexec.Serve(ctx, providerexec.DefaultSocket, "layersentry", runner) }()
+	go func() { errCh <- valkeyexec.Serve(ctx, valkeyexec.DefaultSocket, "layersentry", runner) }()
 	first := <-errCh
 	cancel()
 	second := <-errCh
-	if first != nil && !errors.Is(first, context.Canceled) {
-		return first
-	}
-	if second != nil && !errors.Is(second, context.Canceled) {
-		return second
+	third := <-errCh
+	for _, err := range []error{first, second, third} {
+		if err != nil && !errors.Is(err, context.Canceled) {
+			return err
+		}
 	}
 	return nil
 }
