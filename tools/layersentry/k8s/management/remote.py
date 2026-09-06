@@ -61,7 +61,7 @@ with open(source,'rb') as stream:
 if h.hexdigest()!=p['archive']:raise SystemExit(5)
 if source==partial:os.chmod(source,0o600);os.replace(source,path)
 cmd=['/var/lib/rancher/rke2/bin/ctr','--address','/run/k3s/containerd/containerd.sock','--namespace','k8s.io']
-r=subprocess.run(cmd+['images','import','--all-platforms','--digests','--base-name',p['image'].rsplit('@',1)[0],path],capture_output=True,timeout=240)
+r=subprocess.run(cmd+['images','import','--local','--all-platforms','--digests','--base-name',p['image'].rsplit('@',1)[0],path],capture_output=True,timeout=240)
 if r.returncode:raise SystemExit(6)
 r=subprocess.run(cmd+['images','list'],capture_output=True,text=True,timeout=30,check=True)
 if not any(len(f)>=3 and f[0]==p['image'] and f[2]==p['image'].rsplit('@',1)[1] for f in [line.split() for line in r.stdout.splitlines()[1:]]):raise SystemExit(7)

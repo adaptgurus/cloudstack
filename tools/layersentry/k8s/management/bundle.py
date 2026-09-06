@@ -34,6 +34,16 @@ def safe_file(root, relative, *, limit=2 * 1024**3):
     return path
 
 
+def retain_archive(bundle, target):
+    """Preserve the executable mode inside the public artifact transport."""
+    with tarfile.open(target,'w') as archive:
+        for name in sorted(set(bundle.value['files'])|{'bundle.json'}):
+            path=safe_file(bundle.root,name)
+            info=tarfile.TarInfo('bundle/'+name)
+            info.size=path.stat().st_size;info.mode=0o755 if name=='bin/clusterctl' else 0o644
+            with path.open('rb') as stream:archive.addfile(info,stream)
+
+
 def verify_oci(path, expected_image):
     """Retain the complete named index and verify every referenced OCI byte."""
     digest = expected_image.rsplit('@', 1)[-1]
@@ -105,6 +115,8 @@ class Bundle:
             path = safe_file(self.root,name)
             if not isinstance(item,dict) or set(item)!={'sha256','size'} or path.stat().st_size != item['size'] or sha256(path)!=item['sha256']:
                 raise InvalidRequestError('management bundle file digest mismatch')
+        if not os.access(self.root/'bin/clusterctl',os.X_OK):
+            raise InvalidRequestError('pinned clusterctl is not executable; extract the retained bundle tar with file modes preserved')
         images = self.value['images']
         if not isinstance(images,list) or len(images)!=8 or len({image['image'] for image in images})!=8:
             raise InvalidRequestError('management provider image closure is incomplete')

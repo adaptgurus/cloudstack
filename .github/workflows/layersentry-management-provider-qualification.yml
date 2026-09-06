@@ -52,7 +52,7 @@ jobs:
         with:
           name: layersentry-management-provider-bundle-${{ github.sha }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/management-bundle/bundle/
+            ${{ runner.temp }}/management-bundle/management-provider-bundle.tar
             ${{ runner.temp }}/management-bundle/qualification.json
           retention-days: 14
           compression-level: 0

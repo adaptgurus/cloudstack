@@ -16,9 +16,14 @@ verifies every OCI blob/descriptor, generates each provider using native
 clusterctl, and imports/reimports every archive into an isolated instance of
 the exact RKE2 containerd runtime. Only those successful checks promote the
 candidate bundle from `SOURCE_COMPLETE` to `CI_VERIFIED`. The artifact includes
-`qualification.json` and `bundle/`; its retention is 14 days. Copy it into
+`qualification.json` and `management-provider-bundle.tar`; its retention is 14 days. Copy it into
 approved durable artifact storage before expiry. This qualification is
 unsigned; no runtime credentials or deployment inputs are included.
+
+Verify the retained tar SHA-256 against `qualification.json`, then extract it
+with file modes preserved into the approved artifact directory. Its `bundle/`
+directory includes executable clusterctl. The artifact ZIP itself does not
+preserve Unix executable modes, which is why the complete bundle is inside a tar.
 
 Add the following object to the existing protected bootstrap runtime config,
 using the SHA-256 of the exact downloaded `bundle/bundle.json` from the successful
