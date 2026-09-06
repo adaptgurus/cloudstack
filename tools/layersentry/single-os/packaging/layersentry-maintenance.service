@@ -1,0 +1,16 @@
+[Unit]
+Description=LayerSentry Single-OS maintenance evaluation
+After=network-online.target layersentryd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/layersentryd maintenance-run
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
