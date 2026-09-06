@@ -34,7 +34,7 @@ from controller.model import InvalidRequestError
 IDS = [str(UUID(int=index)) for index in range(1, 20)]
 PUBLIC = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEpUeCj6AGhVk6sNjIU7NLidFMzpBS1FdBr1pEDkGXm1'
 PLAN = dict(zip(['bootstrapId', 'projectId', 'zoneId', 'networkId', 'serviceOfferingId', 'templateId', 'publicIpId'], IDS[:7]))
-PLAN.update(name='management', hostIds=IDS[7:10], apiSourceCidrs=['192.0.2.50/32'])
+PLAN.update(name='management', hostIds=IDS[7:10], apiSourceCidrs=['192.0.2.50/32'], sshSourceCidrs=['192.0.2.50/32'])
 
 
 class BootstrapTests(unittest.TestCase):
@@ -110,7 +110,7 @@ class BootstrapTests(unittest.TestCase):
         resources = {
             'listProjects': {'project': [{'id': p['projectId'], 'state': 'Active'}]},
             'listZones': {'zone': [{'id': p['zoneId'], 'allocationstate': 'Enabled'}]},
-            'listNetworks': {'network': [{'id': p['networkId'], 'projectid': p['projectId'], 'zoneid': p['zoneId'], 'state': 'Implemented', 'type': 'Isolated', 'service': [{'name': 'Lb'}, {'name': 'Firewall'}], 'gateway': '192.0.2.1', 'cidr': '192.0.2.0/24'}]},
+            'listNetworks': {'network': [{'id': p['networkId'], 'projectid': p['projectId'], 'zoneid': p['zoneId'], 'state': 'Implemented', 'type': 'Isolated', 'service': [{'name': 'Lb'}, {'name': 'Firewall'}, {'name': 'PortForwarding'}], 'gateway': '192.0.2.1', 'cidr': '192.0.2.0/24'}]},
             'listServiceOfferings': {'serviceoffering': [{'id': p['serviceOfferingId'], 'state': 'Active', 'issystem': False}]},
             'listTemplates': {'template': [{'id': p['templateId'], 'isready': True, 'hypervisor': 'KVM', 'format': 'QCOW2', 'checksum': '{SHA-256}' + 'a'*64}]},
         }
@@ -221,6 +221,7 @@ class TransportTests(unittest.TestCase):
         self.runner = Mock(return_value=subprocess.CompletedProcess([], 0, PUBLIC.encode(), b''))
         self.transport = TrustedGuestTransport(self.hosts, self.key, self.token, runner=self.runner)
         self.vm = {'id': IDS[10], 'hostid': self.host_id, 'instancename': 'i-1-1-VM', 'nic': [{'isdefault': True, 'ipaddress': '192.0.2.11'}]}
+        self.transport.bind_endpoints({IDS[10+i]: {'address': '198.51.100.10', 'port': 2201+i} for i in range(3)})
         self.runner.reset_mock()
 
     def file(self, name, data):
@@ -257,6 +258,9 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(json.loads(guest_call.kwargs['input'])['token'], 'a' * 64)
         self.assertIn('StrictHostKeyChecking=yes', guest_call.args[0])
         self.assertIn('GlobalKnownHostsFile=/dev/null', guest_call.args[0])
+        self.assertIn('root@198.51.100.10', guest_call.args[0])
+        self.assertNotIn('root@192.0.2.11', guest_call.args[0])
+        self.assertEqual(guest_call.args[0][guest_call.args[0].index('-p') + 1], '2201')
 
     def test_token_rotation_during_resume_is_not_silently_accepted(self):
         self.token.write_text('b' * 64)
@@ -301,6 +305,7 @@ class FormationTests(unittest.TestCase):
 
     def test_seed_readiness_precedes_every_join(self):
         native = Mock()
+        native.journal.state = {}
         native.preflight.return_value = {'independentHostPlacement': False}
         native.hosts = {'host': {}}
         native.endpoint = '198.51.100.10'
@@ -310,13 +315,14 @@ class FormationTests(unittest.TestCase):
         native.node_name.side_effect = lambda ordinal: f'cp{ordinal}'
         transport = Mock()
         transport.formation.return_value = {'ready': False, 'nodes': []}
-        result = reconcile(native, transport)
+        result = reconcile(native, transport, Mock())
         self.assertEqual(result['stage'], 'SEED_RKE2_STARTUP')
         self.assertEqual(transport.configure.call_count, 1)
         self.assertTrue(transport.configure.call_args.kwargs['seed'])
 
     def test_inspection_never_calls_native_mutations_or_guest_configuration(self):
         native = Mock()
+        native.journal.state = {}
         native.preflight.return_value = {'independentHostPlacement': False}
         native.hosts = {'host': {}}
         native.endpoint = '192.0.2.100'
@@ -324,7 +330,7 @@ class FormationTests(unittest.TestCase):
         native.node_name.side_effect = lambda ordinal: f'cp{ordinal}'
         transport = Mock()
         transport.formation.return_value = {'ready': False, 'nodes': []}
-        result = reconcile(native, transport, inspect_only=True)
+        result = reconcile(native, transport, Mock(), inspect_only=True)
         self.assertEqual(result['status'], 'PENDING')
         native.ensure_nodes.assert_not_called()
         native.ensure_endpoints.assert_not_called()

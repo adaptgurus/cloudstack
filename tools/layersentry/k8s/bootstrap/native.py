@@ -43,9 +43,9 @@ from controller.model import InvalidRequestError
 READS = {
     'listProjects', 'listZones', 'listNetworks', 'listServiceOfferings',
     'listTemplates', 'listPublicIpAddresses', 'listLoadBalancerRules',
-    'listLoadBalancerRuleInstances', 'listFirewallRules', 'listVirtualMachines', 'listHosts', 'queryAsyncJobResult',
+    'listLoadBalancerRuleInstances', 'listPortForwardingRules', 'listFirewallRules', 'listVirtualMachines', 'listHosts', 'queryAsyncJobResult',
 }
-MUTATIONS = {'deployVirtualMachine', 'createLoadBalancerRule', 'assignToLoadBalancerRule', 'createFirewallRule'}
+MUTATIONS = {'deployVirtualMachine', 'createLoadBalancerRule', 'assignToLoadBalancerRule', 'createFirewallRule', 'createPortForwardingRule', 'deletePortForwardingRule', 'deleteFirewallRule'}
 SAFE_NAME = re.compile(r'^[a-z][a-z0-9-]{0,35}[a-z0-9]$')
 
 
@@ -60,7 +60,7 @@ def protected_file(value, *, private=True):
     except OSError:
         raise InvalidRequestError('required bootstrap file is unavailable') from None
     forbidden = 0o077 if private else 0o022
-    if not path.is_absolute() or path.resolve() != path or not stat.S_ISREG(info.st_mode) or info.st_mode & forbidden:
+    if not path.is_absolute() or path.resolve() != path or not stat.S_ISREG(info.st_mode) or info.st_mode & forbidden or info.st_uid not in (0, os.geteuid()) or info.st_nlink != 1:
         raise InvalidRequestError('bootstrap file type or permissions are unsafe')
     if info.st_size > 1024 * 1024:
         raise InvalidRequestError('bootstrap file exceeds size limit')
@@ -68,11 +68,11 @@ def protected_file(value, *, private=True):
 
 
 def validate_plan(value):
-    keys = {'bootstrapId', 'name', 'projectId', 'zoneId', 'networkId', 'serviceOfferingId', 'templateId', 'publicIpId', 'hostIds', 'apiSourceCidrs'}
+    keys = {'bootstrapId', 'name', 'projectId', 'zoneId', 'networkId', 'serviceOfferingId', 'templateId', 'publicIpId', 'hostIds', 'apiSourceCidrs', 'sshSourceCidrs'}
     if not isinstance(value, dict) or set(value) != keys:
         raise InvalidRequestError('bootstrap plan fields do not match schema')
     result = dict(value)
-    for key in keys - {'name', 'hostIds', 'apiSourceCidrs'}:
+    for key in keys - {'name', 'hostIds', 'apiSourceCidrs', 'sshSourceCidrs'}:
         try:
             result[key] = str(UUID(value[key]))
         except (ValueError, TypeError, AttributeError):
@@ -97,6 +97,16 @@ def validate_plan(value):
     if any(cidr.prefixlen < 24 for cidr in normalized):
         raise InvalidRequestError('operator API source ranges must be /24 or narrower')
     result['apiSourceCidrs'] = sorted({str(cidr) for cidr in normalized})
+    ssh_cidrs = value['sshSourceCidrs']
+    if not isinstance(ssh_cidrs, list) or not 1 <= len(ssh_cidrs) <= 16:
+        raise InvalidRequestError('explicit runner SSH source addresses are required')
+    try:
+        ssh_networks = [ipaddress.IPv4Network(cidr, strict=True) for cidr in ssh_cidrs]
+    except (ValueError, TypeError):
+        raise InvalidRequestError('runner SSH sources must be exact IPv4 /32 addresses') from None
+    if any(cidr.prefixlen != 32 or not any(cidr.subnet_of(api) for api in normalized) for cidr in ssh_networks):
+        raise InvalidRequestError('runner SSH sources must be /32 addresses within approved API sources')
+    result['sshSourceCidrs'] = sorted({str(cidr) for cidr in ssh_networks})
     return result
 
 
@@ -152,11 +162,11 @@ class Journal:
     def __init__(self, path, fingerprint):
         self.path = Path(path)
         parent = self.path.parent
-        if not parent.is_absolute() or not parent.is_dir() or parent.is_symlink() or parent.stat().st_mode & 0o077:
+        if not parent.is_absolute() or not parent.is_dir() or parent.resolve() != parent or parent.stat().st_mode & 0o077 or parent.stat().st_uid not in (0, os.geteuid()):
             raise InvalidRequestError('journal parent must be a private existing directory')
         flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW
         self.lock_fd = os.open(str(self.path) + '.lock', flags, 0o600)
-        if not stat.S_ISREG(os.fstat(self.lock_fd).st_mode) or os.fstat(self.lock_fd).st_mode & 0o077:
+        if not stat.S_ISREG(os.fstat(self.lock_fd).st_mode) or os.fstat(self.lock_fd).st_mode & 0o077 or os.fstat(self.lock_fd).st_uid not in (0, os.geteuid()) or os.fstat(self.lock_fd).st_nlink != 1:
             os.close(self.lock_fd)
             raise InvalidRequestError('journal lock permissions are unsafe')
         try:
@@ -234,8 +244,8 @@ class NativeBootstrap:
             raise InvalidRequestError('project/Site allocation prerequisites are not satisfied')
         if network.get('zoneid') != p['zoneId'] or network.get('projectid') != p['projectId'] or network.get('state') != 'Implemented':
             raise InvalidRequestError('management network is not Implemented in the exact project/Site')
-        if network.get('type') != 'Isolated' or network.get('vpcid') or not {'Lb', 'Firewall'} <= {service.get('name') for service in network.get('service', [])}:
-            raise InvalidRequestError('first management bootstrap requires an isolated non-VPC network with native Lb and Firewall')
+        if network.get('type') != 'Isolated' or network.get('vpcid') or not {'Lb', 'Firewall', 'PortForwarding'} <= {service.get('name') for service in network.get('service', [])}:
+            raise InvalidRequestError('first management bootstrap requires an isolated non-VPC network with native Lb, Firewall and PortForwarding')
         if offering.get('issystem') is True or offering.get('iscustomized') is True or offering.get('state') == 'Inactive':
             raise InvalidRequestError('management node compute profile is not a fixed active user offering')
         if template.get('isready') is not True or template.get('hypervisor') != 'KVM' or template.get('format') != 'QCOW2' or template.get('checksum') != '{SHA-256}' + self.image['sha256']:
@@ -395,3 +405,124 @@ class NativeBootstrap:
             if assigned:
                 rules.append(rule)
         return len(rules) == 2
+
+    def transport_inventory(self, command, collection):
+        rows = self.client.call(command, {'ipaddressid': self.plan['publicIpId'], 'projectid': self.plan['projectId'], 'page': 1, 'pagesize': 100}).get(collection, [])
+        if not isinstance(rows, list) or len(rows) >= 100 or any(not isinstance(row, dict) for row in rows):
+            raise InvalidRequestError('temporary SSH inventory is invalid or truncated')
+        return rows
+
+    def observe_transport(self, ordinal, *, firewall=False):
+        """Never adopt an existing rule: every resource needs a durable submission record."""
+        import ipaddress
+        port = 2200 + ordinal
+        key = f'ssh-{"firewall" if firewall else "forward"}-{ordinal}'
+        command, collection = ('listFirewallRules', 'firewallrule') if firewall else ('listPortForwardingRules', 'portforwardingrule')
+        rows = self.transport_inventory(command, collection)
+        start, end = ('startport', 'endport') if firewall else ('publicport', 'publicendport')
+        relevant = [row for row in rows if row.get('protocol') in ('tcp', 'all') and int(row.get(start, 0)) <= port <= int(row.get(end, 65535))]
+        if not relevant:
+            return None
+        record = self.journal.state['operations'].get(key)
+        if len(relevant) != 1 or not record:
+            raise InvalidRequestError('temporary SSH port is overlapping or not journal-owned')
+        row = relevant[0]
+        if row.get('protocol') != 'tcp' or int(row.get(start, 0)) != port or int(row.get(end, 0)) != port or row.get('ipaddressid') != self.plan['publicIpId']:
+            raise InvalidRequestError('temporary SSH rule binding drifted')
+        if record.get('resourceId') and record['resourceId'] != row.get('id'):
+            raise InvalidRequestError('temporary SSH resource ID changed')
+        UUID(row['id'])
+        if firewall:
+            cidrs = {str(ipaddress.IPv4Network(c.strip(), strict=True)) for c in row.get('cidrlist', '').split(',')}
+            if cidrs != set(self.plan['sshSourceCidrs']):
+                raise InvalidRequestError('temporary SSH firewall is not restricted to exact runner sources')
+        else:
+            if row.get('virtualmachineid') != self.vm_id(ordinal) or row.get('networkid') != self.plan['networkId'] or int(row.get('privateport', 0)) != 22 or int(row.get('privateendport', 0)) != 22:
+                raise InvalidRequestError('temporary SSH forwarding is not bound to the exact VM/network/port')
+            vm = self.observe_vm(ordinal)
+            nics = [nic for nic in (vm or {}).get('nic', []) if nic.get('isdefault') is True]
+            if len(nics) != 1 or row.get('vmguestip') != nics[0].get('ipaddress'):
+                raise InvalidRequestError('temporary SSH forwarding guest address drifted')
+        return row
+
+    def ensure_transport(self, nodes):
+        if self.journal.state.get('credentialsEscrowed'):
+            raise InvalidRequestError('credential escrow forbids reopening temporary SSH transport')
+        # Check all approved ingress ports before exposing any forwarding backend.
+        for ordinal in (1, 2, 3):
+            self.observe_transport(ordinal, firewall=True)
+            self.observe_transport(ordinal)
+        endpoints = {}
+        for ordinal, vm in enumerate(nodes, start=1):
+            port = 2200 + ordinal
+            def observe_forward():
+                row = self.observe_transport(ordinal)
+                return row if row and row.get('state') == 'Active' else None
+            forward = self.advance(f'ssh-forward-{ordinal}', 'createPortForwardingRule', {
+                'ipaddressid': self.plan['publicIpId'], 'networkid': self.plan['networkId'],
+                'virtualmachineid': self.vm_id(ordinal), 'vmguestip': next(nic['ipaddress'] for nic in vm['nic'] if nic.get('isdefault') is True),
+                'publicport': port, 'publicendport': port, 'privateport': 22, 'privateendport': 22,
+                'protocol': 'tcp', 'openfirewall': False,
+            }, observe_forward)
+            if not forward:
+                continue
+            def observe_firewall():
+                row = self.observe_transport(ordinal, firewall=True)
+                return row if row and row.get('state') == 'Active' else None
+            firewall = self.advance(f'ssh-firewall-{ordinal}', 'createFirewallRule', {
+                'ipaddressid': self.plan['publicIpId'], 'protocol': 'tcp', 'startport': port, 'endport': port,
+                'cidrlist': ','.join(self.plan['sshSourceCidrs']),
+            }, observe_firewall)
+            if firewall:
+                endpoints[vm['id']] = {'address': self.endpoint, 'port': port}
+        return endpoints if len(endpoints) == 3 else None
+
+    def delete_transport_rule(self, ordinal, *, firewall):
+        kind = 'firewall' if firewall else 'forward'
+        key = f'ssh-delete-{kind}-{ordinal}'
+        operations = self.journal.state['operations']
+        row = self.observe_transport(ordinal, firewall=firewall)
+        if row is None:
+            operations[key] = {'state': 'OBSERVED_ABSENT'}
+            self.journal.save()
+            return True
+        creation = operations.get(f'ssh-{kind}-{ordinal}', {})
+        if creation.get('resourceId') != row['id']:
+            raise InvalidRequestError('temporary SSH deletion requires exact journal-owned resource ID')
+        if key in operations:
+            record = operations[key]
+            if record.get('resourceId') != row['id']:
+                raise InvalidRequestError('temporary SSH deletion identity drifted')
+            if record.get('jobId'):
+                job = self.client.call('queryAsyncJobResult', {'jobid': record['jobId']})
+                if job.get('jobstatus') == 2:
+                    raise InvalidRequestError('temporary SSH deletion failed; no automatic replay')
+            return False
+        operations[key] = {'state': 'SUBMITTING', 'resourceId': row['id']}
+        self.journal.save()
+        try:
+            result = self.client.call('deleteFirewallRule' if firewall else 'deletePortForwardingRule', {'id': row['id']})
+            if result.get('jobid'):
+                operations[key].update(state='WAITING', jobId=str(UUID(result['jobid'])))
+            else:
+                operations[key]['state'] = 'UNKNOWN'
+        except Exception:
+            operations[key]['state'] = 'UNKNOWN'
+        self.journal.save()
+        return False
+
+    def cleanup_transport(self):
+        if not self.journal.state.get('credentialsEscrowed'):
+            raise InvalidRequestError('temporary SSH cleanup requires verified credential escrow')
+        complete = True
+        for ordinal in (1, 2, 3):
+            # Close ingress before deleting its backend forwarding rule.
+            if not self.delete_transport_rule(ordinal, firewall=True):
+                complete = False
+                continue
+            if not self.delete_transport_rule(ordinal, firewall=False):
+                complete = False
+        if complete:
+            self.journal.state['transportClosed'] = True
+            self.journal.save()
+        return complete

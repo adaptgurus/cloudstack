@@ -26,26 +26,28 @@ Alternatives considered: native CKS would create a different managed lifecycle; 
 - Exactly three deterministic management VM identities are bound to the selected project, Site, implemented isolated non-VPC network, fixed compute offering, exact qualified image and selected KVM hosts.
 - Native userdata contains only the root operator public key, deterministic hostname and QGA enablement. Password SSH is disabled. No token, private key, API key or arbitrary customer script is included.
 - The bootstrap input must carry a trusted-key verified image attestation. A Ready KVM template alone is insufficient. The native template checksum must be exactly `{SHA-256}<attested digest>`, matching `ChecksumValue`/`DownloadManagerImpl`; an unprefixed native checksum means MD5, not SHA-256.
-- The first release profile requires native Lb and Firewall services. VPC ACLs and other endpoint providers are unsupported by this first bootstrap and are rejected.
+- The first release profile requires native Lb, Firewall and PortForwarding services. VPC ACLs and other endpoint providers are unsupported by this first bootstrap and are rejected.
 - 6443/9345 LB rules are separate from firewall ownership. Firewall source ranges are the selected management network, its observed source-NAT IP and explicit operator ranges of /24 or narrower. Existing broader/overlapping rules are rejected, not silently adopted.
 - The journal is stored in a private directory with exclusive writer locking and atomic fsync-backed replacement. It records plan identity, safe resource/job IDs and submission states. A timed-out or interrupted native submission is observed by exact identity before proceeding; an absent result is `UNKNOWN` and is never blindly replayed.
 - KVM SSH uses an operator-approved known-hosts file. Host ID/address, VM UUID and instance name are bound to live native API observations. A fixed QGA operation reads only the root-owned Ed25519 host public key. No arbitrary QGA command or customer script is forwarded.
-- Guest SSH accepts only that observed host key. Its private operator key and strong stable RKE2 token come from protected runtime files. The token travels through SSH stdin to mode-0600 guest RKE2 configuration. A changed token or configuration is rejected during resume.
+- Guest SSH connects through native, journal-owned public endpoint ports 2201–2203 forwarded to the exact VM private port 22. It does not assume a route to the isolated guest subnet. Each port uses `openfirewall=false` and a separate exact Runner /32 firewall rule; foreign, broader or overlapping rules fail before forwarding creation. Guest SSH accepts only that observed host key, pinned as `[publicIP]:port`. Its private operator key and strong stable RKE2 token come from protected runtime files. The token travels through SSH stdin to mode-0600 guest RKE2 configuration. A changed token or configuration is rejected during resume.
 - Guest firewall changes retain Enforcing SELinux and active firewalld. They restrict control-plane/etcd/kubelet/Canal ports to observed peers/router and SSH to the current authenticated Runner source. The fixed dedicated management pod CIDR is trusted for management pod networking; it must not be reused as a tenant workload-node security profile. Unchanged firewall configuration is queried and does not cause another reload.
 - Seed-only LB membership is established first. The seed becomes readable before joiners start. Final membership includes the three owned nodes. Readiness requires exactly the expected names, roles, RKE2 version and Ready conditions; the final API query goes through the fixed endpoint with CA verification, and 9345 is separately TLS-verified.
+- After formation, the verified SSH channel exports a flattened management kubeconfig to the explicit private runtime output file. Only embedded CA/client certificate/key credentials survive; no exec, token, proxy or path hooks are accepted. The file fixes the API endpoint, is atomically created without replacing existing credentials, and is mode 0600. The Runner verifies the API and 9345 using its CA before recording a safe file digest and closing only journal-owned temporary SSH firewall/forwarding rules. Cleanup observes exact resource IDs and never replays ambiguous deletion. Credentials remain outside logs, journals and CI artifacts.
+- Completed reconciles and inspections use the protected kubeconfig directly and do not recreate SSH. Missing/drifted credentials block recovery. Failed export/API verification retains the owned transport as pending; incomplete cleanup cannot report complete bootstrap.
 - The `inspect` action performs remote reads only. Local journal/temporary trust files may be created. It never deploys a VM, changes LB/firewall state or configures a guest.
 
 ## Operator inputs
 
-Runtime configuration is a private JSON file with exactly `plan`, `image`, `cloudstack`, `journal`, `operatorKeyFile`, `tokenFile` and `hosts`.
+Runtime configuration is a private JSON file with exactly `plan`, `image`, `cloudstack`, `journal`, `operatorKeyFile`, `tokenFile`, `hosts` and `managementKubeconfigFile`.
 
 | Object | Required inputs |
 | --- | --- |
-| `plan` | `bootstrapId`, `name`, `projectId`, `zoneId`, `networkId`, `serviceOfferingId`, `templateId`, `publicIpId`, three `hostIds`, explicit `apiSourceCidrs` |
+| `plan` | `bootstrapId`, `name`, `projectId`, `zoneId`, `networkId`, `serviceOfferingId`, `templateId`, `publicIpId`, three `hostIds`, explicit `apiSourceCidrs`, exact Runner `sshSourceCidrs` (/32, within approved API ranges) |
 | `image` | `attestationFile`, detached `signatureFile`, operator-trusted `publicKeyFile` |
 | `cloudstack` | HTTPS `endpoint`, protected `apiKeyFile`, protected `secretKeyFile`, verified `caFile` |
 | `hosts` | Map from exact host UUID to approved `address`, `user` = `root`, protected `keyFile`, pinned `knownHostsFile` |
-| Other | Private existing journal directory, stable protected Ed25519 operator key and strong RKE2 token files |
+| Other | Private existing journal directory, stable protected Ed25519 operator key and strong RKE2 token files; explicit management kubeconfig output file in an existing private operator directory |
 
 The image attestation requires `schemaVersion=1.0`, `artifactType=layersentry-rke2-node-image`, exact `templateId`, `os=rocky9`, `architecture=amd64`, `rke2Version=v1.36.4+rke2r1`, `qualificationStatus=LIVE_VERIFIED`, `rke2Installed=true`, `qemuGuestAgentInstalled=true`, `sshEnabled=true`, `selinuxEnforcing=true`, `sha256` and `qualificationEvidenceSha256`. Those values must come from the image release/qualification path, not be fabricated to pass preflight.
 
@@ -64,6 +66,15 @@ The coordinated CPU image builder is a separate task. At this checkpoint no qual
 
 ## Validation and handoff
 
-Local source qualification: 27 management-bootstrap tests passed, covering native ambiguity/no replay, identity drift, job retention, exclusive journal locking, symlink/rebind rejection, scoped LB/firewall behavior, real OpenSSL signature/tamper/unqualified-image rejection, fixed embedded-program compilation, KVM/guest host-key binding, secret stdin separation, token drift, seed-before-join and read-only inspection. The full existing E source regression passed: 101 tests in total, including these 27 tests. No host, guest, CloudStack resource, storage or network mutation occurred during this source task.
+Original source qualification: 27 management-bootstrap tests passed, covering native ambiguity/no replay, identity drift, job retention, exclusive journal locking, symlink/rebind rejection, scoped LB/firewall behavior, real OpenSSL signature/tamper/unqualified-image rejection, fixed embedded-program compilation, KVM/guest host-key binding, secret stdin separation, token drift, seed-before-join and read-only inspection. The full existing E source regression passed: 101 tests in total, including these 27 tests. No host, guest, CloudStack resource, storage or network mutation occurred during this source task.
 
 Integration owns the shared ledger/knowledge-graph update, versioned approved runner delivery, actual image qualification and end-to-end Rocky/Chrome/Firefox evidence. DBaaS/APaaS and provider installation are not completed by management-node bootstrap.
+
+
+## Transport and credential lifecycle correction
+
+The initial source implementation assumed direct Runner access to an isolated guest IP; review found that no such route was guaranteed. The correction uses exact native `CreatePortForwardingRuleCmd` parameters (`publicport/publicendport`, `privateport/privateendport`, `virtualmachineid`, `vmguestip`, `networkid`, `openfirewall=false`) and `FirewallRuleResponse` binding fields. `ListPortForwardingRulesCmd`, `DeletePortForwardingRuleCmd`, `ListFirewallRulesCmd` and `DeleteFirewallRuleCmd` support read-before-delete without touching unrelated rules. Public forwarding requires the allocated endpoint to be routable from the approved Runner; inability to reach it remains a visible gate, not an assumed pass.
+
+Protected inputs additionally reject unexpected owners and hardlinks. The management credential output requires a private, operator-owned existing directory. A completed journal stores only the kubeconfig digest and transport state. Subsequent provider installation consumes that runtime kubeconfig through its native tooling; installation is not performed by this bounded bootstrap.
+
+Correction qualification: the full E regression passes 114 tests, including 40 focused offline bootstrap tests (27 original plus 13 new transport/credential/lifecycle tests). Tests cover foreign-rule rejection, exact VM/address/port binding, restricted source rules, ambiguous-delete no replay, mandatory escrow before cleanup, no private-IP fallback, no reopened forwarding after completion, kubeconfig hook/TLS bypass rejection, private exclusive output, unsafe owner/hardlink/symlink rejection, and authenticated-API-only completed reconciliation. No runtime credentials or live lab endpoints were used by the tests.

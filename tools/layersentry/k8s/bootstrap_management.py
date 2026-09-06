@@ -25,6 +25,7 @@ import sys
 
 from bootstrap.native import Journal, NativeBootstrap, NativeCloudStackClient, canonical, protected_file, validate_plan, verify_image
 from bootstrap.transport import TrustedGuestTransport
+from bootstrap.credentials import ManagementCredentials
 from controller.cloudstack import CloudStackConfig
 from controller.model import InvalidRequestError
 
@@ -39,10 +40,11 @@ def ready_nodes(observation, names):
     )
 
 
-def reconcile(native, transport, *, inspect_only=False):
+def reconcile(native, transport, credentials, *, inspect_only=False):
     preflight = native.preflight()
     transport.validate_hosts(native.hosts)
-    if inspect_only:
+    escrow = native.journal.state.get('credentialsEscrowed')
+    if inspect_only or escrow:
         nodes = [native.observe_vm(index) for index in (1, 2, 3)]
     else:
         nodes = native.ensure_nodes()
@@ -55,13 +57,29 @@ def reconcile(native, transport, *, inspect_only=False):
     peer_ips = [next(nic['ipaddress'] for nic in vm['nic'] if nic.get('isdefault') is True) for vm in nodes]
     seed = nodes[0]
     host = native.hosts[seed['hostid']]
-    if inspect_only:
-        observation = transport.formation(seed, host, native.endpoint, through_endpoint=True)
-        result['stage'] = 'FORMATION_INSPECTION'
+    expected_names = [native.node_name(i) for i in (1, 2, 3)]
+    if escrow:
+        if credentials.digest() != escrow.get('sha256'):
+            raise InvalidRequestError('escrowed management credentials changed; transport will not reopen')
+        observation = credentials.inspect(native.endpoint)
         result['formation'] = observation
-        if ready_nodes(observation, [native.node_name(i) for i in (1, 2, 3)]) and observation.get('endpoint9345Tls') is True:
-            result['status'] = 'LIVE_VERIFIED'
+        result['stage'] = 'MANAGEMENT_API_INSPECTION'
+        if ready_nodes(observation, expected_names) and observation.get('endpoint9345Tls') is True:
+            closed = native.journal.state.get('transportClosed') if inspect_only else native.cleanup_transport()
+            if closed:
+                result['status'] = 'LIVE_VERIFIED'
+                result['stage'] = 'MANAGEMENT_API_VERIFIED_TRANSPORT_CLOSED'
+            else:
+                result['stage'] = 'TEMPORARY_SSH_CLEANUP'
         return result
+    if inspect_only:
+        result['stage'] = 'CREDENTIAL_ESCROW_PENDING'
+        return result
+    endpoints = native.ensure_transport(nodes)
+    if not endpoints:
+        result['stage'] = 'TEMPORARY_SSH_FORWARDING'
+        return result
+    transport.bind_endpoints(endpoints)
     if not native.ensure_endpoints([seed]):
         result['stage'] = 'SEED_ENDPOINT'
         return result
@@ -85,8 +103,19 @@ def reconcile(native, transport, *, inspect_only=False):
     observation = transport.formation(seed, host, native.endpoint, through_endpoint=True)
     result['formation'] = observation
     result['stage'] = 'FORMATION_VERIFICATION'
-    if ready_nodes(observation, [native.node_name(i) for i in (1, 2, 3)]) and observation.get('endpoint9345Tls') is True:
-        result['status'] = 'LIVE_VERIFIED'
+    if ready_nodes(observation, expected_names) and observation.get('endpoint9345Tls') is True:
+        credentials.install(transport.export_credentials(seed, host), native.endpoint)
+        direct = credentials.inspect(native.endpoint)
+        if not ready_nodes(direct, expected_names) or direct.get('endpoint9345Tls') is not True:
+            result['stage'] = 'DIRECT_API_CREDENTIAL_VERIFICATION'
+            return result
+        native.journal.state['credentialsEscrowed'] = {'sha256': credentials.digest()}
+        native.journal.save()
+        result['formation'] = direct
+        result['stage'] = 'TEMPORARY_SSH_CLEANUP'
+        if native.cleanup_transport():
+            result['status'] = 'LIVE_VERIFIED'
+            result['stage'] = 'MANAGEMENT_API_VERIFIED_TRANSPORT_CLOSED'
     return result
 
 
@@ -97,7 +126,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         config = json.loads(protected_file(args.config).read_bytes())
-        expected = {'plan', 'image', 'cloudstack', 'journal', 'operatorKeyFile', 'tokenFile', 'hosts'}
+        expected = {'plan', 'image', 'cloudstack', 'journal', 'operatorKeyFile', 'tokenFile', 'hosts', 'managementKubeconfigFile'}
         if not isinstance(config, dict) or set(config) != expected:
             raise InvalidRequestError('bootstrap runtime configuration fields do not match schema')
         plan = validate_plan(config['plan'])
@@ -105,6 +134,7 @@ def main(argv=None):
         if set(image) != {'attestationFile', 'signatureFile', 'publicKeyFile'}:
             raise InvalidRequestError('image trust configuration is invalid')
         verified = verify_image(image['attestationFile'], image['signatureFile'], image['publicKeyFile'], plan['templateId'])
+        credentials = ManagementCredentials(config['managementKubeconfigFile'])
         transport = TrustedGuestTransport(config['hosts'], config['operatorKeyFile'], config['tokenFile'])
         cloud = config['cloudstack']
         if set(cloud) != {'endpoint', 'apiKeyFile', 'secretKeyFile', 'caFile'}:
@@ -115,10 +145,10 @@ def main(argv=None):
             secret_key_file=protected_file(cloud['secretKeyFile']), ca_file=protected_file(cloud['caFile'], private=False),
         ))
         fingerprint = hashlib.sha256(canonical({'plan': plan, 'image': verified['sha256'], 'operatorPublicKey': transport.public_key,
-                                               'tokenSha256': transport.token_sha256, 'cloudstackEndpoint': cloud['endpoint']})).hexdigest()
+                                               'tokenSha256': transport.token_sha256, 'cloudstackEndpoint': cloud['endpoint'], 'managementKubeconfigFile': str(credentials.path)})).hexdigest()
         with Journal(config['journal'], fingerprint) as journal:
             native = NativeBootstrap(client, plan, verified, journal, transport.public_key)
-            result = reconcile(native, transport, inspect_only=args.action == 'inspect')
+            result = reconcile(native, transport, credentials, inspect_only=args.action == 'inspect')
         print(json.dumps(result, sort_keys=True))
         return 0 if result['status'] == 'LIVE_VERIFIED' else 2
     except (InvalidRequestError, OSError, ValueError, KeyError, TypeError):

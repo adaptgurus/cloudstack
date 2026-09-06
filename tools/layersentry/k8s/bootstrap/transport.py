@@ -142,6 +142,15 @@ print(json.dumps({'ready':True,'nodes':result,'endpoint9345Tls':endpoint}))
 '''
 
 
+_GUEST_KUBECONFIG = '''import json,subprocess,sys
+p=json.load(sys.stdin)
+if p != {}: raise SystemExit(2)
+r=subprocess.run(['/var/lib/rancher/rke2/bin/kubectl','--kubeconfig','/etc/rancher/rke2/rke2.yaml','config','view','--raw','--flatten','--minify','-o','json'],capture_output=True,timeout=20)
+if r.returncode or len(r.stdout)>262144: raise SystemExit(3)
+sys.stdout.buffer.write(r.stdout)
+'''
+
+
 class TrustedGuestTransport:
     def __init__(self, hosts, operator_key_file, token_file, *, runner=subprocess.run):
         if not isinstance(hosts, dict) or not hosts or len(hosts) > 64:
@@ -165,6 +174,7 @@ class TrustedGuestTransport:
             raise InvalidRequestError('bootstrap operator key must be Ed25519')
         self.public_key = ' '.join(self.public_key.split()[:2])
         self.known_guests = {}
+        self.endpoints = {}
 
     def run(self, argv, value, *, timeout):
         try:
@@ -218,17 +228,28 @@ class TrustedGuestTransport:
         self.known_guests[vm_id] = public_key
         return public_key
 
+    def bind_endpoints(self, endpoints):
+        if not isinstance(endpoints, dict) or len(endpoints) != 3:
+            raise InvalidRequestError('exact native temporary SSH forwarding is required')
+        for vm_id, endpoint in endpoints.items():
+            UUID(vm_id)
+            ipaddress.IPv4Address(endpoint['address'])
+            if endpoint.get('port') not in (2201, 2202, 2203):
+                raise InvalidRequestError('temporary SSH port is invalid')
+        self.endpoints = dict(endpoints)
+
     def guest_call(self, vm, host, script, payload):
+        endpoint = self.endpoints.get(vm.get('id'))
+        if not endpoint:
+            raise InvalidRequestError('no verified native SSH forwarding for this VM')
         public_key = self.observe_guest_host_key(vm, host)
-        nics = [nic for nic in vm.get('nic', []) if nic.get('isdefault') is True]
-        if len(nics) != 1:
-            raise InvalidRequestError('guest default network is ambiguous')
-        address = str(ipaddress.ip_address(nics[0].get('ipaddress', '')))
+        address = str(ipaddress.IPv4Address(endpoint['address']))
+        port = endpoint['port']
         with tempfile.TemporaryDirectory(prefix='layersentry-guest-trust-') as directory:
             known_hosts = Path(directory) / 'known_hosts'
-            known_hosts.write_text(address + ' ' + public_key + '\n')
+            known_hosts.write_text('[' + address + ']:' + str(port) + ' ' + public_key + '\n')
             known_hosts.chmod(0o600)
-            argv = self.ssh_options(self.operator_key, known_hosts) + ['root@' + address, 'python3 -c ' + shlex.quote(script)]
+            argv = self.ssh_options(self.operator_key, known_hosts) + ['-p', str(port), 'root@' + address, 'python3 -c ' + shlex.quote(script)]
             raw = self.run(argv, payload, timeout=150)
         try:
             result = json.loads(raw)
@@ -246,3 +267,6 @@ class TrustedGuestTransport:
 
     def formation(self, vm, host, endpoint, *, through_endpoint=False):
         return self.guest_call(vm, host, _GUEST_FORMATION, {'endpoint': endpoint, 'throughEndpoint': through_endpoint})
+
+    def export_credentials(self, vm, host):
+        return self.guest_call(vm, host, _GUEST_KUBECONFIG, {})
