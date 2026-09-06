@@ -342,7 +342,22 @@ class FileReplicationEngine:
                 require(intent["scope_sha256"] == fingerprint(self.plan.scope()) and intent["epoch_id"] == epoch_id,
                         "EPOCH_REQUEST_CONFLICT")
                 require(mode == "AUTO" or mode == intent["mode"], "EPOCH_MODE_CONFLICT")
-                state = read_json(epoch, "state.json")
+                try:
+                    state = read_json(epoch, "state.json")
+                except FileNotFoundError:
+                    state = None
+                if state is None:
+                    # Intent is durable before the first PREPARED checkpoint.
+                    # No child can run until CAPTURING and its worker identity
+                    # have been saved. Recover only that pre-submission window;
+                    # any provider evidence without state remains ambiguous.
+                    require(not ({"worker.json", "manifest.json", "capture-complete.json",
+                                  "capture-error.json"} & set(os.listdir(epoch))),
+                            "CAPTURE_STATE_MISSING_RECONCILE_REQUIRED")
+                    require(not os.path.lexists(self.capture_root / epoch_id),
+                            "CAPTURE_STATE_MISSING_RECONCILE_REQUIRED")
+                    state = {"state": "PREPARED"}
+                    replace_json(epoch, "state.json", state)
                 if state["state"] == "COMMITTED":
                     head = self._optional(plan, "head.json", {})
                     if active == epoch_id or head.get("epoch_id") == intent["previous_head"]:

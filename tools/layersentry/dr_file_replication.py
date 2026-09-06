@@ -233,6 +233,19 @@ def write_disk(folder: int, entry: dict, chunks: Iterable[bytes], limits: CopyLi
     available = os.fstatvfs(folder)
     require(available.f_bavail * available.f_frsize >= entry["size"] + limits.reserve_bytes, "DESTINATION_CAPACITY_INSUFFICIENT")
     temporary = entry["filename"] + ".partial"
+    # A crash can occur after sealing/fsync but before publication. Reopen only
+    # the service-owned partial for this locked immutable intent; completed
+    # point files remain read-only and are never rewritten.
+    try:
+        previous = regular_file(folder, temporary)
+    except FileNotFoundError:
+        pass
+    else:
+        try:
+            require(os.fstat(previous).st_uid == os.geteuid(), "PARTIAL_FILE_OWNER_CHANGED")
+            os.fchmod(previous, 0o600)
+        finally:
+            os.close(previous)
     fd = regular_file(folder, temporary, os.O_WRONLY | os.O_CREAT)
     with os.fdopen(fd, "wb") as target:
         os.ftruncate(target.fileno(), 0)
