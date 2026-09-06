@@ -201,6 +201,14 @@ Central Flux
   OWNS -> LayerSentry package desired state on remote CAPI clusters
   MUST_NOT_DEPEND_ON -> tenant-selected Argo CD/Flux installation
 
+Qualified package UI
+  DISCOVERS -> approved current/historical profiles through authenticated project BFF
+  BINDS -> selected cluster + exact profile + approved catalog digest
+  OBSERVES -> package state and durable operation history without readiness promotion
+  RECOVERS -> UNKNOWN intent through authenticated explicit observation
+  REQUIRES -> typed stateless uninstall confirmation + server lifecycle checks
+  EVIDENCE -> docs/layersentry/evidence/k8s/2026-09-07-qualified-package-ui.md
+
 LayerSentry DBaaS
   RUNS_ON -> LayerSentry-managed RKE2
   USES -> OpenEverest/operator/provider adapters according to certified engine

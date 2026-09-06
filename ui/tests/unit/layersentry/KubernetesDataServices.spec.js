@@ -129,3 +129,170 @@ it('discovers only server-qualified images for the current project and Site', as
   expect(kubernetesRequest).toHaveBeenCalledWith('/images?projectId=project-one&zoneId=site-one', expect.any(Object))
   expect(wrapper.vm.images).toEqual([image])
 })
+
+const packageRow = (extra = {}) => ({ package: 'example-operator', version: '1.2.3', profile: 'standard', catalogSha256: 'a'.repeat(64), available: true, stateful: false, blockers: [], ...extra })
+const pendingPackage = { status: 'PENDING', detail: 'Package is absent or not yet Ready.', resources: {} }
+const unknownOperation = projectId => ({ id: '12345678-1234-1234-1234-123456789abc', projectId, targetName: 'team', kind: 'kubernetes.package.install', status: 'UNKNOWN' })
+const choosePackage = async (row = packageRow()) => {
+  kubernetesRequest.mockResolvedValue(pendingPackage)
+  wrapper.vm.readiness = { kubernetes: true, gates: { capc_volume_ownership_safe: true } }
+  wrapper.vm.selectedCluster = { name: 'team', namespace: 'tenant-a', ready: true }
+  wrapper.vm.packageCatalog = [row]
+  wrapper.vm.packageSelection = wrapper.vm.packageKey(row)
+  await flushPromises()
+  kubernetesRequest.mockReset()
+}
+Object.defineProperty(window, 'crypto', { value: require('crypto').webcrypto, configurable: true })
+
+it('discovers approved profiles without converting availability into installed readiness', async () => {
+  const row = packageRow()
+  kubernetesRequest.mockResolvedValue({ packages: [row] })
+  await wrapper.vm.loadPackageCatalog()
+  expect(kubernetesRequest).toHaveBeenCalledWith('/packages?projectId=project-one', expect.any(Object))
+  expect(wrapper.vm.packageCatalog).toEqual([row])
+  expect(wrapper.vm.packageStatus).toBeNull()
+  expect(wrapper.vm.canInstallPackage).toBe(false)
+})
+
+it('fences catalog results from a previous project and malformed catalog values', async () => {
+  let resolveCatalog
+  kubernetesRequest.mockImplementation(() => new Promise(resolve => { resolveCatalog = resolve }))
+  const pending = wrapper.vm.loadPackageCatalog()
+  wrapper.vm.resetScope()
+  resolveCatalog({ packages: [packageRow()] })
+  await pending
+  expect(wrapper.vm.packageCatalog).toEqual([])
+  kubernetesRequest.mockResolvedValue({ packages: [packageRow({ catalogSha256: 'untrusted' })] })
+  await wrapper.vm.loadPackageCatalog()
+  expect(wrapper.vm.packageCatalog).toEqual([])
+  expect(wrapper.vm.packageError).toContain('invalid')
+})
+
+it('fences status from an old profile and retains exact catalog selection', async () => {
+  await choosePackage()
+  let resolveOld
+  kubernetesRequest.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  const old = wrapper.vm.loadPackageStatus()
+  const next = packageRow({ profile: 'other', catalogSha256: 'b'.repeat(64) })
+  wrapper.vm.packageCatalog.push(next)
+  kubernetesRequest.mockResolvedValue(pendingPackage)
+  wrapper.vm.packageSelection = wrapper.vm.packageKey(next)
+  await flushPromises()
+  resolveOld({ status: 'CONVERGED', detail: 'Old profile ready', resources: {} })
+  await old
+  expect(wrapper.vm.packageStatus).toEqual(pendingPackage)
+  expect(kubernetesRequest.mock.calls[1][0]).toContain('catalogSha256=' + 'b'.repeat(64))
+})
+
+it('fences old package status when cluster selection changes', async () => {
+  await choosePackage()
+  let resolveOld
+  kubernetesRequest.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  const old = wrapper.vm.loadPackageStatus()
+  kubernetesRequest.mockResolvedValue({ cluster: { name: 'other', namespace: 'tenant-a', ready: true } })
+  await wrapper.vm.selectCluster({ name: 'other', namespace: 'tenant-a' })
+  resolveOld({ status: 'CONVERGED', detail: 'Wrong cluster result', resources: {} })
+  await old
+  expect(wrapper.vm.selectedCluster.name).toBe('other')
+  expect(wrapper.vm.packageStatus).toBeNull()
+})
+
+it('submits only the selected profile with exact digest and recovers the original ambiguous request', async () => {
+  await choosePackage()
+  kubernetesRequest.mockRejectedValue(Object.assign(new Error('unknown outcome'), { ambiguous: true }))
+  await wrapper.vm.installPackage()
+  const attempt = wrapper.vm.uncertainAttempt
+  expect(attempt.body).toEqual({ clusterName: 'team', namespace: 'tenant-a', projectId: 'project-one', package: 'example-operator', version: '1.2.3', profile: 'standard', catalogSha256: 'a'.repeat(64) })
+  expect(attempt.path).toBe('/clusters/team/packages')
+  expect(wrapper.vm.requestLocked).toBe(true)
+  kubernetesRequest.mockImplementation(async (path, options) => options.method === 'POST'
+    ? { operation: { id: 'package-op', projectId: 'project-one', targetName: 'team', kind: 'kubernetes.package.install', status: 'REQUESTED' } } : pendingPackage)
+  await wrapper.vm.submitAttempt(attempt)
+  expect(kubernetesRequest.mock.calls[1][1].idempotencyKey).toBe(attempt.idempotencyKey)
+  expect(wrapper.vm.operations[0].status).toBe('REQUESTED')
+  expect(wrapper.vm.packageStatus?.status).not.toBe('CONVERGED')
+})
+
+it('blocks historical install and stateful uninstall while requiring exact stateless confirmation', async () => {
+  await choosePackage(packageRow({ available: false, blockers: ['Historical profile'] }))
+  expect(wrapper.vm.canInstallPackage).toBe(false)
+  wrapper.vm.packageDeleteConfirmation = 'other'
+  expect(wrapper.vm.canUninstallPackage).toBe(false)
+  wrapper.vm.packageDeleteConfirmation = 'example-operator'
+  expect(wrapper.vm.canUninstallPackage).toBe(true)
+  wrapper.vm.packageCatalog[0].stateful = true
+  expect(wrapper.vm.canUninstallPackage).toBe(false)
+  wrapper.vm.packageCatalog[0].stateful = false
+  kubernetesRequest.mockResolvedValue({ operation: { id: 'delete-op', projectId: 'project-one', targetName: 'team', kind: 'kubernetes.package.delete', status: 'REQUESTED' } })
+  await wrapper.vm.uninstallPackage()
+  expect(kubernetesRequest.mock.calls[0][1]).toMatchObject({ method: 'DELETE', body: { catalogSha256: 'a'.repeat(64), projectId: 'project-one' } })
+})
+
+it('requires fresh package state, ready target and no active cluster reservation', async () => {
+  await choosePackage()
+  expect(wrapper.vm.canInstallPackage).toBe(true)
+  wrapper.vm.packageStatus = null
+  expect(wrapper.vm.canInstallPackage).toBe(false)
+  wrapper.vm.packageStatus = pendingPackage
+  wrapper.vm.selectedCluster.ready = false
+  expect(wrapper.vm.canInstallPackage).toBe(false)
+  wrapper.vm.selectedCluster.ready = true
+  wrapper.vm.operations = [unknownOperation('project-one')]
+  expect(wrapper.vm.canInstallPackage).toBe(false)
+})
+
+it('observes only an UNKNOWN operation in the current project with an empty body', async () => {
+  const operation = unknownOperation('project-one')
+  wrapper.vm.operations = [operation]
+  kubernetesRequest.mockResolvedValue({ operation: { ...operation, status: 'RUNNING' } })
+  await wrapper.vm.observeOperation({ ...operation, projectId: 'other' })
+  expect(kubernetesRequest).not.toHaveBeenCalled()
+  await wrapper.vm.observeOperation(operation)
+  expect(kubernetesRequest).toHaveBeenCalledWith('/operations/' + operation.id + '/reconcile', expect.objectContaining({ method: 'POST', body: {} }))
+  expect(wrapper.vm.operations[0].status).toBe('RUNNING')
+  expect(wrapper.vm.uncertainAttempt).toBeNull()
+})
+
+it('requires fresh history after ambiguous observation and never replays it automatically', async () => {
+  const operation = unknownOperation('project-one')
+  wrapper.vm.operations = [operation]
+  kubernetesRequest.mockRejectedValue(Object.assign(new Error('unknown'), { ambiguous: true }))
+  await wrapper.vm.observeOperation(operation)
+  await wrapper.vm.observeOperation(operation)
+  expect(kubernetesRequest).toHaveBeenCalledTimes(1)
+  expect(wrapper.vm.uncertainObservationId).toBe(operation.id)
+  expect(wrapper.vm.uncertainAttempt).toBeNull()
+  kubernetesRequest.mockImplementation(async path => path.startsWith('/operations') ? { operations: [operation] } : { clusters: [] })
+  await wrapper.vm.loadRuntime(wrapper.vm.generation)
+  expect(wrapper.vm.uncertainObservationId).toBeNull()
+})
+
+it('preserves observation authorization failures and rejects stale operation receipts', async () => {
+  const operation = unknownOperation('project-one')
+  wrapper.vm.operations = [operation]
+  kubernetesRequest.mockRejectedValue(Object.assign(new Error('No access'), { status: 403 }))
+  await wrapper.vm.observeOperation(operation)
+  expect(wrapper.vm.error).toBe('No access')
+  expect(wrapper.vm.operations[0].status).toBe('UNKNOWN')
+  let resolveObservation
+  kubernetesRequest.mockImplementation(() => new Promise(resolve => { resolveObservation = resolve }))
+  const pending = wrapper.vm.observeOperation(operation)
+  wrapper.vm.resetScope()
+  resolveObservation({ operation: { ...operation, status: 'RUNNING' } })
+  await pending
+  expect(wrapper.vm.operations).toEqual([])
+})
+
+it('does not let a history read started before observation overwrite its new receipt', async () => {
+  const operation = unknownOperation('project-one')
+  wrapper.vm.operations = [operation]
+  let resolveHistory
+  kubernetesRequest.mockImplementationOnce(() => new Promise(resolve => { resolveHistory = resolve }))
+    .mockResolvedValueOnce({ clusters: [] })
+  const pending = wrapper.vm.loadRuntime(wrapper.vm.generation)
+  kubernetesRequest.mockResolvedValue({ operation: { ...operation, status: 'RUNNING' } })
+  await wrapper.vm.observeOperation(operation)
+  resolveHistory({ operations: [operation] })
+  await pending
+  expect(wrapper.vm.operations[0].status).toBe('RUNNING')
+})

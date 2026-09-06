@@ -92,3 +92,14 @@ describe('CloudStack discovery and operation recovery', () => {
     expect(operationNeedsPolling({ status: 'READY' })).toBe(false)
   })
 })
+
+it('allows only local package and operation observation paths with mutation protection', async () => {
+  fetch.mockResolvedValue(response({ operation: { status: 'UNKNOWN' } }))
+  await kubernetesRequest('/packages?projectId=one')
+  const attempt = mutationAttempt('POST', '/operations/12345678-1234-1234-1234-123456789abc/reconcile', {})
+  await kubernetesRequest(attempt.path, attempt)
+  expect(fetch.mock.calls[1][1]).toMatchObject({ credentials: 'same-origin', body: '{}', headers: { 'Idempotency-Key': attempt.idempotencyKey } })
+  await expect(kubernetesRequest('/packages/../clusters')).rejects.toThrow('Invalid Kubernetes API path')
+  await expect(kubernetesRequest('/clusters/team/packages', { method: 'DELETE', body: {} })).rejects.toThrow('request identifier')
+  expect(fetch).toHaveBeenCalledTimes(2)
+})

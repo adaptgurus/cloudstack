@@ -70,7 +70,7 @@ class="project-select"
               <a-empty v-if="!clusters.length && !loading && !error && readiness" description="No managed clusters reported for this project" />
               <a-list v-else :data-source="clusters" :loading="loading">
                 <template #renderItem="{ item }"><a-list-item>
-                  <a-button type="link" @click="selectCluster(item)">{{ item.name }}</a-button>
+                  <a-button type="link" :disabled="requestLocked" @click="selectCluster(item)">{{ item.name }}</a-button>
                   <a-tag :color="item.ready === true ? 'success' : 'default'">{{ item.ready === true ? 'Ready' : (item.phase || 'UNKNOWN') }}</a-tag>
                 </a-list-item></template>
               </a-list>
@@ -87,6 +87,42 @@ class="project-select"
                 <a-button danger :disabled="!canDelete" @click="deleteCluster">Delete cluster</a-button>
               </a-form>
             </a-card>
+            <a-card v-if="selectedCluster" title="Packages" class="section-card">
+              <p>Choose a platform-approved package for {{ selectedCluster.name }}. Availability does not mean the package is installed.</p>
+              <a-alert v-if="packageError" type="error" show-icon :message="packageError" class="section-card" />
+              <a-alert v-if="catalogBlockers.length" type="info" show-icon :message="catalogBlockers.join(' ')" class="section-card" />
+              <a-empty v-if="!loadingCatalog && !packageError && !packageCatalog.length" description="No approved package profiles are reported" />
+              <a-form layout="vertical">
+                <a-form-item label="Package version and profile">
+                  <a-select
+                    v-model:value="packageSelection"
+                    :options="packageOptions"
+                    :loading="loadingCatalog"
+                    :disabled="requestLocked || loadingCatalog"
+                    placeholder="Select a package profile"
+                    show-search
+                    option-filter-prop="label" />
+                </a-form-item>
+                <template v-if="selectedPackage">
+                  <a-alert v-if="selectedPackage.blockers.length" type="warning" show-icon :message="selectedPackage.blockers.join(' ')" class="section-card" />
+                  <p role="status">Observed package state: {{ loadingPackageStatus ? 'Checking' : (packageStatus ? packageStatus.status : 'UNKNOWN') }}</p>
+                  <p v-if="packageStatus">{{ packageStatus.detail }}</p>
+                  <a-space wrap>
+                    <a-button :disabled="requestLocked || loadingPackageStatus" @click="loadPackageStatus">Refresh package state</a-button>
+                    <a-button type="primary" :disabled="!canInstallPackage" @click="installPackage">Install selected package</a-button>
+                  </a-space>
+                  <a-divider />
+                  <p v-if="selectedPackage.stateful">Stateful uninstall is unavailable until its retention and backup workflow is verified.</p>
+                  <template v-else>
+                    <p>Uninstall removes this package. The service checks package dependencies and waits for removal to finish.</p>
+                    <a-form-item :label="'Type ' + selectedPackage.package + ' to confirm uninstall'">
+                      <a-input v-model:value="packageDeleteConfirmation" :disabled="requestLocked" />
+                    </a-form-item>
+                    <a-button danger :disabled="!canUninstallPackage" @click="uninstallPackage">Uninstall selected package</a-button>
+                  </template>
+                </template>
+              </a-form>
+            </a-card>
           </a-col>
         </a-row>
         <a-card title="Operation history" class="section-card">
@@ -99,6 +135,9 @@ class="project-select"
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'"><span role="status">{{ record.status }} ({{ record.stepIndex }}/{{ record.stepCount }})</span></template>
               <template v-else-if="column.key === 'detail'">{{ record.lastError || record.recovery || '—' }}</template>
+              <template v-else-if="column.key === 'recovery'">
+                <a-button v-if="record.status === 'UNKNOWN'" :disabled="requestLocked || uncertainObservationId === record.id" @click="observeOperation(record)">Observe current outcome</a-button>
+              </template>
             </template>
           </a-table>
           <a-button v-if="nextCursor" :disabled="loading" @click="loadMoreOperations">Load earlier operations</a-button>
@@ -159,6 +198,17 @@ export default {
       scaleReplicas: 3,
       deleteConfirmation: '',
       uncertainAttempt: null,
+      uncertainObservationId: null,
+      packageCatalog: [],
+      catalogBlockers: [],
+      packageSelection: undefined,
+      packageDeleteConfirmation: '',
+      packageStatus: null,
+      packageError: '',
+      loadingCatalog: false,
+      loadingPackageStatus: false,
+      catalogGeneration: 0,
+      packageGeneration: 0,
       generation: 0,
       discoveryGeneration: 0,
       selectionGeneration: 0,
@@ -172,7 +222,8 @@ export default {
         { title: 'Action', dataIndex: 'kind', key: 'kind' },
         { title: 'Operation ID', dataIndex: 'id', key: 'id' },
         { title: 'Status', key: 'status' },
-        { title: 'Details', key: 'detail' }
+        { title: 'Details', key: 'detail' },
+        { title: 'Recovery', key: 'recovery' }
       ],
       otherServices: [
         { key: 'dbaas', title: 'DBaaS', description: 'Database provisioning requires a qualified database operator, certified persistent storage and verified backup and recovery. This deployment has not exposed a qualified database lifecycle service.' },
@@ -190,6 +241,11 @@ export default {
     imageOptions () { return options(this.images) },
     frontendOptions () { return options(this.frontends) },
     poolOptions () { return (this.selectedCluster?.nodePools || []).map(pool => ({ value: pool.name, label: `${pool.name} (${pool.replicas} desired)` })) },
+    packageOptions () { return this.packageCatalog.map(row => ({ value: this.packageKey(row), label: `${row.package} ${row.version} · ${row.profile}${row.available ? '' : ' (installation unavailable)'}` })) },
+    selectedPackage () { return this.packageCatalog.find(row => this.packageKey(row) === this.packageSelection) || null },
+    packageTargetReady () { return !!this.projectId && this.serverReady && this.selectedCluster?.ready === true && !!this.selectedPackage && !this.requestLocked && !this.clusterBusy && !this.loadingCatalog && !this.loadingPackageStatus && !this.packageError },
+    canInstallPackage () { return this.packageTargetReady && this.selectedPackage.available === true && !!this.packageStatus && this.packageStatus.status !== 'CONVERGED' },
+    canUninstallPackage () { return this.packageTargetReady && this.selectedPackage.stateful === false && !!this.packageStatus && this.packageDeleteConfirmation === this.selectedPackage.package },
     serverReady () { return this.readiness?.kubernetes === true && this.readiness?.gates?.capc_volume_ownership_safe === true },
     readinessDescription () {
       return !this.readiness ? 'The Kubernetes service must be reachable and report release readiness before provisioning is enabled.'
@@ -219,7 +275,8 @@ export default {
   watch: {
     storeScope () { this.initialize() },
     projectId () { this.resetScope(); this.refresh() },
-    'draft.zone_id' () { this.loadSiteDiscovery() }
+    'draft.zone_id' () { this.loadSiteDiscovery() },
+    packageSelection () { this.packageDeleteConfirmation = ''; this.loadPackageStatus() }
   },
   mounted () { this.initialize() },
   beforeUnmount () { this.resetScope() },
@@ -230,6 +287,7 @@ export default {
       this.aborter = new AbortController()
       clearTimeout(this.pollTimer); this.pollTimer = null
       this.readiness = null; this.operations = []; this.clusters = []; this.selectedCluster = null
+      this.resetPackageState(true); this.uncertainObservationId = null
       this.nextCursor = null; this.uncertainAttempt = null; this.submitting = false; this.error = ''; this.notice = ''
       this.draft = emptyDraft(); this.zones = []; this.networks = []; this.offerings = []; this.images = []; this.frontends = []
       this.pollCount = 0; this.pollingPaused = false; this.loadingDiscovery = false; this.loading = false
@@ -263,7 +321,7 @@ export default {
         if (generation !== this.generation) return
         this.readiness = readiness
         this.zones = zones.filter(z => z.allocationstate === 'Enabled')
-        await this.loadRuntime(generation)
+        await Promise.all([this.loadRuntime(generation), this.loadPackageCatalog()])
       } catch (error) { if (generation === this.generation) { this.error = error.message; this.readiness = null } } finally {
         if (generation === this.generation) { this.loading = false; this.schedulePoll() }
       }
@@ -305,10 +363,13 @@ export default {
       if (generation !== this.generation || runtime !== this.runtimeGeneration) return
       if (!Array.isArray(history.operations) || !Array.isArray(inventory.clusters)) throw new Error('Kubernetes service returned an invalid inventory.')
       this.operations = history.operations; this.nextCursor = history.nextCursor || null
+      if (history.operations.some(op => op.id === this.uncertainObservationId && op.projectId === this.projectId)) this.uncertainObservationId = null
       this.clusters = inventory.clusters
       if (this.selectedCluster) {
         const current = this.clusters.find(c => c.name === this.selectedCluster.name && c.namespace === this.selectedCluster.namespace)
         this.selectedCluster = current || null
+        if (!current) this.resetPackageState()
+        else await this.loadPackageStatus()
       }
     },
     schedulePoll () {
@@ -317,6 +378,7 @@ export default {
       if (++this.pollCount > 120) { this.pollingPaused = true; return }
       const generation = this.generation
       this.pollTimer = setTimeout(async () => {
+        if (this.submitting) { this.schedulePoll(); return }
         try { await this.loadRuntime(generation); if (generation === this.generation) this.schedulePoll() } catch (error) {
           if (generation === this.generation) { this.error = error.message; this.pollingPaused = true; this.readiness = null }
         }
@@ -337,11 +399,99 @@ export default {
     async selectCluster (cluster) {
       const generation = this.generation
       const selection = ++this.selectionGeneration
+      this.resetPackageState()
       this.selectedCluster = null; this.scalePool = undefined; this.deleteConfirmation = ''
       try {
         const result = await kubernetesRequest('/clusters/' + encodeURIComponent(cluster.name) + scopeQuery(this.projectId, { namespace: cluster.namespace }), { signal: this.aborter.signal })
-        if (generation === this.generation && selection === this.selectionGeneration) this.selectedCluster = result.cluster
+        if (generation === this.generation && selection === this.selectionGeneration) {
+          this.selectedCluster = result.cluster
+          await this.loadPackageStatus()
+        }
       } catch (error) { if (generation === this.generation && selection === this.selectionGeneration) this.error = error.message }
+    },
+    packageKey (row) { return JSON.stringify([row.catalogSha256, row.package, row.version, row.profile]) },
+    resetPackageState (catalog = false) {
+      this.packageGeneration++
+      this.packageSelection = undefined; this.packageStatus = null; this.packageDeleteConfirmation = ''; this.packageError = ''; this.loadingPackageStatus = false
+      if (catalog) { this.catalogGeneration++; this.packageCatalog = []; this.catalogBlockers = []; this.loadingCatalog = false }
+    },
+    async loadPackageCatalog () {
+      if (!this.projectId) return
+      const generation = this.generation
+      const catalog = ++this.catalogGeneration
+      const current = () => generation === this.generation && catalog === this.catalogGeneration
+      this.loadingCatalog = true; this.packageError = ''
+      try {
+        const result = await kubernetesRequest('/packages' + scopeQuery(this.projectId), { signal: this.aborter.signal })
+        if (!current()) return
+        if (!Array.isArray(result.packages) || result.packages.length > 2176 || !result.packages.every(row =>
+          row && dnsName(row.package) && dnsName(row.profile) && typeof row.version === 'string' && /^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$/.test(row.version) &&
+          typeof row.catalogSha256 === 'string' && /^[a-f0-9]{64}$/.test(row.catalogSha256) && typeof row.available === 'boolean' && typeof row.stateful === 'boolean' && Array.isArray(row.blockers) && row.blockers.every(value => typeof value === 'string'))) throw new Error('The package catalog response is invalid.')
+        if (new Set(result.packages.map(row => this.packageKey(row))).size !== result.packages.length) throw new Error('The package catalog contains duplicate profiles.')
+        this.packageCatalog = result.packages
+        this.catalogBlockers = Array.isArray(result.blockers) ? result.blockers.filter(value => typeof value === 'string') : []
+        if (!this.selectedPackage) this.resetPackageState()
+        else await this.loadPackageStatus()
+      } catch (error) {
+        if (current()) { this.resetPackageState(); this.packageCatalog = []; this.packageError = error.message }
+      } finally { if (current()) this.loadingCatalog = false }
+    },
+    packageRequest () {
+      const row = this.selectedPackage
+      if (!row || !this.selectedCluster || !this.projectId) return null
+      return { clusterName: this.selectedCluster.name, namespace: this.selectedCluster.namespace, projectId: this.projectId, package: row.package, version: row.version, profile: row.profile, catalogSha256: row.catalogSha256 }
+    },
+    async loadPackageStatus () {
+      const request = this.packageRequest()
+      const generation = this.generation
+      const selection = this.selectionGeneration
+      const observation = ++this.packageGeneration
+      this.packageStatus = null; this.loadingPackageStatus = false
+      if (!request) return
+      this.packageError = ''
+      const current = () => generation === this.generation && selection === this.selectionGeneration && observation === this.packageGeneration
+      this.loadingPackageStatus = true
+      try {
+        const { clusterName, projectId, ...fields } = request
+        const result = await kubernetesRequest('/clusters/' + encodeURIComponent(clusterName) + '/packages' + scopeQuery(projectId, fields), { signal: this.aborter.signal })
+        if (!current()) return
+        if (!['CONVERGED', 'PENDING', 'RETRYABLE', 'AMBIGUOUS', 'FAILED'].includes(result.status) || typeof result.detail !== 'string') throw new Error('The package status response is invalid.')
+        this.packageStatus = result
+      } catch (error) { if (current()) this.packageError = error.message } finally { if (current()) this.loadingPackageStatus = false }
+    },
+    installPackage () {
+      if (!this.canInstallPackage) return
+      const body = this.packageRequest()
+      return this.submitAttempt(mutationAttempt('POST', '/clusters/' + body.clusterName + '/packages', body))
+    },
+    uninstallPackage () {
+      if (!this.canUninstallPackage) return
+      const body = this.packageRequest()
+      return this.submitAttempt(mutationAttempt('DELETE', '/clusters/' + body.clusterName + '/packages', body))
+    },
+    async observeOperation (operation) {
+      if (this.requestLocked || operation.status !== 'UNKNOWN' || operation.projectId !== this.projectId || this.uncertainObservationId === operation.id ||
+          !/^[0-9a-f-]{36}$/.test(operation.id) || !this.operations.some(row => row.id === operation.id && row.status === 'UNKNOWN')) return
+      const generation = this.generation
+      this.runtimeGeneration++; clearTimeout(this.pollTimer)
+      this.submitting = true; this.error = ''; this.notice = ''
+      try {
+        const attempt = mutationAttempt('POST', '/operations/' + operation.id + '/reconcile', {})
+        const result = await kubernetesRequest(attempt.path, { ...attempt, signal: this.aborter.signal })
+        if (generation !== this.generation) return
+        if (result.operation?.id !== operation.id || result.operation.projectId !== this.projectId) throw new Error('The service did not return the selected operation.')
+        this.operations = this.operations.map(row => row.id === operation.id ? result.operation : row)
+        this.notice = 'Operation outcome observed. History reports its current state.'
+        this.pollCount = 0
+      } catch (error) {
+        if (generation === this.generation) {
+          this.error = error.message
+          if (error.ambiguous || !error.status) {
+            this.uncertainObservationId = operation.id
+            this.notice = 'Observation outcome is unknown. Refresh operation history before observing again.'
+          }
+        }
+      } finally { if (generation === this.generation) { this.submitting = false; this.schedulePoll() } }
     },
     createCluster () {
       if (!this.canCreate) return
@@ -368,23 +518,26 @@ export default {
       }))
     },
     async submitAttempt (attempt) {
-      if (this.submitting || !this.projectId || attempt.body.project_id !== this.projectId) return
+      if (this.submitting || !this.projectId || (attempt.body.project_id || attempt.body.projectId) !== this.projectId) return
       const generation = this.generation
+      this.runtimeGeneration++; clearTimeout(this.pollTimer)
       this.submitting = true; this.error = ''; this.notice = ''
       try {
         const result = await kubernetesRequest(attempt.path, { ...attempt, signal: this.aborter.signal })
         if (generation !== this.generation) return
         if (!result.operation?.id || result.operation.projectId !== this.projectId) throw new Error('Controller did not return the submitted operation.')
+        if (attempt.path.endsWith('/packages') && (result.operation.targetName !== attempt.body.clusterName || result.operation.kind !== 'kubernetes.package.' + (attempt.method === 'DELETE' ? 'delete' : 'install'))) throw new Error('Controller did not return the selected package operation.')
         this.uncertainAttempt = null
         this.operations = [result.operation, ...this.operations.filter(op => op.id !== result.operation.id)]
-        this.notice = 'Request accepted. Operation history reports progress; acceptance does not mean the cluster is ready.'
-        this.pollCount = 0; this.schedulePoll()
+        this.notice = 'Request accepted. Operation history reports progress; acceptance does not mean the cluster or package is ready.'
+        if (attempt.path.endsWith('/packages')) { this.packageStatus = null; this.packageDeleteConfirmation = ''; this.loadPackageStatus() }
+        this.pollCount = 0
       } catch (error) {
         if (generation === this.generation) {
           this.error = error.message
           if (error.ambiguous || !error.status) this.uncertainAttempt = attempt
         }
-      } finally { if (generation === this.generation) this.submitting = false }
+      } finally { if (generation === this.generation) { this.submitting = false; this.schedulePoll() } }
     }
   }
 }
