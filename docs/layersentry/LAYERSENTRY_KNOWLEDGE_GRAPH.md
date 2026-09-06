@@ -397,6 +397,7 @@ LayerSentry universal CPU node image
   BUILDS_FROM -> signed dated Rocky GenericCloud QCOW2 and locked RPM/RKE2 inputs
   CUSTOMIZES_OFFLINE -> host capabilities, SELinux policy and staged Canal images
   REQUIRES_BUILD_GATE -> actual guestfs setfiles capability, exact critical file labels, no autorelabel fallback
+  ORDERS_EXPORT -> cloud-final.service then exporter within cloud-init.target, after multi-user.target
   EXPORTS_PUBLIC_IDENTITY_ONLY -> root-owned post-cloud-final public key for confined QGA; vendor private-key labels preserved
   HAS_BUILD_EVIDENCE -> evidence/k8s/2026-09-06-rke2-cpu-image-relabel-build.json
   EXCLUDES -> per-cluster credentials, host identity and running RKE2 state

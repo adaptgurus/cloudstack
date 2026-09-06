@@ -40,7 +40,7 @@ ReadWritePaths=/usr/share/layersentry/node-image
 RestrictAddressFamilies=AF_UNIX
 RemainAfterExit=yes
 [Install]
-WantedBy=multi-user.target
+WantedBy=cloud-init.target
 UNIT
 systemctl enable layersentry-host-public-key.service
 # The verified official archive uses only bin/, lib/systemd/ and share/rke2/.
