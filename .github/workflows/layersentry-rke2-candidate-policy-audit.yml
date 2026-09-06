@@ -1,0 +1,45 @@
+name: LayerSentry exact CPU candidate policy audit
+on:
+  push:
+    branches: [codex/k8s-image-policy-audit]
+    paths:
+      - .github/workflows/layersentry-rke2-candidate-policy-audit.yml
+      - tools/layersentry/k8s/image/audit_candidate_labels.py
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          repository: adaptgurus/cloudstack
+          run-id: 34050507635
+          artifact-ids: 9994542246
+          merge-multiple: true
+          path: candidate
+      - name: Audit exact candidate read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          # Match the original appliance prerequisites to diagnose its feature set.
+          sudo apt-get install -y --no-install-recommends qemu-utils libguestfs-tools linux-image-generic python3-guestfs
+          sudo chmod a+r /boot/vmlinuz-*
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          mkdir evidence
+          dpkg-query -W > evidence/hosted-packages.tsv
+          /usr/bin/python3 tools/layersentry/k8s/image/audit_candidate_labels.py candidate/cpu-image/layersentry-rke2-rocky9-amd64.qcow2 evidence/audit.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: layersentry-cpu-policy-audit-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
