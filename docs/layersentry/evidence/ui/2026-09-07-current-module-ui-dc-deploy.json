@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "workflowRunId": 34063750260,
+  "buildRunId": 34059760313,
+  "evidenceArtifactId": 9998299417,
+  "evidenceArtifactZipSha256": "e04579aeb066929cf655e650cfd1869b7a995c5964978967eb9bde88f04040e5",
+  "sha256": "765899f2d28e677faaf2c63938283e43f88bf876800ee6303a86bf1fb005b5e6",
+  "receipt": {
+    "schema": 1,
+    "target": "10.10.10.14",
+    "source": "1feb3f4c2d4c76a6eb1cb696bb5f022cd7f7e630",
+    "runId": "34063750260",
+    "runAttempt": "1",
+    "uiCommit": "dc58f76f67dac13aa886c8d45475944f31b0c039",
+    "archiveSha256": "131717933f8c7fbe4a4385dfa313abd700ffd016926164d825b6bde86aa90edf",
+    "status": "PARTIAL",
+    "phase": "Complete",
+    "deploymentInvoked": true,
+    "productionCertified": false,
+    "guiVerified": false,
+    "remoteStaging": "/run/layersentry-dr-ui-34063750260-1",
+    "stagingRetained": true,
+    "sshExecutable": "C:\\WINDOWS\\System32\\OpenSSH\\ssh.exe",
+    "wrapperSha256": "12905056bdac1baabe3bdde3908b41707255f7bf5cf1364a046c0357b88c7652",
+    "remoteExitCode": 0,
+    "checks": [
+      "BACKEND_CONTENT_HASHES=PASS",
+      "CLOUDSTACK_UI_COMMIT=dc58f76f67dac13aa886c8d45475944f31b0c039",
+      "CLOUDSTACK_VERSION=4.22.1.1",
+      "DC_SERVER_PROPERTIES_PRESERVATION=PASS",
+      "EXACT_UI_FILES=PASS",
+      "HTTP_CLIENT=200",
+      "HTTP_UI_ASSET_HASHES=PASS",
+      "LAYERSENTRY_DC_UI_DEPLOYMENT=PASS",
+      "RUNTIME_CONFIG_PRESERVATION=PASS",
+      "RUNTIME_PRODUCT=LayerSentry",
+      "RUNTIME_PROFILE=layersentry-kvm"
+    ],
+    "artifactServedVerified": true
+  },
+  "moduleLifecyclesVerified": false,
+  "productionCertified": false
+}

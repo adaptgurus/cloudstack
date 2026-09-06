@@ -1,5 +1,13 @@
 # LayerSentry V1 — Durable Progress Ledger
 
+## 2026-09-07 current UI deployed on both targets; DC address/TLS prerequisites advanced
+
+DC UI deployment 34063750260 passed at runner 1feb3f4c2d4c76a6eb1cb696bb5f022cd7f7e630. Both DC and DR now serve exact reviewed UI dc58f76f67dac13aa886c8d45475944f31b0c039 from build 34059760313. DC verified served assets, backend hashes, runtime configuration and server.properties preservation. Protected DC staging /run/layersentry-dr-ui-34063750260-1 remains retained pending owned cleanup. Authenticated Chrome/Firefox and module lifecycles remain NOT_TESTED. [DC deployment receipt](evidence/ui/2026-09-07-current-module-ui-dc-deploy.json).
+
+DHCP Apply 34063327094 added exact .14 and .20 exclusions while preserving all six leases, three reservations and both attached VM identities; it did not revoke the old .14 lease or alter NAT/scope. Read-only Pod lab Plan 34063886863 passed prerequisite checks for the exact .2–.254 to .2–.9 subset. It was not applied; allocated usage remains UNKNOWN because Disabled Zone capacity rows are filtered. The native range guard is not atomic, so any lab Apply additionally requires exclusive administrative writers including root/admin and synchronous IP allocation. Default production capacity checks remain strict. Native TLS Prepare 34063409993 completed the previously recorded certificate job and staged verified leaf/CA/JKS and configuration; no listener activation or firewall mutation occurred in Prepare. [Actual prerequisite receipts and hashes](evidence/dr/2026-09-07-dc-address-and-tls-prerequisites.json).
+
+Credential-free GUI startup diagnostics 34063539296 and 34064041108 proved that preserving ProgramData fixes the Windows OpenSSH configuration-only startup failure. The dummy PowerShell password helper still emits zero bytes with both ignored stdin and a closed pipe; the closed-pipe hypothesis is not verified. Both diagnostic runs stopped before network access, real credentials or native identity Plan. GUI login has not yet been attempted; do not infer authentication failure or retry passwords.
+
 ## 2026-09-07 DC guest network and firmware identity verified
 
 Native guest NIC/bridge/traffic-label run 34062614955 passed. The exact added NIC uses ls-guest0/eth1 with no L3 addresses; management networking is preserved and DC remains Disabled. Guest gateway routing is still unverified. Trusted Hyper-V/SSH run 34062671636 independently bound sen VM ID 29ba176b-b81a-4f47-8f51-ecec869f247f to firmware BIOS GUID and guest product_uuid ccbcac90-c8e3-4091-90a0-7e2e8cf2f7e5; these are distinct identities, with no byte-order conversion required. [Actual receipts](evidence/dr/2026-09-07-dc-guest-network-and-firmware.json).

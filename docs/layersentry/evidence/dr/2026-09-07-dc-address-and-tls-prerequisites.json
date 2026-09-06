@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "target": "10.10.10.14",
+  "status": "PARTIAL",
+  "dhcp": {
+    "workflowRunId": 34063327094,
+    "sha256": "4bf887d8a1a2086a80bf614bcb801d6a40881e2bb2061677d91d772b162736cf",
+    "receipt": {
+      "schema": 1,
+      "host": "TESTSER",
+      "mode": "Apply",
+      "runId": "34063327094",
+      "sourceCommit": "37be1f6cb9e23fb6f5fc04276867b04c8d8c933e",
+      "status": "EXCLUSIONS_RECONCILED_LEASES_PRESERVED",
+      "exclusionMutationAttempted": true,
+      "data": {
+        "schema": 1,
+        "host": "TESTSER",
+        "scope": "10.10.10.0",
+        "start": "10.10.10.10",
+        "end": "10.10.10.250",
+        "status": "EXCLUSIONS_RECONCILED_LEASES_PRESERVED",
+        "exclusions": [
+          "10.10.10.14",
+          "10.10.10.20"
+        ],
+        "reservations": [
+          {
+            "address": "10.10.10.13",
+            "clientId": "00-15-5d-0a-0a-13",
+            "type": "Both"
+          },
+          {
+            "address": "10.10.10.12",
+            "clientId": "00-15-5d-0a-0a-12",
+            "type": "Both"
+          },
+          {
+            "address": "10.10.10.11",
+            "clientId": "00-15-5d-0a-0a-11",
+            "type": "Both"
+          }
+        ],
+        "leases": [
+          {
+            "address": "10.10.10.13",
+            "clientId": "00-15-5d-0a-0a-13",
+            "state": "ActiveReservation"
+          },
+          {
+            "address": "10.10.10.14",
+            "clientId": "00-15-5d-00-39-09",
+            "state": "Active"
+          },
+          {
+            "address": "10.10.10.15",
+            "clientId": "00-15-5d-00-39-0b",
+            "state": "Active"
+          },
+          {
+            "address": "10.10.10.10",
+            "clientId": "00-15-5d-00-39-0a",
+            "state": "Active"
+          },
+          {
+            "address": "10.10.10.11",
+            "clientId": "00-15-5d-0a-0a-11",
+            "state": "ActiveReservation"
+          },
+          {
+            "address": "10.10.10.12",
+            "clientId": "00-15-5d-0a-0a-12",
+            "state": "ActiveReservation"
+          }
+        ],
+        "attachedVmIds": [
+          "29ba176b-b81a-4f47-8f51-ecec869f247f",
+          "61fef4dc-44dc-43ad-a2a0-f923912a01d7"
+        ],
+        "operations": [
+          {
+            "command": "Add-DhcpServerv4ExclusionRange",
+            "start": "10.10.10.14",
+            "end": "10.10.10.14"
+          },
+          {
+            "command": "Add-DhcpServerv4ExclusionRange",
+            "start": "10.10.10.20",
+            "end": "10.10.10.20"
+          }
+        ],
+        "leaseRevocationPerformed": false,
+        "scopeChangePerformed": false,
+        "podRangeChangePerformed": false
+      }
+    }
+  },
+  "podPlan": {
+    "workflowRunId": 34063886863,
+    "runnerCommit": "30193a35cb1e69736d87430c3582bc927203b6e0",
+    "sha256": "240e1b1f9c28e703643ef21d0cf4aecb01ac87ccc4b166978e19a8b0b5bdf665",
+    "receipt": {
+      "administrativeExclusivityRequired": true,
+      "capacityTotalFromEndpoints": 253,
+      "capacityUsed": "UNKNOWN_DISABLED_ZONE",
+      "command": "updatePodManagementNetworkIpRange",
+      "concurrentWriterSafety": "NOT_ESTABLISHED_NATIVE_GUARD_IS_NOT_ATOMIC",
+      "configurationUpdateRequested": false,
+      "currentEnd": "10.10.10.254",
+      "currentStart": "10.10.10.2",
+      "derivedCapacityRefreshRequested": false,
+      "exclusiveWriterReservation": "ROOT_EXCLUSIVE_DC_POD_RANGE_INCLUDING_ADMIN_AND_SYNCHRONOUS_IP_WRITERS",
+      "mode": "EXCLUSIVE_DISABLED_DC_LAB_ONLY",
+      "parameters": {
+        "currentendip": "10.10.10.254",
+        "currentstartip": "10.10.10.2",
+        "newendip": "10.10.10.9",
+        "newstartip": "10.10.10.2",
+        "podid": "020dc658-af4e-4e2e-bed5-0607de8a787f"
+      },
+      "reviewedReceiptSha256": {
+        "capacity": "54a2f9a54dbc41defb37698eff2eb87100deeb4c81b638a2b5a8b968ccba1f6e",
+        "guestNetwork": "d8dce4ef9ab60ccea6b05161b918770a7da8001885ebef181597b759f4104897",
+        "hypervNetwork": "5d13f4e2a820c8421db5bff37b975b62cb4541095564f221392e28bd4e1e33fb"
+      },
+      "schema": 1,
+      "status": "LAB_PLAN_REVIEW_REQUIRED",
+      "target": "10.10.10.14",
+      "zoneEnabled": false
+    },
+    "applied": false
+  },
+  "tlsPrepare": {
+    "workflowRunId": 34063409993,
+    "runnerCommit": "eba8e9772909569cf7d10f974bd27eab20219d54",
+    "sha256": "895847c31da8e963eb7ea301d4b65461613804e1cbf6d8c088a0301156a5f13b",
+    "receipt": {
+      "automaticReplay": false,
+      "caSha256": "67885ce20afcea82d0912937adb7a5d72c2f2cfff7fe894745a5574a4720b1bd",
+      "certificateSha256": "bf3a4879d200003c1453a2c9be402187c73d7a9e17030dd9fa6b2c9b18f9273f",
+      "configurationInstalled": false,
+      "firewallChanged": false,
+      "phase": "Prepare",
+      "planSha256": "2279b43d2a215a1d7c23fd535ca78c7049b93b15fb79cbd62e605f00881fb105",
+      "productionCertified": false,
+      "schema": 1,
+      "serviceRestarted": false,
+      "status": "PARTIAL",
+      "target": "10.10.10.14"
+    }
+  },
+  "limitations": [
+    "Pod native range guard is not atomic; exclusive lab administrative writers required. Allocated usage remains UNKNOWN.",
+    "DHCP existing leases are preserved, including old .14 lease; exclusion does not prove lease revocation.",
+    "TLS Prepare staged credentials/configuration only; Install/Activate require separate receipts.",
+    "Guest network routing and native two-Zone recovery remain NOT_TESTED."
+  ],
+  "productionCertified": false
+}
