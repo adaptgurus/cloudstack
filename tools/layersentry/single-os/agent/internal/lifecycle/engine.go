@@ -29,8 +29,6 @@ func(e *Engine)Plan(ctx context.Context,req model.ServiceRequest)(model.Plan,mod
  requestDigest,err:=config.CanonicalDigest(req);if err!=nil{return model.Plan{},model.Operation{},err}
  proposed:=model.Operation{ID:req.OperationID,ServiceID:req.ServiceID,IdempotencyKey:req.IdempotencyKey,RequestDigest:requestDigest,Status:model.OpPreflight,Stage:"preflight"}
  op,err:=e.Store.Begin(proposed);if err!=nil{return model.Plan{},op,err}
- // Idempotent re-planning never re-resolves packages or repository state. Once a
- // plan is pinned, return exactly that stored plan/current operation.
  if op.PlanDigest!=""{
   plan,err:=e.Store.GetPlan(op.ID);if err!=nil{return model.Plan{},op,fmt.Errorf("load pinned plan: %w",err)}
   if err=validateStoredPlan(plan,op,requestDigest);err!=nil{return model.Plan{},op,err}
@@ -62,8 +60,6 @@ func(e *Engine)Install(ctx context.Context,req model.ServiceRequest,confirmedPla
  if confirmedPlanDigest==""||confirmedPlanDigest!=plan.Digest||confirmedPlanDigest!=op.PlanDigest{return op,errors.New("plan confirmation digest mismatch")}
  p,ok:=e.Registry.Get(req.Provider);if !ok{return op,errors.New("provider disappeared")}
  lk,err:=lock.Acquire(e.LockPath);if err!=nil{return op,err};defer lk.Release()
- // Re-read under the mutation lock so a concurrent/crashed process cannot have
- // transitioned the operation between confirmation and the first mutation.
  current,err:=e.Store.GetOperation(op.ID);if err!=nil{return op,err};if current.Status!=model.OpWaitingConfirmation||current.PlanDigest!=op.PlanDigest{return current,errors.New("operation changed before mutation lock acquisition")};op=current
  op.Status=model.OpRunning;op.Stage="preflight-revalidation";op.Error="";_ = e.Store.SaveOperation(op)
  fail:=func(stage string,cause error,ambiguous bool)(model.Operation,error){op.Stage=stage;op.Error=redact(cause.Error());if ambiguous{op.Status=model.OpUnknown}else{op.Status=model.OpFailedNeedsRecovery};_ = e.Store.SaveOperation(op);return op,cause}
@@ -81,7 +77,9 @@ func(e *Engine)Install(ctx context.Context,req model.ServiceRequest,confirmedPla
  }
  st:=model.ServiceState{ID:req.ServiceID,Provider:req.Provider,Category:req.Category,ReleaseLine:req.ReleaseLine,ResolvedVersion:plan.ResolvedVersion,Topology:req.Topology,Storage:req.Storage,Network:req.Network,Maintenance:req.Maintenance,Backup:req.Backup,Cluster:req.Cluster,SecretRefs:req.SecretRefs,ConfigDigest:requestDigest,PlanDigest:plan.Digest,Status:"installing",UpdatedAt:time.Now().UTC()}
  op.Stage="service-start";_ = e.Store.SaveOperation(op);if err=p.Start(ctx,op,st);err!=nil{return fail("service-start",err,isAmbiguous(err))}
- op.Stage="firewall";_ = e.Store.SaveOperation(op);if err=(firewall.Manager{Runner:e.Runner}).Apply(ctx,req.ServiceID,req.Network.Port,req.Network.AllowedCIDRs);err!=nil{return fail("firewall",err,isAmbiguous(err))}
+ if req.Network.Port>0{
+  op.Stage="firewall";_ = e.Store.SaveOperation(op);if err=(firewall.Manager{Runner:e.Runner}).Apply(ctx,req.ServiceID,req.Network.Port,req.Network.AllowedCIDRs);err!=nil{return fail("firewall",err,isAmbiguous(err))}
+ }
  op.Status=model.OpVerifying;op.Stage="health";_ = e.Store.SaveOperation(op);st.Status="installed"
  h,err:=p.Health(ctx,st);if err!=nil{return fail("health",err,false)};if !h.Healthy{return fail("health",errors.New(h.Error),false)}
  if err=e.Store.SaveService(st);err!=nil{return fail("commit-state",err,false)}
@@ -97,5 +95,5 @@ func validateStoredPlan(plan model.Plan,op model.Operation,requestDigest string)
 }
 func isAmbiguous(err error)bool{return errors.Is(err,context.DeadlineExceeded)||errors.Is(err,context.Canceled)}
 func(e *Engine)Health(ctx context.Context,id string)(model.HealthResult,error){st,err:=e.Store.GetService(id);if err!=nil{return model.HealthResult{},err};p,ok:=e.Registry.Get(st.Provider);if !ok{return model.HealthResult{},errors.New("provider unavailable")};return p.Health(ctx,st)}
-func(e *Engine)Uninstall(ctx context.Context,id string,op model.Operation,destroyData bool)(model.Operation,error){st,err:=e.Store.GetService(id);if err!=nil{return op,err};p,ok:=e.Registry.Get(st.Provider);if !ok{return op,errors.New("provider unavailable")};lk,err:=lock.Acquire(e.LockPath);if err!=nil{return op,err};defer lk.Release();op.Status=model.OpRunning;op.Stage="uninstall";_ = e.Store.SaveOperation(op);if err=p.Uninstall(ctx,op,st,destroyData);err!=nil{op.Status=model.OpFailedNeedsRecovery;op.Error=redact(err.Error());_ = e.Store.SaveOperation(op);return op,err};if e.Runner!=nil{if err=(firewall.Manager{Runner:e.Runner}).Remove(ctx,id);err!=nil{op.Status=model.OpFailedNeedsRecovery;op.Stage="firewall-cleanup";op.Error=redact(err.Error());_ = e.Store.SaveOperation(op);return op,err}};res,err:=p.ResidueAudit(ctx,st);if err!=nil{return op,err};for _,v:=range res{if v=="present"||v=="active"{op.Status=model.OpFailedNeedsRecovery;op.Stage="residue-audit";op.Error="managed residue remains";_ = e.Store.SaveOperation(op);return op,errors.New("managed residue remains")}};st.Status="uninstalled-data-preserved";_ = e.Store.SaveService(st);op.Status=model.OpSucceeded;op.Stage="complete";op.Error="";_ = e.Store.SaveOperation(op);return op,nil}
+func(e *Engine)Uninstall(ctx context.Context,id string,op model.Operation,destroyData bool)(model.Operation,error){st,err:=e.Store.GetService(id);if err!=nil{return op,err};p,ok:=e.Registry.Get(st.Provider);if !ok{return op,errors.New("provider unavailable")};lk,err:=lock.Acquire(e.LockPath);if err!=nil{return op,err};defer lk.Release();op.Status=model.OpRunning;op.Stage="uninstall";_ = e.Store.SaveOperation(op);if err=p.Uninstall(ctx,op,st,destroyData);err!=nil{op.Status=model.OpFailedNeedsRecovery;op.Error=redact(err.Error());_ = e.Store.SaveOperation(op);return op,err};if e.Runner!=nil&&st.Network.Port>0{if err=(firewall.Manager{Runner:e.Runner}).Remove(ctx,id);err!=nil{op.Status=model.OpFailedNeedsRecovery;op.Stage="firewall-cleanup";op.Error=redact(err.Error());_ = e.Store.SaveOperation(op);return op,err}};res,err:=p.ResidueAudit(ctx,st);if err!=nil{return op,err};for _,v:=range res{if v=="present"||v=="active"{op.Status=model.OpFailedNeedsRecovery;op.Stage="residue-audit";op.Error="managed residue remains";_ = e.Store.SaveOperation(op);return op,errors.New("managed residue remains")}};st.Status="uninstalled-data-preserved";_ = e.Store.SaveService(st);op.Status=model.OpSucceeded;op.Stage="complete";op.Error="";_ = e.Store.SaveOperation(op);return op,nil}
 func redact(s string)string{if len(s)>1024{s=s[:1024]};return s}
