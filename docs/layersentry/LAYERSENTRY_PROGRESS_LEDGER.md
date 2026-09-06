@@ -1,5 +1,11 @@
 # LayerSentry V1 — Durable Progress Ledger
 
+## 2026-09-07 DC guest network and firmware identity verified
+
+Native guest NIC/bridge/traffic-label run 34062614955 passed. The exact added NIC uses ls-guest0/eth1 with no L3 addresses; management networking is preserved and DC remains Disabled. Guest gateway routing is still unverified. Trusted Hyper-V/SSH run 34062671636 independently bound sen VM ID 29ba176b-b81a-4f47-8f51-ecec869f247f to firmware BIOS GUID and guest product_uuid ccbcac90-c8e3-4091-90a0-7e2e8cf2f7e5; these are distinct identities, with no byte-order conversion required. [Actual receipts](evidence/dr/2026-09-07-dc-guest-network-and-firmware.json).
+
+Capacity run 34062542683 returned no type-5 rows for the Disabled Zone; exact native source filters disabled capacity rows, so allocated usage remains UNKNOWN, not zero. Pod range remains .2–.254, which overlaps DHCP; no Pod/DHCP change has been applied. GUI identity Plan 34062346063 failed opening the new SSH tunnel before API/login. Native TLS Plan 34062472402 reached the verified target but rejected the incorrect VM-ID/product_uuid assumption before any TLS change; subsequent firmware observation above supplies the correct binding. Neither failed prerequisite is module production verification.
+
 ## 2026-09-07 current module UI deployed on DR
 
 Run 34062120056 succeeded on exact DR 10.10.10.20 with UI commit dc58f76f67dac13aa886c8d45475944f31b0c039. Served HTTP 200/assets match the reviewed production build; backend content hashes and runtime configuration were preserved. Protected backup remains at /var/backups/layersentry/20260906T214807Z-dr-ui-34062120056-1. This is deployed-asset verification; authenticated browser/module lifecycle and production certification remain unverified. [Immutable receipt](evidence/ui/2026-09-07-current-module-ui-dr-deploy.json).
