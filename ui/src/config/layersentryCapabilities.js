@@ -40,7 +40,7 @@ const FEATURE_DEFINITIONS = Object.freeze({
   },
   [LAYERSENTRY_FEATURES.BACKUP]: {
     defaultEnabled: false,
-    requiredApis: ['listBackupOfferings'],
+    requiredApis: ['listBackupOfferings', 'assignVirtualMachineToBackupOffering'],
     requireReady: true
   },
   [LAYERSENTRY_FEATURES.DR]: {
