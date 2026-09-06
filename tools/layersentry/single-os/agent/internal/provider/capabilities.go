@@ -11,6 +11,9 @@ import (
 // confused or malicious callers supplying fields a provider does not own. A
 // provider still performs its product-specific validation afterwards.
 func ValidateIntentCapabilities(id string, r model.ServiceRequest) error {
+	if r.Category == model.CategoryDatabase && r.Maintenance.AutoPatch && !r.Backup.Enabled {
+		return errors.New("automatic database patching requires a provider-managed backup policy")
+	}
 	switch id {
 	case "postgresql":
 		return onlySecretRefs(r, "admin_password")
