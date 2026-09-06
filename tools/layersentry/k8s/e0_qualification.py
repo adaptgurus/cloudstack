@@ -35,7 +35,7 @@ EXPECTED_SOURCE = {
     "capc_commit": "7521b14a31e6c46f81f16aae3738a27c08ad063f",
     "capc_patch_sha256": "6d3fc88ccf986bd025fc6d714ec7b4fa19d0c2afe6f10c50ef02a198286cea74",
     "cloudstack_csi_commit": "a84477e922d62b82387ab55134fafc9c0b5aaf64",
-    "cloudstack_csi_patch_sha256": "64853e92e82f4a6e5e298b9d114a1522aea21d04f84c02e1667079c54d4f9635",
+    "cloudstack_csi_patch_sha256": "ad1339342211b63d8c9c9a20994da20c66ae632e03c7ddc1c65d4215bf9c4f58",
 }
 
 REQUIRED_CASES = (

@@ -121,6 +121,8 @@ def evaluate_component_readiness(manifest: Mapping[str, Any]) -> ComponentReadin
         blockers.append("CloudStack CSI project lifecycle is not qualified")
     if csi.get("resizeIdempotencyQualified") is not True:
         blockers.append("CloudStack CSI resize idempotency is not live-qualified")
+    if csi.get("apkPackageLayerDeterministic") is not True:
+        blockers.append("CloudStack CSI runtime package layer is not deterministic")
 
     repository = flux.get("repository")
     parsed = urllib.parse.urlsplit(repository) if isinstance(repository, str) else None

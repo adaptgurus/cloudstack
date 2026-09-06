@@ -56,6 +56,7 @@ class ComponentReadinessTest(unittest.TestCase):
             "image": "registry.example.test/layersentry/cloudstack-csi@sha256:" + "b" * 64,
             "projectLifecycleQualified": True,
             "resizeIdempotencyQualified": True,
+            "apkPackageLayerDeterministic": True,
         })
         candidate["fluxCatalog"] = {
             "repository": "https://git.example.test/layersentry/catalog.git",
