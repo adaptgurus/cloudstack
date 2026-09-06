@@ -49,6 +49,32 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE / NOT_TESTED — 2026-09-06 CCM Kubernetes 1.36 source overlay
+
+Exact implementation commit:
+
+`54121666698fde9e716bb3041ccf051a71e26726`
+
+The selected Apache CloudStack CCM remains upstream `v1.2.0` commit
+`4740dbcacc7fc5892354b03b2f0be7ebf5c92584`. Workstream E added a pinned
+downstream overlay aligning its Go/Kubernetes build graph to Go `1.26.0` and
+Kubernetes libraries `v0.36.0`, removed legacy v0.24 replacement pins, adapted
+the current CCM command alias contract, fixed current-toolchain logging and
+included resolved module checksums. Builder/runtime base images are pinned by
+registry manifest digest. Overlay SHA-256 is
+`a6689998f2a46b9622ac69f97f8e67e231f075ffa8cca16a85a97fd0f4893726`.
+
+A fresh isolated worktree returned `APPLIED`, exact patched source passed
+`go test ./...`, and re-materialization returned `ALREADY_APPLIED`. The 74
+Workstream E Python tests and 5 overlay tests also passed. Evidence:
+`docs/layersentry/evidence/k8s/2026-09-06-e1-ccm-kubernetes-136-source.md`.
+
+This proves source build compatibility only. No downstream image/SBOM/
+signature exists and no Kubernetes 1.36 node/LB lifecycle ran; therefore
+`kubernetes136Qualified=false` and CCM image remain unresolved in the release
+manifest. E1 startup remains blocked. Next gate is immutable CCM/CSI/catalog
+artifact publication followed by live CCM/CSI/Flux qualification.
+
 ### SOURCE_COMPLETE / BLOCKED — 2026-09-06 E1 controller runtime wiring
 
 Exact implementation commit:

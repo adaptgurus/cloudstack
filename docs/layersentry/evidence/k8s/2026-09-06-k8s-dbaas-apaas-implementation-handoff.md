@@ -12,6 +12,20 @@
 
 ## 0. Latest continuation checkpoint
 
+CloudStack CCM Kubernetes 1.36 source qualification is implemented at
+`54121666698fde9e716bb3041ccf051a71e26726`. The digest-pinned overlay keeps
+official CCM `v1.2.0` as owner, aligns its resolved build graph to Kubernetes
+libraries `v0.36.0`/Go `1.26.0`, adapts the current CCM command API and pins
+builder/runtime images. A fresh overlay application passed exact upstream
+`go test ./...` and was idempotent; 74 Workstream E Python and 5 overlay tests
+pass. Overlay SHA-256 is
+`a6689998f2a46b9622ac69f97f8e67e231f075ffa8cca16a85a97fd0f4893726`.
+Evidence: `docs/layersentry/evidence/k8s/2026-09-06-e1-ccm-kubernetes-136-source.md`.
+
+This does not set `kubernetes136Qualified`: no final image or live node/LB
+lifecycle evidence exists. Resume with immutable artifact/catalog publication
+and live E0/E1 qualification; stateful DBaaS remains blocked.
+
 E1 controller runtime wiring is implemented at
 `58e9e2e18e13d91422fe264530828fc6ba538b3d`. It composes the strict
 CloudStack-session BFF, capability RBAC, read-only CloudStack resolver,
