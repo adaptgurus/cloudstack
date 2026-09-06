@@ -31,5 +31,11 @@
     "projectPVCGrow": "disabled-until-live-qualified",
     "artifactBuild": "requires-verified-apk-closure-staged-before-build"
   },
-  "status": "SOURCE_COMPLETE"
+  "status": "SOURCE_COMPLETE",
+  "buildArtifact": {
+    "lock": "artifact-lock.json",
+    "sha256": "ecbe36013f66bf6015321f07bb2ebbc5ed3d87125c60c5958099b1f0b297d19f",
+    "status": "CI_VERIFIED",
+    "scope": "unsigned linux/amd64 OCI archive closure; no registry publication or live CSI qualification"
+  }
 }

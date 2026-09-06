@@ -201,6 +201,12 @@ Central Flux
   OWNS -> LayerSentry package desired state on remote CAPI clusters
   MUST_NOT_DEPEND_ON -> tenant-selected Argo CD/Flux installation
 
+CloudStack CSI retained OCI artifact lock
+  BINDS -> exact archive/index/runtime/config/platform + unsigned SBOM/provenance source
+  DOES_NOT_PROVIDE -> registry publication, workload installation or live data safety
+  REQUIRES -> complete-index preservation and destination digest verification before registry binding
+  EVIDENCE -> docs/layersentry/evidence/k8s/2026-09-07-csi-artifact-binding.md
+
 Qualified package UI
   DISCOVERS -> approved current/historical profiles through authenticated project BFF
   BINDS -> selected cluster + exact profile + approved catalog digest

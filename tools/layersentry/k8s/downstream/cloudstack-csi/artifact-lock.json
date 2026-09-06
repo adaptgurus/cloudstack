@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0",
+  "artifactType": "layersentry-csi-build-closure",
+  "status": "CI_VERIFIED",
+  "layersentrySourceCommit": "d40c54acb8a18b71475b154f14dd631460c94f89",
+  "upstreamCommit": "a84477e922d62b82387ab55134fafc9c0b5aaf64",
+  "patchSha256": "bec55930bf7b0e0b41abd8d7ef7eefb0a2540376275a507d62f3673fec7048a1",
+  "apkLockSha256": "52a13676a019716187edb17110cfb77459a096ef7aaf5d35b93664580979796c",
+  "workflow": {
+    "repository": "adaptgurus/cloudstack",
+    "runId": 34047140051,
+    "path": ".github/workflows/layersentry-csi-artifact-qualification.yml",
+    "sourceCommit": "d40c54acb8a18b71475b154f14dd631460c94f89",
+    "conclusion": "success"
+  },
+  "githubArtifact": {
+    "id": 9993465630,
+    "name": "layersentry-csi-build-d40c54acb8a18b71475b154f14dd631460c94f89-1",
+    "sizeBytes": 48030165,
+    "sha256": "102c9642a5a0cd81fcafe4d6e5771f18688a228bcf601706578f45f12f24c534",
+    "expiresAt": "2026-09-20T17:00:38Z"
+  },
+  "images": {
+    "cloudstack-csi-driver": {
+      "archiveSha256": "0a52fdf6194ac4efa5ac3f155f3a14a07f12d0fc98e9565db55e137fe53e5919",
+      "archiveSizeBytes": 31515136,
+      "imageIndexDigest": "sha256:863a4d6280fb2d354071c8fef7020297985e506a6f7a4fbce38ecb34a0357b43",
+      "imageManifestDigest": "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+      "imageConfigDigest": "sha256:22d6f58a31262790032745d8079a8fc985c0c677937277b526fa0ea10b0d1c3c",
+      "platform": "linux/amd64",
+      "provenanceSourceBinding": {
+        "upstreamCommit": "a84477e922d62b82387ab55134fafc9c0b5aaf64",
+        "layersentryCommit": "d40c54acb8a18b71475b154f14dd631460c94f89",
+        "dockerfileDirectory": "cmd/cloudstack-csi-driver",
+        "dependencyCount": 3,
+        "predicateType": "https://slsa.dev/provenance/v1",
+        "unsigned": true
+      },
+      "archivePath": "cloudstack-csi-driver.oci.tar",
+      "registryReference": null,
+      "attestations": {
+        "provenance": {
+          "digest": "sha256:c1a4798197b8e6345e11017c4dd6a074e17e316d6a61ce670e5bd088dbcd9ae3",
+          "predicateType": "https://slsa.dev/provenance/v1"
+        },
+        "sbom": {
+          "digest": "sha256:3d5c9a1934018f526c19626f66fd523a026bb1599280f1a463d1766aaa85a7c9",
+          "predicateType": "https://spdx.dev/Document"
+        }
+      },
+      "sbomPackageCount": 98
+    },
+    "cloudstack-csi-sc-syncer": {
+      "archiveSha256": "f0839c00895f754be994760d82ee4a0d498fbbc4bc2a88b407b7406634ecdd59",
+      "archiveSizeBytes": 17906176,
+      "imageIndexDigest": "sha256:7deba98bf6851481ded002d13779f4ef43f666f6385dbfce2291037b5cafca73",
+      "imageManifestDigest": "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+      "imageConfigDigest": "sha256:7cc43f84321070a6a5cd472f5248d0f451d154628bc0148d452ac042ebaf793c",
+      "platform": "linux/amd64",
+      "provenanceSourceBinding": {
+        "upstreamCommit": "a84477e922d62b82387ab55134fafc9c0b5aaf64",
+        "layersentryCommit": "d40c54acb8a18b71475b154f14dd631460c94f89",
+        "dockerfileDirectory": "cmd/cloudstack-csi-sc-syncer",
+        "dependencyCount": 3,
+        "predicateType": "https://slsa.dev/provenance/v1",
+        "unsigned": true
+      },
+      "archivePath": "cloudstack-csi-sc-syncer.oci.tar",
+      "registryReference": null,
+      "attestations": {
+        "sbom": {
+          "digest": "sha256:c23d902a11526c2b8d08cd100db46f054a514986332a15d1502aa87a26109021",
+          "predicateType": "https://spdx.dev/Document"
+        },
+        "provenance": {
+          "digest": "sha256:fd37c069b12f05db900fff7a7abcf8ddd9996f71f346e1d0b433ec70dad8dacc",
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "sbomPackageCount": 67
+    }
+  },
+  "registryPublished": false,
+  "signed": false,
+  "liveVerified": false,
+  "productionCertified": false,
+  "arm64ImageBuilt": false
+}
