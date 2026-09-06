@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,6 +13,16 @@ import boot_qga_acceptance as boot
 
 
 class BootAcceptanceTests(unittest.TestCase):
+    def test_command_failure_preserves_bounded_causal_output(self):
+        failure = subprocess.CalledProcessError(1, ['virsh'], output='x' * 20000 + 'causal libvirt error')
+        with patch.object(boot.subprocess, 'check_output', side_effect=failure):
+            with self.assertRaises(RuntimeError) as caught:
+                boot.run(['virsh', 'create', '/owned/domain.xml'])
+        diagnostic = json.loads(str(caught.exception))
+        self.assertEqual(1, diagnostic['returnCode'])
+        self.assertEqual(16384, len(diagnostic['output']))
+        self.assertTrue(diagnostic['output'].endswith('causal libvirt error'))
+
     def record(self):
         identity = str(uuid.uuid4())
         work = boot.PREFIX / ('layersentry-cpuqc-' + identity)
