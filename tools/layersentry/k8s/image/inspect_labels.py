@@ -40,6 +40,10 @@ def inspect(image=None):
     try:
         if image is not None:
             handle.add_drive_opts(str(image.resolve(strict=True)), format='qcow2', readonly=True)
+        else:
+            # libguestfs requires at least one drive even for appliance capability probes.
+            # Its scratch API owns/removes this unformatted 1 MiB file on close.
+            handle.add_drive_scratch(1024 * 1024)
         handle.launch()
         report['guestfsVersion'] = handle.version()
         report['applianceSelinuxRelabelAvailable'] = bool(handle.feature_available(['selinuxrelabel']))

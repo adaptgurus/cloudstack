@@ -27,16 +27,16 @@ def public_key(text):
 def export():
     if os.geteuid() != 0:
         raise ValueError('root-owned exporter required')
-    descriptor = os.open(SOURCE, os.O_RDONLY | os.O_NOFOLLOW)
+    descriptor = os.open(SOURCE, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(descriptor, 'r') as source:
         info = os.fstat(source.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_nlink != 1 or info.st_mode & 0o022 or info.st_size > 4096:
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_gid != 0 or info.st_nlink != 1 or info.st_mode & 0o022 or info.st_size > 4096:
             raise ValueError('trusted root-owned public source required')
         data = public_key(source.read(4097))
     parent = DESTINATION.parent
     for directory in [parent, *parent.parents]:
         info = directory.lstat()
-        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_gid != 0 or info.st_mode & 0o022:
             raise ValueError('trusted export directory ancestry required')
     descriptor, name = tempfile.mkstemp(prefix='.ssh-public-', dir=parent)
     try:
