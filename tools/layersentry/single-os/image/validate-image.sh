@@ -32,7 +32,8 @@ if [[ "$mode" == "--sealed" ]]; then
     /var/lib/layersentryd/checkpoints \
     /var/lib/layersentryd/secrets \
     /var/lib/layersentryd/evidence \
-    /var/lib/layersentryd/backups; do
+    /var/lib/layersentryd/backups \
+    /var/lib/layersentryd/apps; do
     [[ ! -d "$dir" || -z "$(find "$dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]] || { echo "FAIL customer_state_present=$dir"; exit 1; }
   done
   [[ ! -s /etc/machine-id ]] || { echo "FAIL machine_id_not_sealed"; exit 1; }
