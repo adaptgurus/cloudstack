@@ -49,6 +49,20 @@ Before changing anything:
 
 ## Current checkpoint
 
+### PARTIAL / CI_VERIFIED — 2026-09-06 management bootstrap, provider artifacts and DR host prerequisites
+
+Combined source branch `codex/k8s-service-completion` preserves the current history and incorporates first-management native bootstrap, caller-visible qualified image discovery, exact provider artifact builders and the Rocky/RKE2 CPU image builder. Source through `7c4c866415b1163e78df827d8866e8e0fbed5838` passed Rocky container run `34050272795`: **126 Kubernetes and 27 DR tests**, no skips. The image/boot continuation through `e96e9b8d211d39bcde00704cda70b22f347d1f07` adds 11 passing source tests. These are bounded code/artifact results, not complete module acceptance.
+
+- Bootstrap uses native CloudStack VM/LB/firewall/temporary port-forwarding APIs, exact image attestations and QGA-pinned guest SSH. It escrows a fixed-endpoint management kubeconfig into a protected runtime file before closing owned forwarding. Reconcile never silently reopens SSH after escrow. Actual three-node formation and provider installation remain `NOT_TESTED`.
+- Caller-visible template discovery intersects the user's native CloudStack inventory with the server's qualified SHA-256 catalog. Empty/unqualified bindings offer no image; the UI cannot submit arbitrary merely-Ready templates.
+- CAPC/CCM hosted run `34050386205` passed at source `6162cc1e40`. CAPC artifact `9994484772` and CCM artifact `9994441961` contain verified OCI archives, SBOM/provenance and component manifests referencing the actual imported OCI index digests. Exact records are in `evidence/k8s/2026-09-06-capc-ccm-hosted-build-qualification.json`. Provider activation, public distribution/signing and live compatibility are unverified.
+- CPU image run `34050507635`, job `101533146612`, passed at `f05710874613c3a38c2704c28650a04f7bae2aef`. Artifact `9994542246`; ZIP SHA `b9a4abd099ebbd08a5585bc17d6bfad8b7e801c737e1b074f5ddb905201e8ce3`; standalone QCOW2 SHA `8ee4a820fd427abf3f00e0f55b0421c8cb9d5fa054cd84bc0aab62fc1fc4bf77`. Signed Rocky9.8 and 312 exact signed RPMs plus pinned RKE2/Canal inputs built offline; the output remains unsigned, runtime-unqualified and unregistered. RKE2 was not started in the image builder.
+- Strict read-only DR host run `34049342997` established Rocky9.8 and missing libvirt/QEMU/storage prerequisites. The bounded package/socket preparation runs `34049966021`, `34050379479` and completion `34050627512` installed signed libvirt `11.10.0-12.3.el9_8`, QEMU `10.1.0-17.el9_8.5` and xorriso `1.5.4-5.el9`. The missing read-only libvirt socket caused the initial provider-read failure; starting that exact socket restored native read-only access. Final evidence proves zero domains and preserved SELinux Enforcing/firewalld active. No guest, disk formatting, bridge/network or CloudStack API change occurred in this preparation.
+- Versioned boot runner `7e51ac2aa` binds the successful image and boot harness `e96e9b8d211d39bcde00704cda70b22f347d1f07`. Run `34051209929`, job `101535049972`, is pending actual networkless `.20` boot/QGA acceptance. Its passing owned transient guest may be retained for DR provider capture only; no production image or cluster gate is inferred.
+- DC console trust remains under exact-VM verification. A password was sent once only after a visually and programmatically bound empty Password prompt. Root shell was independently established from a tightly scoped prompt image; host-key proof is still pending. No DC SSH login or configuration change is claimed.
+
+Production readiness is not a defensible percentage yet. Native two-Zone NAS recovery, latest/older live libvirt recovery, restart/failback/fencing, management cluster/provider/CSI validation, client provisioning, DBaaS/APaaS lifecycle and GUI acceptance remain unfinished. Repository-wide RAT licensing failures remain unresolved; no license declaration or certification flag was fabricated to bypass them.
+
 ### PARTIAL / CI_VERIFIED — 2026-09-06 DC/DR and Kubernetes customer lifecycle continuation
 
 User reassigned completion of DC/DR replication and Kubernetes provisioning,

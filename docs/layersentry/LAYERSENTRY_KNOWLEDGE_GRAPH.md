@@ -602,3 +602,9 @@ in the progress ledger and runner evidence.
 ## Customer Kubernetes lifecycle inventory
 
 The existing E BFF now exposes project-authorized operation history from its durable journal and cluster/node-pool inventory from owned CAPI resources. Native CloudStack project authorization precedes reads; bounded native pagination and project namespace/label verification preserve tenancy. See `evidence/k8s/2026-09-06-customer-lifecycle-integration.md` for source evidence and remaining Rocky GUI/runtime gates.
+
+## First management Kubernetes bootstrap and qualified artifacts
+
+First-management RKE2 bootstrap uses native CloudStack VM, load-balancer, firewall and temporary port-forwarding resources. A trusted KVM host exposes the guest's public SSH identity through QGA; temporary scoped forwarding supplies reachability. Verified management credentials must be escrowed and usable before the journal permits transport cleanup. After cleanup, inspection uses the authenticated management API and cannot silently recreate SSH.
+
+The Rocky/RKE2 node-image builder connects a signed Rocky base, exact signed RPM closure and locked RKE2/Canal archives to an offline sealed QCOW2 candidate. A distinct owned networkless boot/QGA harness supplies runtime evidence while retaining an explicit boundary between unsigned candidate, qualified node template and production cluster. CAPC/CCM OCI builders bind downstream source, runtime content, SBOM/provenance and deployment manifests to the imported OCI index digest. Live provider/storage compatibility remains a separate gate. Current artifact identities and acceptance results belong in the progress ledger and evidence files.
