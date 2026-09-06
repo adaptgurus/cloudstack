@@ -49,6 +49,18 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE — 2026-09-06 CloudStack CSI 3.0.2 source qualification and idempotent expansion
+
+Exact implementation commit:
+
+`d249be7dba`
+
+Workstream E pinned exact upstream CloudStack CSI tag `cloudstack-csi-3.0.2`, commit `a84477e922d62b82387ab55134fafc9c0b5aaf64`, and added a digest-verified downstream overlay without changing Apache CloudStack core. Source review verified the configured project is installed as a cloudstack-go default option and explicitly passed on volume creation. The overlay makes expansion convergent at the CSI controller and CloudStack connector layers: observed capacity at or above the rounded request returns success with actual capacity and does not replay `resizeVolume`.
+
+Local source evidence: the exact patched upstream tree passed `go test ./...` using the module-declared Go `1.23.5` toolchain. Overlay preflight/apply/reapply returned `APPLICABLE`, `APPLIED`, then `ALREADY_APPLIED`; patch SHA-256 is `64853e92e82f4a6e5e298b9d114a1522aea21d04f84c02e1667079c54d4f9635`. All 26 Workstream E policy/evidence tests and 4 overlay tests passed. `e0_qualification.py` requires exact-source Rocky 9 evidence for project create/isolation, attach/detach, snapshot/restore, repeated expand/delete, CAPC PVC survival and NodeDiskSet replacement before it returns `LIVE_VERIFIED`. Design evidence: `docs/layersentry/evidence/k8s/2026-09-06-e0-cloudstack-csi-qualification.md`.
+
+This is not live CloudStack/Kubernetes qualification. `csiProjectScope=false`, `csiResizeIdempotent=false`, project PVC auto-grow remains disabled, and all destructive cases remain `NOT_TESTED`. Next Workstream E source gate: implement the LayerSentry BFF/controller execution contract with durable sagas, supported CloudStack/CAPI/Kubernetes adapters and fail-closed release gates; then implement E1 create/status/delete/scale and central Flux reconciliation.
+
 ### SOURCE_COMPLETE — 2026-09-06 E0 NodeDiskSet ownership/planning contract
 
 Exact implementation commit:

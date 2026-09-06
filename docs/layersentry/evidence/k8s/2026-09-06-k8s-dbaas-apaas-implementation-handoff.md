@@ -12,6 +12,10 @@
 
 ## 0. Latest continuation checkpoint
 
+CloudStack CSI source qualification continued at `d249be7dba`. The exact upstream `cloudstack-csi-3.0.2` commit is pinned with a SHA-verified overlay that makes repeated/already-satisfied expansion convergent and returns observed capacity. The exact patched upstream tree passed `go test ./...`; the overlay applied and reapplied idempotently. Source review confirmed the existing project option flow, but actual CloudStack `4.22.1.1` project isolation and lifecycle remain `NOT_TESTED`.
+
+The new `e0_qualification.py` harness requires project create/isolation, attach/detach, snapshot/restore, expansion/delete replay, CAPC PVC survival and NodeDiskSet destructive evidence on Rocky 9. It has not been populated by a live run, so CSI, CAPC and NodeDiskSet runtime gates remain false. Resume with the LayerSentry BFF/controller and E1 lifecycle; do not enable DBaaS mutations.
+
 The NodeDiskSet source contract is implemented at `efcd97056b`. It adds exact project/Site/disk-offering/node-pool/Machine/logical-disk ownership, durable CloudStack volume-ID bindings, complete tags, retain/delete, expand-only resize and explicit reattach/recreate replacement semantics. The planner rejects durable application/database data in favor of CSI/PVC ownership and fails closed for missing, ambiguous or cross-scope inventory. All 22 local Workstream E policy/planner tests passed.
 
 This does not enable direct disks in production. The release/UI evidence gate remains false because the BFF executor and destructive Rocky replacement/idempotency tests are `NOT_TESTED`. Design evidence is `docs/layersentry/evidence/k8s/2026-09-06-e0-nodediskset-design.md`. Resume with exact CloudStack CSI `3.0.2` project-scoped lifecycle and resize idempotency qualification, then the BFF/controller execution layer.
@@ -225,7 +229,7 @@ Lane B runtime reconciliation        PENDING
 6443 + 9345 endpoint runtime         BLOCKED/PENDING
 CAPC volume ownership fix            BLOCKED/PENDING
 NodeDiskSet source planner            SOURCE_COMPLETE; runtime NOT_TESTED
-CloudStack CSI qualification          PENDING
+CloudStack CSI source/resize overlay  SOURCE_COMPLETE; live project lifecycle NOT_TESTED
 Flux remote package lifecycle         PENDING runtime proof
 PostgreSQL DBaaS mutation              BLOCKED by E0
 MySQL/MongoDB DBaaS mutation           BLOCKED by E0/PostgreSQL-first rule
