@@ -10,6 +10,7 @@ import (
     "encoding/base64"
     "encoding/hex"
     "encoding/json"
+    "encoding/pem"
     "errors"
     "fmt"
     "io"
@@ -45,20 +46,22 @@ type Manager struct {
 }
 
 type TokenRecord struct {
-    ID          string     `json:"id"`
-    ServiceID   string     `json:"service_id"`
-    Provider    string     `json:"provider"`
-    ReleaseLine string     `json:"release_line"`
-    AllowedRole string     `json:"allowed_role"`
-    TokenSHA256 string     `json:"token_sha256"`
-    CreatedAt   time.Time  `json:"created_at"`
-    ExpiresAt   time.Time  `json:"expires_at"`
-    UsedAt      *time.Time `json:"used_at,omitempty"`
+    ID                 string     `json:"id"`
+    ServiceID          string     `json:"service_id"`
+    Provider           string     `json:"provider"`
+    ReleaseLine        string     `json:"release_line"`
+    AllowedRole        string     `json:"allowed_role"`
+    AllowedNodeAddress string     `json:"allowed_node_address"`
+    TokenSHA256        string     `json:"token_sha256"`
+    CreatedAt          time.Time  `json:"created_at"`
+    ExpiresAt          time.Time  `json:"expires_at"`
+    UsedAt             *time.Time `json:"used_at,omitempty"`
 }
 
 type IssuedToken struct {
-    Token     string    `json:"token"`
-    ExpiresAt time.Time `json:"expires_at"`
+    Token       string    `json:"token"`
+    PeerAddress string    `json:"peer_address"`
+    ExpiresAt   time.Time `json:"expires_at"`
 }
 
 type EnrollmentIntent struct {
@@ -99,11 +102,12 @@ func Open(root string) (*Manager, error) {
     return &Manager{root: root}, nil
 }
 
-func (m *Manager) Issue(serviceID, provider, releaseLine, allowedRole string, ttl time.Duration, now time.Time) (IssuedToken, error) {
+func (m *Manager) Issue(serviceID, provider, releaseLine, allowedRole, allowedNodeAddress string, ttl time.Duration, now time.Time) (IssuedToken, error) {
     if m == nil {
         return IssuedToken{}, errors.New("cluster enrollment manager unavailable")
     }
-    if !uuidRE.MatchString(serviceID) || provider == "" || releaseLine == "" || allowedRole == "" {
+    ip := net.ParseIP(allowedNodeAddress)
+    if !uuidRE.MatchString(serviceID) || provider == "" || releaseLine == "" || allowedRole == "" || ip == nil || ip.String() != allowedNodeAddress {
         return IssuedToken{}, errors.New("cluster enrollment token scope is invalid")
     }
     if ttl == 0 {
@@ -129,14 +133,15 @@ func (m *Manager) Issue(serviceID, provider, releaseLine, allowedRole string, tt
         now = now.UTC()
     }
     record := TokenRecord{
-        ID:          id,
-        ServiceID:   serviceID,
-        Provider:    provider,
-        ReleaseLine: releaseLine,
-        AllowedRole: allowedRole,
-        TokenSHA256: hex.EncodeToString(sum[:]),
-        CreatedAt:   now,
-        ExpiresAt:   now.Add(ttl),
+        ID:                 id,
+        ServiceID:          serviceID,
+        Provider:           provider,
+        ReleaseLine:        releaseLine,
+        AllowedRole:        allowedRole,
+        AllowedNodeAddress: allowedNodeAddress,
+        TokenSHA256:        hex.EncodeToString(sum[:]),
+        CreatedAt:          now,
+        ExpiresAt:          now.Add(ttl),
     }
     raw, err := json.MarshalIndent(record, "", "  ")
     if err != nil {
@@ -146,7 +151,7 @@ func (m *Manager) Issue(serviceID, provider, releaseLine, allowedRole string, tt
     if err = filesystem.AtomicWrite(path, append(raw, '\n'), 0600, m.root); err != nil {
         return IssuedToken{}, err
     }
-    return IssuedToken{Token: token, ExpiresAt: record.ExpiresAt}, nil
+    return IssuedToken{Token: token, PeerAddress: allowedNodeAddress, ExpiresAt: record.ExpiresAt}, nil
 }
 
 func (m *Manager) Consume(token []byte, intent EnrollmentIntent, now time.Time) error {
@@ -157,7 +162,8 @@ func (m *Manager) Consume(token []byte, intent EnrollmentIntent, now time.Time) 
     if err != nil {
         return err
     }
-    if !uuidRE.MatchString(intent.ServiceID) || intent.Provider == "" || intent.ReleaseLine == "" || intent.Role == "" {
+    nodeIP := net.ParseIP(intent.NodeAddress)
+    if !uuidRE.MatchString(intent.ServiceID) || intent.Provider == "" || intent.ReleaseLine == "" || intent.Role == "" || nodeIP == nil || nodeIP.String() != intent.NodeAddress {
         return errors.New("cluster enrollment intent invalid")
     }
     if now.IsZero() {
@@ -183,7 +189,7 @@ func (m *Manager) Consume(token []byte, intent EnrollmentIntent, now time.Time) 
     if err != nil || len(expected) != sha256.Size || subtle.ConstantTimeCompare(sum[:], expected) != 1 {
         return errors.New("cluster enrollment token rejected")
     }
-    if record.ServiceID != intent.ServiceID || record.Provider != intent.Provider || record.ReleaseLine != intent.ReleaseLine || record.AllowedRole != intent.Role {
+    if record.ServiceID != intent.ServiceID || record.Provider != intent.Provider || record.ReleaseLine != intent.ReleaseLine || record.AllowedRole != intent.Role || record.AllowedNodeAddress != intent.NodeAddress {
         return errors.New("cluster enrollment token scope mismatch")
     }
     used := now
@@ -254,7 +260,8 @@ func (m *Manager) read(id string) (TokenRecord, error) {
     if err = dec.Decode(&rec); err != nil {
         return TokenRecord{}, err
     }
-    if rec.ID != id || !uuidRE.MatchString(rec.ServiceID) || rec.TokenSHA256 == "" || rec.ExpiresAt.IsZero() {
+    ip := net.ParseIP(rec.AllowedNodeAddress)
+    if rec.ID != id || !uuidRE.MatchString(rec.ServiceID) || rec.TokenSHA256 == "" || rec.ExpiresAt.IsZero() || ip == nil || ip.String() != rec.AllowedNodeAddress {
         return TokenRecord{}, errors.New("cluster enrollment token record invalid")
     }
     return rec, nil
@@ -307,7 +314,7 @@ func (c *Client) Enroll(ctx context.Context, req model.ServiceRequest) (PeerInfo
 
     tlsConfig := &tls.Config{
         MinVersion:         tls.VersionTLS12,
-        InsecureSkipVerify: true, // Replaced by the mandatory SHA-256 leaf-certificate pin below.
+        InsecureSkipVerify: true, // Default PKI validation is replaced by the mandatory SHA-256 leaf-certificate pin below.
         VerifyConnection: func(cs tls.ConnectionState) error {
             if len(cs.PeerCertificates) < 1 {
                 return errors.New("cluster peer did not present a TLS certificate")
@@ -392,40 +399,12 @@ func CertificateFingerprint(certPath string) (string, error) {
     if err != nil {
         return "", err
     }
-    block, _ := decodePEMCertificate(raw)
-    if len(block) == 0 {
+    block, _ := pem.Decode(raw)
+    if block == nil || block.Type != "CERTIFICATE" || len(block.Bytes) == 0 {
         return "", errors.New("TLS certificate PEM invalid")
     }
-    sum := sha256.Sum256(block)
+    sum := sha256.Sum256(block.Bytes)
     return hex.EncodeToString(sum[:]), nil
-}
-
-func decodePEMCertificate(raw []byte) ([]byte, []byte) {
-    const begin = "-----BEGIN CERTIFICATE-----"
-    const end = "-----END CERTIFICATE-----"
-    text := string(raw)
-    start := strings.Index(text, begin)
-    if start < 0 {
-        return nil, nil
-    }
-    text = text[start+len(begin):]
-    finish := strings.Index(text, end)
-    if finish < 0 {
-        return nil, nil
-    }
-    encoded := strings.Map(func(r rune) rune {
-        switch r {
-        case ' ', '\t', '\r', '\n':
-            return -1
-        default:
-            return r
-        }
-    }, text[:finish])
-    der, err := base64.StdEncoding.DecodeString(encoded)
-    if err != nil {
-        return nil, nil
-    }
-    return der, raw
 }
 
 func tokenID(token []byte) (string, error) {
