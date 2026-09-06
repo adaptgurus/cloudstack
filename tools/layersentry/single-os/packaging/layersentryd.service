@@ -25,7 +25,7 @@ RestrictSUIDSGID=true
 RestrictRealtime=true
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-ReadWritePaths=/var/lib/layersentryd /run/layersentryd /etc/fstab /etc/nginx /var/lib/pgsql /var/log/nginx /etc/httpd /var/www/html /etc/tomcat /etc/my.cnf.d /var/lib/mysql /etc/redis /var/lib/redis /srv /data /opt/layersentry-data /var/log/layersentry-services
+ReadWritePaths=/var/lib/layersentryd /run/layersentryd /etc/fstab /etc/nginx /var/lib/pgsql /var/log/nginx /etc/httpd /var/www/html /etc/tomcat /etc/my.cnf.d /var/lib/mysql /etc/redis /var/lib/redis /etc/valkey /var/lib/valkey /var/log/valkey /srv /data /opt/layersentry-data /var/log/layersentry-services
 CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
 AmbientCapabilities=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
 
