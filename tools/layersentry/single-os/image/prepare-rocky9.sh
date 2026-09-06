@@ -8,7 +8,7 @@ management_cidr="${LAYERSENTRY_MANAGEMENT_CIDR:?set LAYERSENTRY_MANAGEMENT_CIDR}
 agent_rpm="${LAYERSENTRY_AGENT_RPM:?set LAYERSENTRY_AGENT_RPM to the prebuilt LayerSentry RPM}"
 [[ -f "$agent_rpm" && ! -L "$agent_rpm" ]] || { echo "LayerSentry RPM must be a regular local file" >&2; exit 1; }
 
-dnf -y install ca-certificates firewalld audit policycoreutils openssh-server chrony python3 dnf-plugins-core xfsprogs e2fsprogs util-linux
+dnf -y install ca-certificates firewalld audit policycoreutils openssh-server chrony python3 dnf-plugins-core xfsprogs e2fsprogs util-linux iproute
 "$ROOT/rocky9-hardening" apply --management-cidr "$management_cidr"
 
 rpmkeys --checksig "$agent_rpm" | grep -Eiq 'pgp|rsa|signature' || { echo "LayerSentry RPM signature verification failed" >&2; exit 1; }
@@ -23,8 +23,9 @@ if [[ -n "${LAYERSENTRY_PGDG_REPO_RPM:-}" ]]; then
   dnf -y install "$repo_rpm"
 fi
 
+systemd-sysusers /usr/lib/sysusers.d/layersentryd.conf
 systemd-tmpfiles --create /usr/lib/tmpfiles.d/layersentryd.conf
 systemctl daemon-reload
-systemctl enable layersentry-firstboot.service layersentryd.service layersentry-maintenance.timer
+systemctl enable layersentry-privileged.service layersentry-firstboot.service layersentryd.service layersentry-maintenance.timer
 "$ROOT/image/validate-image.sh" --pre-seal
 printf 'PREPARE_OK rocky=9 management_cidr=%s agent_rpm=%s\n' "$management_cidr" "$(basename "$agent_rpm")"
