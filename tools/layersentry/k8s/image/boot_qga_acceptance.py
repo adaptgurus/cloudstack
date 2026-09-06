@@ -20,7 +20,19 @@ URI = 'qemu:///system'
 
 
 def run(argv, timeout=60):
-    return subprocess.check_output(argv, timeout=timeout, text=True, stderr=subprocess.STDOUT)
+    try:
+        return subprocess.check_output(argv, timeout=timeout, text=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as error:
+        # These fixed image/libvirt commands carry no credentials. Preserve the
+        # bounded causal diagnostic rather than only their numeric exit status.
+        raise RuntimeError(json.dumps({'command': Path(argv[0]).name, 'returnCode': error.returncode,
+                                       'output': (error.output or '')[-16384:]})) from error
+    except subprocess.TimeoutExpired as error:
+        output = error.output or ''
+        if isinstance(output, bytes):
+            output = output.decode(errors='replace')
+        raise TimeoutError(json.dumps({'command': Path(argv[0]).name, 'timeoutSeconds': timeout,
+                                       'output': output[-16384:]})) from error
 
 
 def virsh(*args, timeout=60):
@@ -264,7 +276,27 @@ def boot(args):
                 (args.evidence / 'console.log').write_bytes(stream.read())
         (args.evidence / 'ownership.json').write_text(ownership.read_text())
         if not (passed and args.retain_for_dr_qualification):
-            cleanup(ownership)
+            try:
+                cleanup(ownership)
+            except BaseException as error:
+                (args.evidence / 'cleanup.json').write_text(json.dumps({
+                    'status': 'UNKNOWN', 'domainUuid': identity, 'ownershipManifest': str(ownership),
+                    'failure': str(error)}, indent=2) + '\n')
+                if passed:
+                    (args.evidence / 'result.json').write_text(json.dumps({
+                        'status': 'PARTIAL', 'bootAndQgaPassed': True, 'cleanupStatus': 'UNKNOWN',
+                        'productionQualified': False}, indent=2) + '\n')
+                    raise
+                # Preserve the original boot error; the separate cleanup receipt
+                # identifies any resources requiring explicit reconciliation.
+            else:
+                (args.evidence / 'cleanup.json').write_text(json.dumps({
+                    'status': 'LIVE_VERIFIED', 'domainUuid': identity,
+                    'ownedDomainAbsent': True, 'ownedRuntimeWorkspaceRemoved': True}, indent=2) + '\n')
+        else:
+            (args.evidence / 'cleanup.json').write_text(json.dumps({
+                'status': 'PENDING', 'reason': 'EXPLICITLY_RETAINED_FOR_DR_QUALIFICATION',
+                'domainUuid': identity, 'ownershipManifest': str(ownership)}, indent=2) + '\n')
 
 
 def main():
