@@ -25,9 +25,20 @@ docker buildx build "${args[@]}" --attest "type=sbom,generator=$scanner" --prove
 docker buildx build "${args[@]}" --provenance=false --load "$source_dir" 2>&1 | tee "$evidence_dir/$component-load.log"
 docker image inspect "$tag" > "$evidence_dir/$component-inspect.json"
 if [ "$component" = capc ]; then smoke=--help; else smoke=--version; fi
+smoke_status=0
 timeout 30 docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
-  --memory 512m --pids-limit 64 "$tag" "$smoke" > "$evidence_dir/$component-smoke.txt" 2>&1
+  --memory 512m --pids-limit 64 "$tag" "$smoke" > "$evidence_dir/$component-smoke.txt" 2>&1 || smoke_status=$?
 test -s "$evidence_dir/$component-smoke.txt"
+if [ "$component" = capc ]; then
+  # Exact upstream pflag ExitOnError returns 2 for --help; require its expected
+  # usage and provider flags so a crash/timeout cannot masquerade as smoke pass.
+  test "$smoke_status" = 2
+  grep -Fx 'Usage of /manager:' "$evidence_dir/$component-smoke.txt"
+  grep -Fx 'pflag: help requested' "$evidence_dir/$component-smoke.txt"
+  grep -F -- '--cloudstackmachine-concurrency' "$evidence_dir/$component-smoke.txt"
+else
+  test "$smoke_status" = 0
+fi
 if [ "$component" = cloudstack-ccm ]; then
   grep -F 'v1.2.0-layersentry.k8s1.36' "$evidence_dir/$component-smoke.txt"
 fi
