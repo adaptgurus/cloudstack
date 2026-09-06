@@ -16,6 +16,7 @@
 // under the License.
 
 import { vueProps } from '@/vue-app'
+import { getLayersentryFeatureState, LAYERSENTRY_FEATURES } from './layersentryCapabilities'
 import { isLayersentryKvmProfile } from './productProfile'
 
 const KVM_SCOPED_ROUTES = new Set(['vm', 'host', 'cluster', 'template'])
@@ -43,6 +44,12 @@ const DOMAIN_ADMIN_HIDDEN_SECTIONS = new Set([
   'customaction'
 ])
 
+const FEATURE_ROUTES = Object.freeze({
+  backup: LAYERSENTRY_FEATURES.BACKUP,
+  backupschedule: LAYERSENTRY_FEATURES.BACKUP,
+  buckets: LAYERSENTRY_FEATURES.BUCKETS
+})
+
 export function withLayersentryKvmParams (routeName, params, config = vueProps.$config) {
   if (!isLayersentryKvmProfile(config) || !KVM_SCOPED_ROUTES.has(routeName)) {
     return params
@@ -68,14 +75,38 @@ export function shouldHideLayersentrySection (sectionName, userInfo = {}, config
   return USER_HIDDEN_SECTIONS.has(sectionName)
 }
 
-export function applyLayersentryNavigation (routes = [], userInfo = {}, config = vueProps.$config) {
+export function shouldHideLayersentryFeatureRoute (routeName, apis = {}, config = vueProps.$config) {
+  if (!isLayersentryKvmProfile(config)) return false
+  const feature = FEATURE_ROUTES[routeName]
+  if (!feature) return false
+  return !getLayersentryFeatureState(feature, apis, config).visible
+}
+
+function applyFeatureRouteVisibility (route, apis, config) {
+  if (!route) return route
+  const children = Array.isArray(route.children)
+    ? route.children.map(child => applyFeatureRouteVisibility(child, apis, config))
+    : route.children
+  const normalized = children === route.children ? route : { ...route, children }
+  if (!route.name || !shouldHideLayersentryFeatureRoute(route.name, apis, config)) {
+    return normalized
+  }
+  return {
+    ...normalized,
+    hidden: true
+  }
+}
+
+export function applyLayersentryNavigation (routes = [], userInfo = {}, config = vueProps.$config, apis = {}) {
   if (!isLayersentryKvmProfile(config)) return routes
-  return routes.map(route => {
+  return routes.map(originalRoute => {
+    let route = applyFeatureRouteVisibility(originalRoute, apis, config)
     if (!route || !route.name) return route
     if (!shouldHideLayersentrySection(route.name, userInfo, config)) return route
-    return {
+    route = {
       ...route,
       hidden: true
     }
+    return route
   })
 }

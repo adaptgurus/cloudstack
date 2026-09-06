@@ -276,7 +276,7 @@ export function asyncRouterMap () {
     component: shallowRef(BasicLayout),
     meta: { icon: 'HomeOutlined' },
     redirect: '/dashboard',
-    children: applyLayersentryNavigation(primaryChildren, store.getters.userInfo, vueProps.$config)
+    children: applyLayersentryNavigation(primaryChildren, store.getters.userInfo, vueProps.$config, store.getters.apis)
   },
   {
     path: '/:catchAll(.*)', redirect: '/exception/404', hidden: true

@@ -17,6 +17,7 @@
 
 import {
   applyLayersentryNavigation,
+  shouldHideLayersentryFeatureRoute,
   shouldHideLayersentrySection,
   withLayersentryKvmParams
 } from '@/config/layersentryNavigation'
@@ -58,13 +59,51 @@ describe('LayerSentry navigation presentation', () => {
     expect(shouldHideLayersentrySection('config', { roletype: 'Admin' }, profile)).toBe(false)
   })
 
-  it('marks menu sections hidden without deleting direct routes or children', () => {
-    const child = { name: 'host', path: '/host' }
+  it('keeps Backup and Bucket routes hidden until explicit provider readiness exists', () => {
+    const config = {
+      ...profile,
+      layersentry: {
+        features: {
+          backup: { enabled: false, ready: false },
+          buckets: { enabled: false, ready: false }
+        }
+      }
+    }
+    expect(shouldHideLayersentryFeatureRoute('backup', { listBackupOfferings: {}, listBackups: {} }, config)).toBe(true)
+    expect(shouldHideLayersentryFeatureRoute('backupschedule', { listBackupOfferings: {}, listBackupSchedule: {} }, config)).toBe(true)
+    expect(shouldHideLayersentryFeatureRoute('buckets', { listBuckets: {} }, config)).toBe(true)
+  })
+
+  it('shows provider routes only when policy is ready and the prerequisite API exists', () => {
+    const config = {
+      ...profile,
+      layersentry: {
+        features: {
+          backup: { enabled: true, ready: true },
+          buckets: { enabled: true, ready: true }
+        }
+      }
+    }
+    expect(shouldHideLayersentryFeatureRoute('backup', { listBackupOfferings: {}, listBackups: {} }, config)).toBe(false)
+    expect(shouldHideLayersentryFeatureRoute('backup', { listBackups: {} }, config)).toBe(true)
+    expect(shouldHideLayersentryFeatureRoute('buckets', { listBuckets: {} }, config)).toBe(false)
+  })
+
+  it('marks menu sections and provider children hidden without deleting their direct routes', () => {
+    const backup = { name: 'backup', path: '/backup', children: [{ path: '/backup/:id' }] }
+    const config = {
+      ...profile,
+      layersentry: { features: { backup: { enabled: false, ready: false } } }
+    }
     const routes = applyLayersentryNavigation([
-      { name: 'infra', path: '/infra', children: [child] },
+      { name: 'infra', path: '/infra', children: [{ name: 'host', path: '/host' }] },
+      { name: 'storage', path: '/storage', children: [backup] },
       { name: 'compute', path: '/compute' }
-    ], { roletype: 'User' }, profile)
-    expect(routes[0]).toEqual({ name: 'infra', path: '/infra', children: [child], hidden: true })
-    expect(routes[1]).toEqual({ name: 'compute', path: '/compute' })
+    ], { roletype: 'User' }, config, { listBackups: {}, listBackupOfferings: {} })
+    expect(routes[0].hidden).toBe(true)
+    expect(routes[0].children[0]).toEqual({ name: 'host', path: '/host' })
+    expect(routes[1].hidden).not.toBe(true)
+    expect(routes[1].children[0]).toEqual({ ...backup, hidden: true })
+    expect(routes[2]).toEqual({ name: 'compute', path: '/compute' })
   })
 })
