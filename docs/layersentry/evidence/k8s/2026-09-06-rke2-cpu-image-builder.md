@@ -1,6 +1,6 @@
 # First-management RKE2 CPU image build decision
 
-Status: `DESIGN_DEFINED`; actual Rocky boot, join and storage qualification remains `NOT_TESTED`. Scope: versioned amd64 CPU QCOW2 for the first dedicated management cluster. No CloudStack core or lab mutation.
+Status: `CI_VERIFIED` for the offline image build; actual Rocky boot, join and storage qualification remains `NOT_TESTED`. Scope: versioned amd64 CPU QCOW2 for the first dedicated management cluster. No CloudStack core or lab mutation.
 
 ## Research and decision
 
@@ -39,3 +39,11 @@ Run `34049274366`, job `101529832125`, at `8faca33a0938dc252d3fe2602050d54d8a9f9
 ## Fourth hosted build: evidence extraction argument correction
 
 Run `34049850090`, job `101531358066`, at `b2d1aa30222d4f2c842924d0e9f48873d95c6eb5` completed offline customization, credential/identity sealing, SELinux relabel and `qemu-img check` with no errors. The resulting build copy occupied 2,674,393,088 bytes. It then failed inventory extraction because [virt-cat documents an optional `--format=qcow2` argument](https://libguestfs.org/virt-cat.1.html); the separated `qcow2` token was treated as an additional guest filename. Corrected both libguestfs invocations to explicit equals syntax. The failed candidate was discarded, with logs retained in artifact `9994346155`; this is not a published or qualified image.
+
+## Successful hosted build and runtime handoff
+
+[Run 34050507635](https://github.com/adaptgurus/cloudstack/actions/runs/34050507635), job `101533146612`, at source `f05710874613c3a38c2704c28650a04f7bae2aef` passed all 11 source tests, locked input materialization, signed Rocky checksum/RPM verification, offline customization, SELinux relabel, image integrity check and guest inventory/version extraction. Artifact `9994542246` contains the unsigned QCOW2 and build evidence. Exact hashes and qualification flags are recorded in `2026-09-06-rke2-cpu-image-build.json`. The image is 2,673,999,872 bytes, SHA-256 `8ee4a820fd427abf3f00e0f55b0421c8cb9d5fa054cd84bc0aab62fc1fc4bf77`. GitHub artifact retention is 14 days.
+
+The runtime owner accepted handoff and dispatched Cozystack run `34051209929` to independently verify archive/image hashes before bounded networkless boot/QGA acceptance. A competing local download was stopped at the owner's request; no independent download verification or live boot success is claimed here. Harness-only commit `fb2ec21623fa4429f3353f7f194e0057466843bf` corrects the post-boot empty authorized_keys expectation using the exact locked cloud-init RPM source: cc_ssh always writes an empty authorized_keys file when no keys are supplied. The sealed image still contains no authorized key file.
+
+The runtime harness never starts RKE2 or registers a template. It defaults to cleanup and can explicitly retain only its exact UUID-owned networkless guest for a separate provider replication test. Actual boot, SSH connectivity, join, storage, signatures and production qualification remain separate gates.
