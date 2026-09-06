@@ -38,6 +38,9 @@ class BootAcceptanceTests(unittest.TestCase):
             self.assertEqual(fresh, boot.guest_checks(identity))
         execution = [call.args[1]['arguments']['path'] for call in agent.call_args_list if call.args[1]['execute'] == 'guest-exec']
         self.assertEqual(['/usr/bin/python3', '/usr/bin/python3'], execution)
+        for call in agent.call_args_list:
+            if call.args[1]['execute'] == 'guest-exec':
+                compile(call.args[1]['arguments']['arg'][1], '<qga-reader>', 'exec')
 
     def record(self):
         identity = str(uuid.uuid4())

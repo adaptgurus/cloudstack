@@ -149,7 +149,10 @@ def state(unit,verb):
 root=pathlib.Path('/')
 osdata=dict(line.split('=',1) for line in (root/'etc/os-release').read_text().splitlines() if '=' in line)
 result={'fixtureId':os.environ['LAYERSENTRY_FIXTURE_ID'],'os':osdata['ID'].strip('"'),'osVersion':osdata['VERSION_ID'].strip('"'),
- 'selinux':cmd('getenforce'),'rke2Version':cmd('/usr/local/bin/rke2','--version'),
+ 'selinux':cmd('getenforce'),
+ 'qgaSelinuxContext':cmd('ps','-C','qemu-ga','-o','label='),
+ 'qgaPolicyBooleans':{name:cmd('getsebool',name) for name in ['virt_qemu_ga_run_unconfined','virt_qemu_ga_manage_ssh','virt_qemu_ga_read_nonsecurity_files']},
+ 'rke2Version':cmd('/usr/local/bin/rke2','--version'),
  'services':{u:{'active':state(u,'is-active'),'enabled':state(u,'is-enabled')} for u in ['qemu-guest-agent','sshd','firewalld','rke2-server','rke2-agent']},
  'machineIdGenerated':len((root/'etc/machine-id').read_text().strip())==32,
  'sshHostEd25519PublicKey':(root/'etc/ssh/ssh_host_ed25519_key.pub').read_text().strip(),
@@ -162,6 +165,8 @@ result={'fixtureId':os.environ['LAYERSENTRY_FIXTURE_ID'],'os':osdata['ID'].strip
  'inputLockSha256':hashlib.sha256((root/'usr/share/layersentry/node-image/inputs.lock.json').read_bytes()).hexdigest()}
 assert result['os']=='rocky' and result['osVersion']=='9.8'
 assert result['selinux']=='Enforcing'
+assert result['qgaSelinuxContext'].split(':')[2]=='virt_qemu_ga_t'
+for name,value in result['qgaPolicyBooleans'].items(): assert value==name+' --> off',name
 assert 'v1.36.4+rke2r1' in result['rke2Version']
 for u in ['qemu-guest-agent','sshd','firewalld']: assert result['services'][u]['active']=='active',u
 for u in ['rke2-server','rke2-agent']: assert result['services'][u]=={'active':'inactive','enabled':'disabled'},u
