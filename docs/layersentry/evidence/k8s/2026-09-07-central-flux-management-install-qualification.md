@@ -7,17 +7,34 @@ Hyper-V, KVM guest or management Kubernetes runtime was mutated by this task.
 Source: `codex/k8s-central-flux-install`, based on package commit
 `a37a1f6fa561b62e7bea97a29bb6d5792f677dc2`. Implementation
 `fcc9e9c6bd755711a90adf1d820ef932c6bb30d6`; per-object intent hardening
-`42812d0cb515a0c3db794cc959d1b96392fe79bd`. Only the management bundle/installer,
+`42812d0cb515a0c3db794cc959d1b96392fe79bd`; final execution-field correction
+`b9b39935b3c440bbbdaa744efcc79dbd40ad1b17`. Only the management bundle/installer,
 its source tests and build-only workflow changed. Native CloudStack core, bootstrap
 guest transport, image sealing, package catalog and production gates were untouched.
 
-[Final hosted run 34057556047](https://github.com/adaptgurus/cloudstack/actions/runs/34057556047)
+[Nonce-hardening hosted run 34057556047](https://github.com/adaptgurus/cloudstack/actions/runs/34057556047)
 passed **177 source tests without skips**, exact native generation of all four CAPI
 providers and the minimal Flux export, and two strict native-local import/reimport
 passes of all **11 images** in the exact pinned RKE2 containerd runtime. A legacy
 transfer-API diagnostic is recorded separately and is not a passing gate.
 The preceding [run 34057107223](https://github.com/adaptgurus/cloudstack/actions/runs/34057107223)
 passed 176 source tests and the same artifact checks.
+
+[Final hosted run 34058039241](https://github.com/adaptgurus/cloudstack/actions/runs/34058039241)
+passed **180 source tests without skips** and the same native generation,
+attestation and eleven-image import/reimport gates at the final execution-field
+correction. It reports the same bundle manifest digest. Artifact 9996595533 expires
+2026-09-20T20:28:56Z; its duplicate bundle was not downloaded again.
+
+Root review identified additive execution drift: desired-subset matching accepted
+extra command/envFrom/lifecycle/workingDir and template inputs. The final observer
+compares execution templates after narrowly audited Kubernetes 1.36.4 default and
+conversion normalization. Negative tests cover these fields, routing/credential
+inputs and template annotation injection. Positive tests cover native defaults,
+CPU quantity canonicalization, field selectors, probes and ServiceAccount alias.
+Native projected ServiceAccount volumes are added only to Pods, not Deployment
+templates; the observer reads Deployments and does not reject actual Pod admission.
+Exact upstream source references and the boundary are recorded in DESIGN.md.
 
 The complete [downloaded artifact 9996325314](https://github.com/adaptgurus/cloudstack/actions/runs/34057107223/artifacts/9996325314)
 was independently extracted with executable modes preserved. Its retained tar,
@@ -30,8 +47,8 @@ expiry. This evidence does not claim publisher-signature verification.
 - Bundle manifest SHA-256: `a9e19cc5e01178f7c08966dee0e38ce49b4754b26699e3987a6706fd82215649`.
 - Reviewed central Flux manifest SHA-256: `859af77c8c34f59a157e0a67c7591ea86fab50d04083e7e55d5681119245484f`.
 
-The final hosted run reports the identical bundle manifest digest after source-only
-nonce hardening. Its second artifact 9996458382 was not downloaded redundantly;
+Both hardening runs report the identical bundle manifest digest after source-only
+changes. Their additional artifacts were not downloaded redundantly;
 the already fully verified identical bundle remains usable with the final installer.
 The JSON evidence records both run/source/artifact bindings without conflating them.
 

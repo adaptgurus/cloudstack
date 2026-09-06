@@ -139,7 +139,7 @@
       }
     }
   },
-  "finalInstallerSourceCommit": "42812d0cb515a0c3db794cc959d1b96392fe79bd",
+  "finalInstallerSourceCommit": "b9b39935b3c440bbbdaa744efcc79dbd40ad1b17",
   "artifact": {
     "id": 9996325314,
     "name": "layersentry-management-provider-bundle-fcc9e9c6bd755711a90adf1d820ef932c6bb30d6-1",
@@ -172,5 +172,19 @@
     "Real approved signed package/profile catalog and workload kubeconfig/operator reconciliation",
     "Stateful E0 storage, backup/restore, node-loss and quorum acceptance",
     "Release signatures and complete CloudStack GUI acceptance on authorized environment"
-  ]
+  ],
+  "executionRequalification": {
+    "runId": 34058039241,
+    "url": "https://github.com/adaptgurus/cloudstack/actions/runs/34058039241",
+    "sourceCommit": "b9b39935b3c440bbbdaa744efcc79dbd40ad1b17",
+    "conclusion": "success",
+    "tests": 180,
+    "testSkips": 0,
+    "bundleManifestSha256FromJobLog": "a9e19cc5e01178f7c08966dee0e38ce49b4754b26699e3987a6706fd82215649",
+    "artifactId": 9996595533,
+    "artifactZipDigestReportedByGitHub": "sha256:266adb651c99b3921cddee94825fcc60ce6a7b0a4874a41a990e6623818c9c22",
+    "artifactExpiresAt": "2026-09-20T20:28:56Z",
+    "additionalArtifactDownloaded": false,
+    "note": "Execution-field drift correction and exact native default handling do not alter the bundled manifest, executables or OCI bytes. Native generation/import/reimport requalified with the identical bundle identity; the first fully downloaded verified artifact remains usable."
+  }
 }
