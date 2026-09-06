@@ -13,21 +13,28 @@ Source5:        layersentry-maintenance.timer
 Source6:        tmpfiles.conf
 Source7:        sysusers.conf
 Source8:        layersentry-privileged.service
+Source9:        configure-from-file.sh
 
+BuildRequires:  systemd-rpm-macros
 Requires:       ca-certificates
 Requires:       firewalld
 Requires:       policycoreutils
+Requires:       policycoreutils-python-utils
 Requires:       util-linux
 Requires:       xfsprogs
 Requires:       e2fsprogs
 Requires:       dnf-plugins-core
+Requires:       lvm2
+Requires:       NetworkManager
 Requires:       systemd
 
 %description
 LayerSentry guest lifecycle agent for installing and managing supported
 VM-native database and application services inside a hardened Rocky Linux 9 VM.
 The HTTPS/API daemon uses a dedicated account; a separately sandboxed root
-helper performs only allowlisted privileged provider actions.
+helper performs only typed allowlisted provider, LVM, data-label and VIP actions.
+Database/application packages and Keepalived are installed on demand from the
+reviewed immutable plan rather than baked into the reusable image.
 
 %prep
 
@@ -36,6 +43,7 @@ helper performs only allowlisted privileged provider actions.
 %install
 install -Dpm0755 %{SOURCE0} %{buildroot}%{_bindir}/layersentryd
 install -Dpm0755 %{SOURCE1} %{buildroot}%{_bindir}/layersentryctl
+install -Dpm0755 %{SOURCE9} %{buildroot}%{_bindir}/layersentry-configure-from-file
 install -Dpm0644 %{SOURCE2} %{buildroot}%{_unitdir}/layersentryd.service
 install -Dpm0644 %{SOURCE3} %{buildroot}%{_unitdir}/layersentry-firstboot.service
 install -Dpm0644 %{SOURCE4} %{buildroot}%{_unitdir}/layersentry-maintenance.service
@@ -58,6 +66,7 @@ systemd-tmpfiles --create %{_tmpfilesdir}/layersentryd.conf >/dev/null 2>&1 || :
 %files
 %{_bindir}/layersentryd
 %{_bindir}/layersentryctl
+%{_bindir}/layersentry-configure-from-file
 %{_unitdir}/layersentry-privileged.service
 %{_unitdir}/layersentryd.service
 %{_unitdir}/layersentry-firstboot.service
