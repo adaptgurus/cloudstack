@@ -17,6 +17,7 @@
 
 import {
   getLayersentryFeatureState,
+  hasApi,
   isLayersentryFeatureVisible,
   LAYERSENTRY_FEATURES
 } from '@/config/layersentryCapabilities'
@@ -102,8 +103,39 @@ describe('LayerSentry GUI capability gates', () => {
     )).toBe(true)
   })
 
+  it('applies provider policy when LayerSentry dashboard code asks whether a gated API is usable', () => {
+    const apis = {
+      listBackupOfferings: {},
+      listBuckets: {},
+      listVirtualMachines: {}
+    }
+    expect(hasApi(apis, 'listBackupOfferings', profile)).toBe(false)
+    expect(hasApi(apis, 'listBuckets', profile)).toBe(false)
+    expect(hasApi(apis, 'listVirtualMachines', profile)).toBe(true)
+
+    const ready = {
+      ...profile,
+      layersentry: {
+        features: {
+          backup: { enabled: true, ready: true },
+          buckets: { enabled: true, ready: true }
+        }
+      }
+    }
+    expect(hasApi(apis, 'listBackupOfferings', ready)).toBe(true)
+    expect(hasApi(apis, 'listBuckets', ready)).toBe(true)
+  })
+
+  it('does not apply LayerSentry provider policy to upstream profiles', () => {
+    expect(hasApi(
+      { listBackupOfferings: {} },
+      'listBackupOfferings',
+      { productProfile: 'upstream' }
+    )).toBe(true)
+  })
+
   it('treats non-GUI product modules as unknown in this workstream', () => {
-    const state = getLayersentryFeatureState('managedKubernetes', {}, profile)
+    const state = getLayersentryFeatureState('externalModule', {}, profile)
     expect(state.visible).toBe(false)
     expect(state.reason).toBe('unknown-feature')
   })

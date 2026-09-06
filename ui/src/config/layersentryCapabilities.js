@@ -50,12 +50,33 @@ const FEATURE_DEFINITIONS = Object.freeze({
   }
 })
 
-export function hasApi (apis = {}, api) {
+const FEATURE_API_MAP = Object.freeze({
+  listBuckets: LAYERSENTRY_FEATURES.BUCKETS,
+  createBucket: LAYERSENTRY_FEATURES.BUCKETS,
+  updateBucket: LAYERSENTRY_FEATURES.BUCKETS,
+  deleteBucket: LAYERSENTRY_FEATURES.BUCKETS,
+  listBackupOfferings: LAYERSENTRY_FEATURES.BACKUP,
+  listBackups: LAYERSENTRY_FEATURES.BACKUP,
+  listBackupSchedule: LAYERSENTRY_FEATURES.BACKUP,
+  createBackup: LAYERSENTRY_FEATURES.BACKUP,
+  createBackupSchedule: LAYERSENTRY_FEATURES.BACKUP,
+  restoreBackup: LAYERSENTRY_FEATURES.BACKUP,
+  assignVirtualMachineToBackupOffering: LAYERSENTRY_FEATURES.BACKUP
+})
+
+function rawHasApi (apis = {}, api) {
   return Boolean(api) && Object.prototype.hasOwnProperty.call(apis || {}, api)
 }
 
+export function hasApi (apis = {}, api, config = vueProps.$config) {
+  if (!rawHasApi(apis, api)) return false
+  const gatedFeature = FEATURE_API_MAP[api]
+  if (!gatedFeature || !isLayersentryKvmProfile(config)) return true
+  return getLayersentryFeatureState(gatedFeature, apis, config).visible
+}
+
 export function hasAllApis (apis = {}, requiredApis = []) {
-  return requiredApis.every(api => hasApi(apis, api))
+  return requiredApis.every(api => rawHasApi(apis, api))
 }
 
 function normalisePolicy (config, feature, definition) {
@@ -121,7 +142,7 @@ export function getLayersentryFeatureState (feature, apis = {}, config = vueProp
   const requiredApis = Array.isArray(policy.requiredApis)
     ? policy.requiredApis
     : definition.requiredApis
-  const missingApis = requiredApis.filter(api => !hasApi(apis, api))
+  const missingApis = requiredApis.filter(api => !rawHasApi(apis, api))
   if (missingApis.length > 0) {
     return {
       feature,
