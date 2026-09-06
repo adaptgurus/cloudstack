@@ -1,0 +1,106 @@
+[
+  {
+    "host": "10.10.10.20",
+    "browser": "chrome",
+    "capturedAt": "2026-09-06T16:27:26.897Z",
+    "status": "READ_ONLY_GUI_BASELINE_PASS",
+    "pages": [
+      {
+        "route": "dashboard",
+        "status": "PASS"
+      },
+      {
+        "route": "vm",
+        "status": "PASS"
+      },
+      {
+        "route": "volume",
+        "status": "PASS"
+      },
+      {
+        "route": "guestnetwork",
+        "status": "PASS"
+      },
+      {
+        "route": "template",
+        "status": "PASS"
+      },
+      {
+        "route": "event",
+        "status": "PASS"
+      }
+    ],
+    "blockedMutations": [],
+    "failedReads": [
+      {
+        "command": "forgotPassword",
+        "status": 401
+      },
+      {
+        "command": "listIdps",
+        "status": 401
+      },
+      {
+        "command": "logout",
+        "status": 431
+      }
+    ],
+    "browserVersion": "152.0.7977.83",
+    "rejectedRequests": [],
+    "browserErrors": [],
+    "indexSha256": "c05fa4f04d9a64cb7ad33ec18ebec6dfdc3b7d78714673ece021cddcee58f724",
+    "productionReadiness": "NOT_VERIFIED"
+  },
+  {
+    "host": "10.10.10.20",
+    "browser": "firefox",
+    "capturedAt": "2026-09-06T16:27:35.032Z",
+    "status": "READ_ONLY_GUI_BASELINE_PASS",
+    "pages": [
+      {
+        "route": "dashboard",
+        "status": "PASS"
+      },
+      {
+        "route": "vm",
+        "status": "PASS"
+      },
+      {
+        "route": "volume",
+        "status": "PASS"
+      },
+      {
+        "route": "guestnetwork",
+        "status": "PASS"
+      },
+      {
+        "route": "template",
+        "status": "PASS"
+      },
+      {
+        "route": "event",
+        "status": "PASS"
+      }
+    ],
+    "blockedMutations": [],
+    "failedReads": [
+      {
+        "command": "listIdps",
+        "status": 401
+      },
+      {
+        "command": "forgotPassword",
+        "status": 401
+      },
+      {
+        "command": "logout",
+        "status": 431
+      }
+    ],
+    "browserVersion": "155.0",
+    "rejectedRequests": [],
+    "browserErrors": [],
+    "indexSha256": "c05fa4f04d9a64cb7ad33ec18ebec6dfdc3b7d78714673ece021cddcee58f724",
+    "productionReadiness": "NOT_VERIFIED"
+  }
+]
