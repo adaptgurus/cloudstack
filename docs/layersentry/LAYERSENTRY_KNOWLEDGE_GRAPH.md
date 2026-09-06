@@ -590,3 +590,7 @@ The architecture decision, threat boundary, configuration contract, recovery
 procedure and acceptance gates are in
 `LAYERSENTRY_ROCKY9_INSTALLER_AND_DB_BACKUPS.md`. Current runtime results belong
 in the progress ledger and runner evidence.
+
+## Customer Kubernetes lifecycle inventory
+
+The existing E BFF now exposes project-authorized operation history from its durable journal and cluster/node-pool inventory from owned CAPI resources. Native CloudStack project authorization precedes reads; bounded native pagination and project namespace/label verification preserve tenancy. See `evidence/k8s/2026-09-06-customer-lifecycle-integration.md` for source evidence and remaining Rocky GUI/runtime gates.

@@ -99,6 +99,24 @@ class BFFApplication:
             path = str(environ.get("PATH_INFO", ""))
             if method == "GET" and path == "/v1/kubernetes/readiness":
                 return self._response(start_response, HTTPStatus.OK, self.service.readiness(actor))
+            if method == "GET" and path in {"/v1/kubernetes/operations", "/v1/kubernetes/clusters"}:
+                try:
+                    query = urllib.parse.parse_qs(str(environ.get("QUERY_STRING", "")),
+                                                 strict_parsing=True, keep_blank_values=True, max_num_fields=3)
+                except ValueError as exc:
+                    raise InvalidRequestError("query string is malformed") from exc
+                allowed = {"projectId", "limit", "after"} if path.endswith("operations") else {"projectId"}
+                if not query.get("projectId") or set(query) - allowed or any(len(v) != 1 or not v[0] for v in query.values()):
+                    raise InvalidRequestError("projectId is required and query fields must occur exactly once")
+                if path.endswith("operations"):
+                    limit = query.get("limit", ["50"])[0]
+                    after = query.get("after", [None])[0]
+                    if not re.fullmatch(r"[0-9]{1,3}", limit) or (after and not re.fullmatch(r"[0-9a-f-]{36}", after)):
+                        raise InvalidRequestError("operation limit or cursor is invalid")
+                    payload = self.service.list_operations(actor, query["projectId"][0], int(limit), after)
+                else:
+                    payload = self.service.list_clusters(actor, query["projectId"][0])
+                return self._response(start_response, HTTPStatus.OK, payload)
             if method == "POST" and path == "/v1/kubernetes/clusters":
                 operation, created = self.service.submit_cluster_create(
                     actor, self._body(environ), str(environ.get("HTTP_IDEMPOTENCY_KEY", "")),

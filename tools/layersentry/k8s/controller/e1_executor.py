@@ -37,6 +37,8 @@ class InfrastructureResolver(Protocol):
 
     def verify_endpoints(self, resolved: ResolvedInfrastructure) -> Mapping[str, Any]: ...
 
+    def namespace_for_project(self, project_id: str) -> str: ...
+
 
 def _ready_condition(resource: Mapping[str, Any], condition_type: str = "Ready") -> bool:
     status = resource.get("status")
@@ -307,9 +309,17 @@ class E1Executor:
             control_plane = self.kubernetes.get(control_plane_ref)
         except NotFoundError:
             control_plane = {}
+        if control_plane and not self._owned(control_plane_ref, control_plane, project_id):
+            raise InvalidRequestError("control plane ownership/project verification failed")
+        pools = [pool for pool in self.kubernetes.list_owned(
+            "cluster.x-k8s.io/v1beta2", "MachineDeployment", namespace, project_id,
+        ) if pool.get("spec", {}).get("clusterName") == name]
+        if any(not pool["metadata"]["name"].startswith(name + "-") for pool in pools):
+            raise InvalidRequestError("worker pool identity does not match the managed cluster")
         return {
             "name": name,
             "namespace": namespace,
+            "projectId": project_id,
             "ready": _ready_condition(cluster, "Available") or _ready_condition(cluster),
             "phase": cluster.get("status", {}).get("phase", "UNKNOWN"),
             "controlPlaneReady": bool(control_plane) and (
@@ -317,4 +327,26 @@ class E1Executor:
             ),
             "conditions": cluster.get("status", {}).get("conditions", []),
             "observedGeneration": cluster.get("metadata", {}).get("generation"),
+            "nodePools": [{
+                "name": pool["metadata"]["name"].removeprefix(name + "-"),
+                "replicas": pool.get("spec", {}).get("replicas", 0),
+                "readyReplicas": pool.get("status", {}).get("readyReplicas", 0),
+            } for pool in pools],
         }
+
+    def list_clusters(self, project_id: str) -> list[Mapping[str, Any]]:
+        namespace = self.resolver.namespace_for_project(project_id)
+        namespace_ref = {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": namespace}}
+        try:
+            actual = self.kubernetes.get(namespace_ref)
+        except NotFoundError:
+            return []
+        if not self._owned(namespace_ref, actual, project_id):
+            raise InvalidRequestError("namespace ownership/project verification failed")
+        clusters = self.kubernetes.list_owned("cluster.x-k8s.io/v1beta2", "Cluster", namespace, project_id)
+        return [{
+            "name": cluster["metadata"]["name"], "namespace": namespace, "projectId": project_id,
+            "ready": _ready_condition(cluster, "Available") or _ready_condition(cluster),
+            "phase": cluster.get("status", {}).get("phase", "UNKNOWN"),
+            "conditions": cluster.get("status", {}).get("conditions", []),
+        } for cluster in clusters]

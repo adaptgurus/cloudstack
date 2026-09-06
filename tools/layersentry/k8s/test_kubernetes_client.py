@@ -15,6 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import urllib.parse
+from copy import deepcopy
 import tempfile
 import unittest
 import urllib.error
@@ -91,6 +94,45 @@ class KubernetesClientTest(unittest.TestCase):
         client.patch_merge(RESOURCE, {"spec": {"replicas": 5}})
         self.assertNotIn("fieldManager", client.opener.request.full_url)
         self.assertEqual(client.opener.request.get_header("Content-type"), "application/merge-patch+json")
+
+    def test_owned_list_uses_native_pagination_and_rejects_cross_project_rows(self):
+        row = deepcopy(RESOURCE)
+        row["metadata"]["labels"] = {"layersentry.io/managed": "true", "layersentry.io/project": "project-1"}
+        next_row = deepcopy(row)
+        next_row["metadata"]["name"] = "cluster-b"
+        client = self.client()
+        requests = []
+        pages = [{"items": [row], "metadata": {"continue": "cursor+/="}}, {"items": [next_row]}]
+        def request(method, path):
+            requests.append((method, path))
+            return pages.pop(0)
+        client.request = request
+        self.assertEqual(len(client.list_owned(RESOURCE["apiVersion"], "Cluster", "tenant-a", "project-1")), 2)
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(requests[1][1]).query)
+        self.assertEqual(query["continue"], ["cursor+/="])
+        self.assertEqual(query["limit"], ["100"])
+        self.assertIn("layersentry.io/project=project-1", query["labelSelector"][0])
+        row["metadata"]["labels"]["layersentry.io/project"] = "foreign"
+        client.request = lambda *args: {"items": [row]}
+        with self.assertRaisesRegex(InvalidRequestError, "ownership"):
+            client.list_owned(RESOURCE["apiVersion"], "Cluster", "tenant-a", "project-1")
+
+    def test_owned_list_rejects_malformed_repeated_or_unbounded_results(self):
+        client = self.client()
+        for response in ([], {"items": [], "metadata": []}, {"items": [None]},
+                         {"items": [{"metadata": None}]}, {"items": [] , "metadata": {"continue": 0}},
+                         {"items": [RESOURCE] * 101}, {"items": [], "metadata": {"continue": "repeat"}}):
+            client.request = lambda *args: response
+            with self.assertRaises(InvalidRequestError):
+                client.list_owned(RESOURCE["apiVersion"], "Cluster", "tenant-a", "project-1")
+        count = [0]
+        def unbounded(*args):
+            count[0] += 1
+            return {"items": [], "metadata": {"continue": str(count[0])}}
+        client.request = unbounded
+        with self.assertRaisesRegex(InvalidRequestError, "bounded"):
+            client.list_owned(RESOURCE["apiVersion"], "Cluster", "tenant-a", "project-1")
+        self.assertEqual(count[0], 10)
 
     def test_unknown_kind_and_unsafe_origin_fail_closed(self):
         with self.assertRaisesRegex(InvalidRequestError, "unsupported"):

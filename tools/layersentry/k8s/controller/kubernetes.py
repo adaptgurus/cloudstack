@@ -163,6 +163,56 @@ class KubernetesClient:
         path, _ = self._resource_path(resource)
         return self.request("GET", path)
 
+    def list_owned(self, api_version: str, kind: str, namespace: str, project_id: str,
+                   cluster_name: str | None = None) -> list[Mapping[str, Any]]:
+        """List only the fixed managed/project selector, with bounded native pagination."""
+        label = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,61}[A-Za-z0-9])?$")
+        if not isinstance(project_id, str) or not label.fullmatch(project_id):
+            raise InvalidRequestError("project label is invalid")
+        selector = f"layersentry.io/managed=true,layersentry.io/project={project_id}"
+        if cluster_name is not None:
+            if not isinstance(cluster_name, str) or not _DNS_LABEL.fullmatch(cluster_name):
+                raise InvalidRequestError("cluster label is invalid")
+            selector += f",cluster.x-k8s.io/cluster-name={cluster_name}"
+        path, _ = self._resource_path({"apiVersion": api_version, "kind": kind,
+                                       "metadata": {"name": "list", "namespace": namespace}})
+        path = path.rsplit("/", 1)[0]
+        items: list[Mapping[str, Any]] = []
+        continuation = ""
+        seen = set()
+        names = set()
+        for _ in range(10):
+            query = {"labelSelector": selector, "limit": "100"}
+            if continuation:
+                query["continue"] = continuation
+            response = self.request("GET", path + "?" + urllib.parse.urlencode(query))
+            if not isinstance(response, Mapping) or not isinstance(response.get("metadata", {}), Mapping):
+                raise InvalidRequestError("Kubernetes list response is invalid")
+            page = response.get("items")
+            if not isinstance(page, list) or len(page) > 100:
+                raise InvalidRequestError("Kubernetes list response is invalid")
+            for item in page:
+                metadata = item.get("metadata", {}) if isinstance(item, Mapping) else {}
+                if not isinstance(metadata, Mapping) or not isinstance(metadata.get("labels", {}), Mapping):
+                    raise InvalidRequestError("Kubernetes list metadata is invalid")
+                labels = metadata.get("labels", {})
+                name = metadata.get("name")
+                if not isinstance(name, str) or not _DNS_LABEL.fullmatch(name) or name in names:
+                    raise InvalidRequestError("Kubernetes list identity is invalid or duplicated")
+                names.add(name)
+                if (metadata.get("namespace") != namespace or labels.get("layersentry.io/managed") != "true"
+                        or labels.get("layersentry.io/project") != project_id
+                        or (cluster_name is not None and labels.get("cluster.x-k8s.io/cluster-name") != cluster_name)):
+                    raise InvalidRequestError("Kubernetes list ownership verification failed")
+                items.append(item)
+            continuation = response.get("metadata", {}).get("continue", "")
+            if continuation == "":
+                return items
+            if not isinstance(continuation, str) or len(continuation) > 4096 or continuation in seen:
+                raise InvalidRequestError("Kubernetes continuation is invalid")
+            seen.add(continuation)
+        raise InvalidRequestError("Kubernetes inventory exceeds the bounded list limit")
+
     def patch_merge(self, resource: Mapping[str, Any], patch: Mapping[str, Any]) -> Mapping[str, Any]:
         path, _ = self._resource_path(resource)
         return self.request("PATCH", path, body=patch, content_type="application/merge-patch+json")

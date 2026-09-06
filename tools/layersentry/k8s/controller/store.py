@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .model import ConflictError, NotFoundError, Operation, OperationStatus
+from .model import ConflictError, InvalidRequestError, NotFoundError, Operation, OperationStatus
 
 
 def _now() -> str:
@@ -146,6 +146,28 @@ class SagaStore:
         if row is None:
             raise NotFoundError("operation not found")
         return self._decode(row)
+
+    def list_project(self, project_id: str, limit: int = 50, after: str | None = None):
+        """Bounded keyset pagination; cursor identity never grants project access."""
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise InvalidRequestError("operation limit must be between 1 and 100")
+        with self._connect() as connection:
+            params: list[Any] = [project_id]
+            predicate = "project_id=?"
+            if after:
+                cursor = connection.execute(
+                    "SELECT created_at,id FROM operations WHERE id=? AND project_id=?",
+                    (after, project_id),
+                ).fetchone()
+                if cursor is None:
+                    raise InvalidRequestError("operation cursor is unavailable in this project")
+                predicate += " AND (created_at < ? OR (created_at = ? AND id < ?))"
+                params.extend([cursor["created_at"], cursor["created_at"], cursor["id"]])
+            rows = connection.execute(
+                "SELECT * FROM operations WHERE " + predicate + " ORDER BY created_at DESC,id DESC LIMIT ?",
+                (*params, limit + 1),
+            ).fetchall()
+        return [self._decode(row) for row in rows[:limit]], rows[limit - 1]["id"] if len(rows) > limit else None
 
     def update(
         self, operation: Operation, *, status: OperationStatus, step_index: int,

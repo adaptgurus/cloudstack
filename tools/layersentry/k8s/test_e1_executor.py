@@ -58,6 +58,9 @@ class Authorizer:
 
 
 class Resolver:
+    def namespace_for_project(self, project_id):
+        return "tenant-a"
+
     def resolve_cluster(self, request):
         self.last_request = request
         return ResolvedInfrastructure(
@@ -114,6 +117,12 @@ class FakeKubernetes:
             }]}
         return {**stored, "status": status}
 
+    def list_owned(self, api_version, kind, namespace, project_id):
+        return [self.get(value) for key, value in self.objects.items()
+                if key[:3] == (api_version, kind, namespace)
+                and value["metadata"].get("labels", {}).get("layersentry.io/project") == project_id
+                and value["metadata"].get("labels", {}).get("layersentry.io/managed") == "true"]
+
     def patch_merge(self, resource, patch):
         stored = self.objects[self._key(resource)]
         stored.setdefault("spec", {}).update(patch.get("spec", {}))
@@ -135,6 +144,21 @@ class E1ExecutorTest(unittest.TestCase):
         self.flux = FluxBaseline("https://git.example.test/catalog.git", "a" * 40, "./clusters/e1")
         self.executor = E1Executor(self.kubernetes, Resolver(), GATES, self.flux)
         self.service = ControllerService(self.store, Authorizer(), self.executor, GATES)
+
+    def test_cluster_inventory_and_node_pools_recover_from_native_resources(self):
+        self.assertEqual(self.executor.list_clusters("project-1"), [])
+        operation, _ = self.service.submit_cluster_create(ACTOR, payload(), "inventory-native-001")
+        for _ in operation.plan:
+            operation = self.service.advance(operation.id)
+        clusters = self.executor.list_clusters("project-1")
+        self.assertEqual([row["name"] for row in clusters], ["cluster-a"])
+        status = self.executor.cluster_status("tenant-a", "cluster-a", "project-1")
+        self.assertEqual(status["nodePools"][0]["name"], "workers")
+        self.assertEqual(status["nodePools"][0]["replicas"], 3)
+        namespace = self.kubernetes.objects[("v1", "Namespace", None, "tenant-a")]
+        namespace["metadata"]["labels"]["layersentry.io/project"] = "foreign"
+        with self.assertRaisesRegex(InvalidRequestError, "namespace ownership"):
+            self.executor.list_clusters("project-1")
 
     def test_full_create_reconciliation_reaches_ready(self):
         operation, _ = self.service.submit_cluster_create(ACTOR, payload(), "e1-cluster-create-001")

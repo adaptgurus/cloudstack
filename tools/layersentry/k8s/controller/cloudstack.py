@@ -156,6 +156,15 @@ class CloudStackResolver:
             raise NotFoundError(f"CloudStack {collection} resource is unavailable in caller scope")
         return items[0]
 
+    def namespace_for_project(self, project_id: str) -> str:
+        prefix = self.profile.namespace_prefix
+        if (not prefix or len(prefix) > 40 or not prefix[0].isalnum() or not prefix[-1].isalnum()
+                or any(character not in "abcdefghijklmnopqrstuvwxyz0123456789-" for character in prefix)):
+            raise InvalidRequestError("management namespace prefix is invalid")
+        if not isinstance(project_id, str) or not project_id:
+            raise InvalidRequestError("project_id is required")
+        return f"{prefix}-{hashlib.sha256(project_id.encode('utf-8')).hexdigest()[:12]}"
+
     def resolve_cluster(self, request: Mapping[str, Any]) -> ResolvedInfrastructure:
         project_id = request.get("project_id")
         if not project_id:
@@ -207,18 +216,8 @@ class CloudStackResolver:
         except ValueError as exc:
             raise InvalidRequestError("reserved CloudStack public IP is invalid") from exc
 
-        prefix = self.profile.namespace_prefix
-        if (
-            not prefix
-            or len(prefix) > 40
-            or not prefix[0].isalnum()
-            or not prefix[-1].isalnum()
-            or any(character not in "abcdefghijklmnopqrstuvwxyz0123456789-" for character in prefix)
-        ):
-            raise InvalidRequestError("management namespace prefix is invalid")
-        project_suffix = hashlib.sha256(project_id.encode("utf-8")).hexdigest()[:12]
         return ResolvedInfrastructure(
-            namespace=f"{prefix}-{project_suffix}", endpoint_host=endpoint_host,
+            namespace=self.namespace_for_project(project_id), endpoint_host=endpoint_host,
             endpoint_public_ip_id=endpoint_public_ip_id,
             cloudstack_secret_name=self.profile.cloudstack_secret_name,
             cloudstack_secret_namespace=self.profile.cloudstack_secret_namespace,

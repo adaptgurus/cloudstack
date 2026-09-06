@@ -23,6 +23,7 @@ from pathlib import Path
 
 from controller.bff import BFFApplication
 from controller.model import (
+    InvalidRequestError,
     Actor,
     AmbiguousMutationError,
     AuthenticationError,
@@ -112,6 +113,45 @@ class ControllerTest(unittest.TestCase):
         return ControllerService(
             self.store, ProjectAuthorizer(), executor or QueueExecutor(), self.gates,
         )
+
+    def test_inventory_pagination_is_durable_project_scoped_and_stable(self):
+        service = self.service()
+        ids = [service.submit_cluster_create(ACTOR, cluster_payload(name="cluster-" + str(i)),
+               "inventory-create-%04d" % i)[0].id for i in range(5)]
+        foreign, _ = self.store.create_or_get(
+            idempotency_key="foreign-inventory-001", request_sha256="foreign", kind="kubernetes.cluster.create",
+            target_name="foreign", project_id="project-foreign", actor_subject="foreign",
+            request={}, plan=[])
+        with self.store._connect() as connection:
+            connection.execute("UPDATE operations SET created_at=?", ("2026-09-06T00:00:00Z",))
+        self.store = SagaStore(Path(self.store.path))
+        service = self.service()
+        first = service.list_operations(ACTOR, "project-1", limit=2)
+        second = service.list_operations(ACTOR, "project-1", limit=2, after=first["nextCursor"])
+        third = service.list_operations(ACTOR, "project-1", limit=2, after=second["nextCursor"])
+        actual = [row["id"] for page in (first, second, third) for row in page["operations"]]
+        self.assertEqual(actual, sorted(ids, reverse=True))
+        self.assertIsNone(third["nextCursor"])
+        with self.assertRaises(InvalidRequestError):
+            service.list_operations(ACTOR, "project-1", after=foreign.id)
+        with self.assertRaises(AuthorizationError):
+            service.list_operations(ACTOR, "project-foreign")
+        for limit in (0, 101, True, "2"):
+            with self.assertRaises(InvalidRequestError):
+                service.list_operations(ACTOR, "project-1", limit=limit)
+
+    def test_bff_collection_query_validation_and_authorization(self):
+        app = BFFApplication(self.service(), StaticAuthenticator())
+        for query in ("", "projectId=", "projectId=project-1&projectId=project-foreign",
+                      "projectId=project-1&limit=0", "projectId=project-1&limit=101",
+                      "projectId=project-1&after=bad", "projectId=project-1&secret=x"):
+            status, _ = self._request(app, "GET", "/v1/kubernetes/operations", query=query)
+            self.assertEqual(status, 400, query)
+        status, data = self._request(app, "GET", "/v1/kubernetes/operations", query="projectId=project-1")
+        self.assertEqual((status, data), (200, {"operations": [], "nextCursor": None}))
+        for path in ("operations", "clusters"):
+            status, _ = self._request(app, "GET", "/v1/kubernetes/" + path, query="projectId=project-foreign")
+            self.assertEqual(status, 403)
 
     def test_create_is_durably_idempotent_and_collision_safe(self):
         service = self.service()

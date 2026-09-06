@@ -96,6 +96,8 @@ class StepExecutor(Protocol):
 
     def cluster_status(self, namespace: str, name: str, project_id: str) -> Mapping[str, Any]: ...
 
+    def list_clusters(self, project_id: str) -> list[Mapping[str, Any]]: ...
+
 
 def _canonical(value: Mapping[str, Any]) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
@@ -288,6 +290,19 @@ class ControllerService:
         operation = self.store.get(operation_id)
         self.authorizer.require(actor, "kubernetes.operation.read", operation.project_id)
         return operation
+
+    def list_operations(self, actor: Actor, project_id: str, limit: int = 50, after: str | None = None):
+        if not project_id:
+            raise InvalidRequestError("projectId is required")
+        self.authorizer.require(actor, "kubernetes.operation.read", project_id)
+        operations, cursor = self.store.list_project(project_id, limit, after)
+        return {"operations": [operation.public_dict() for operation in operations], "nextCursor": cursor}
+
+    def list_clusters(self, actor: Actor, project_id: str):
+        if not project_id:
+            raise InvalidRequestError("projectId is required")
+        self.authorizer.require(actor, "kubernetes.cluster.read", project_id)
+        return {"clusters": self.executor.list_clusters(project_id)}
 
     def advance(self, operation_id: str) -> Operation:
         operation = self.store.get(operation_id)
