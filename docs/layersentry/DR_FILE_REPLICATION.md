@@ -15,6 +15,8 @@ Status: `PARTIAL`. The NAS/QCOW2 data path has local filesystem, protocol, journ
 
 The native binding also imports the existing `dr_state_machine.py`. Install these reviewed files together; the SSH receiver command intentionally fixes the installation path to `/opt/layersentry/dr/dr_replication_cli.py` and its configuration to `/etc/layersentry/dr/receiver.json`. No installation has been performed by this work.
 
+Native recovery lease acquisition is exclusive per executor, including retries of the same operation ID. A live owner renews using its token; another worker waits for explicit release or expiry, then acquires a new token and reconciles the recorded native job before any further action. Operation IDs are not lease credentials. SQLite wait time counts toward existing lease expiry, while a newly acquired lease's TTL starts after the lock is obtained. This is local coordination and does not constitute distributed witness or source fencing.
+
 ## Operator configuration
 
 Configuration is JSON in a root/service-owned directory, with no symlink components or group/world write access. `schema` is `1`, `enabled` is a boolean and starts `false`. `role` is `source` or `receiver`. Both configurations embed the same `plan` object; credentials never belong in that object or its manifest.
