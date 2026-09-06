@@ -13,7 +13,7 @@ import time
 
 import yaml
 
-from management.bundle import Bundle, sha256
+from management.bundle import Bundle, sha256, retain_archive
 from management.install import clusterctl_config, clusterctl_env
 
 ROOT = Path(__file__).resolve().parent
@@ -77,17 +77,25 @@ def native_import(bundle, source, output):
         while not Path(socket).exists():
             if daemon.poll() is not None or time.monotonic()>deadline:raise RuntimeError('isolated containerd did not start')
             time.sleep(0.2)
-        observations=[]
-        for attempt in range(2):
+        observations=[];transfer_probe=None
+        for attempt in range(3):
             for item in bundle.value['images']:
                 repository=item['image'].split('@')[0]
-                run(ctr+['images','import','--all-platforms','--digests','--base-name',repository,str(bundle.file(item['file']))],timeout=300)
+                flags=[] if attempt==0 else ['--local']
+                run(ctr+['images','import',*flags,'--all-platforms','--digests','--base-name',repository,str(bundle.file(item['file']))],timeout=300)
             rows=run(ctr+['images','list']).decode().splitlines()
             actual={row.split()[0]:row.split()[2] for row in rows[1:] if len(row.split())>=3}
             expected={item['image']:item['image'].split('@')[1] for item in bundle.value['images']}
-            if any(actual.get(name)!=digest for name,digest in expected.items()):raise ValueError('native import lost a required exact image index name')
-            observations.append({'attempt':attempt+1,'exactImages':expected})
-        return {'runtimeImage':lock['runtimeImage'],'containerdVersion':version,'binarySha256':{path.name:sha256(path) for path in binaries.iterdir()},'imports':observations}
+            missing=[name for name,digest in expected.items() if actual.get(name)!=digest]
+            if attempt==0:
+                # Diagnose the old transfer-API path without using it as a pass
+                # gate. Runtime now explicitly uses native local import.
+                transfer_probe={'missingExactNames':missing,'observedImages':actual}
+                print(json.dumps({'scope':'transfer-API naming diagnostic','missingExactNames':missing,'observedImages':actual}))
+                continue
+            if missing:raise ValueError('native local import lost required exact image index names: '+json.dumps({'missing':missing,'actual':actual}))
+            observations.append({'attempt':attempt,'mode':'native-local','exactImages':expected})
+        return {'runtimeImage':lock['runtimeImage'],'containerdVersion':version,'binarySha256':{path.name:sha256(path) for path in binaries.iterdir()},'transferApiProbe':transfer_probe,'imports':observations}
     finally:
         daemon.terminate()
         try:daemon.wait(timeout=20)
@@ -106,10 +114,14 @@ def main():
         imported=native_import(bundle,prepared/'source',output)
     value=bundle.value;value['status']='CI_VERIFIED'
     manifest=bundle.root/'bundle.json';manifest.write_text(json.dumps(value,indent=2)+'\n')
+    # GitHub ZIP artifacts discard executable modes. Preserve the usable
+    # clusterctl mode inside a deterministic tar, never as loose ZIP files.
+    retained=prepared/'management-provider-bundle.tar'
+    retain_archive(bundle,retained)
     evidence={'schemaVersion':'1.0','scope':'hosted source, native provider generation and exact RKE2 containerd import/reimport only',
               'status':'CI_VERIFIED','liveVerified':False,'productionCertified':False,'signed':False,
               'sourceCommit':os.environ['GITHUB_SHA'],'workflowRunId':os.environ['GITHUB_RUN_ID'],
-              'bundleManifestSha256':sha256(manifest),'inputLockSha256':sha256(ROOT/'inputs.lock.json'),
+              'bundleManifestSha256':sha256(manifest),'bundleArchiveSha256':sha256(retained),'inputLockSha256':sha256(ROOT/'inputs.lock.json'),
               'generatedProviders':generated,'nativeImport':imported}
     (prepared/'qualification.json').write_text(json.dumps(evidence,indent=2)+'\n')
     print(json.dumps({'status':evidence['status'],'bundleManifestSha256':evidence['bundleManifestSha256'],'liveVerified':False,'productionCertified':False}))

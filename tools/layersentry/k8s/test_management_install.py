@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 
 from bootstrap_management import complete_provider_install
 from controller.model import InvalidRequestError
-from management.bundle import verify_oci,safe_file
+from management.bundle import verify_oci,safe_file,retain_archive
 from management.install import ProviderInstaller,clusterctl_config
 from management.remote import NativeImageStager,_STATUS,_PREPARE,_IMPORT
 
@@ -35,6 +35,17 @@ def oci_fixture(path,*,corrupt=False):
 
 
 class BundleTests(unittest.TestCase):
+    def test_retained_artifact_preserves_executable_and_excludes_unlisted_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'bundle';(root/'bin').mkdir(parents=True)
+            (root/'bin/clusterctl').write_text('pinned bytes');(root/'bundle.json').write_text('{}')
+            (root/'not-approved').write_text('must not escape')
+            target=Path(directory)/'bundle.tar'
+            retain_archive(SimpleNamespace(root=root,value={'files':{'bin/clusterctl':{}}}),target)
+            with tarfile.open(target) as archive:
+                self.assertEqual(archive.getmember('bundle/bin/clusterctl').mode,0o755)
+                self.assertEqual(set(archive.getnames()),{'bundle/bin/clusterctl','bundle/bundle.json'})
+
     def test_bundle_paths_cannot_follow_links_or_writable_files(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);path=root/'file';path.write_text('public')
