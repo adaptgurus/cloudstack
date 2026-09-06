@@ -7,9 +7,11 @@ import ipaddress
 import json
 import os
 import re
+import select
 import struct
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 from dr_file_replication import FileCatalog, FilePlan, absolute_path, disk_chunks, secure_root
@@ -19,6 +21,45 @@ from dr_replication import CHUNK_BYTES, JSON_LIMIT, ReplicationError, canonical,
 # Administrator-installed receiver and configuration. No client-supplied command,
 # program path, destination path, URL, shell fragment or provider secret is sent.
 REMOTE_COMMAND = "/usr/bin/python3 /opt/layersentry/dr/dr_replication_cli.py receive --config /etc/layersentry/dr/receiver.json --execute"
+
+
+class DeadlineWriter:
+    """Unbuffered receiver output; even error replies share the request deadline.
+
+    A stalled SSH peer must not make error handling or interpreter shutdown
+    flush an unbounded buffered write after SIGALRM has been cancelled.
+    This wrapper borrows, but never closes, the caller's file descriptor.
+    """
+
+    def __init__(self, fd: int, deadline: float):
+        self.fd, self.deadline = fd, deadline
+
+    def write(self, data: bytes) -> int:
+        remaining = memoryview(data)
+        original_blocking = os.get_blocking(self.fd)
+        poller = select.poll()
+        poller.register(self.fd, select.POLLOUT)
+        os.set_blocking(self.fd, False)
+        try:
+            while remaining:
+                timeout = self.deadline - time.monotonic()
+                require(timeout > 0, "RECEIVER_DEADLINE_EXCEEDED")
+                if not poller.poll(max(1, int(timeout * 1000))):
+                    continue
+                require(time.monotonic() < self.deadline, "RECEIVER_DEADLINE_EXCEEDED")
+                try:
+                    written = os.write(self.fd, remaining)
+                except BlockingIOError:
+                    continue
+                require(written > 0, "TRANSFER_PEER_DISCONNECTED")
+                remaining = remaining[written:]
+        finally:
+            os.set_blocking(self.fd, original_blocking)
+        return len(data)
+
+    def flush(self) -> None:
+        # write() sends all bytes directly; there is no deferred flush.
+        pass
 
 
 def read_exact(stream, size: int) -> bytes:

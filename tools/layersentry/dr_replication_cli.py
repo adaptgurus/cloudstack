@@ -12,12 +12,13 @@ import json
 import os
 import signal
 import sys
+import time
 from pathlib import Path
 
 from dr_file_replication import FileCatalog, FilePlan, QcowTools, absolute_path, secure_root
 from dr_libvirt_capture import FileReplicationEngine
 from dr_replication import Repository, ReplicationError, fingerprint, identifier, read_json, require
-from dr_replication_transport import MountedTransport, SshTransport, receive_one, write_frame
+from dr_replication_transport import DeadlineWriter, MountedTransport, SshTransport, receive_one, write_frame
 
 
 def configuration(path: str) -> tuple[dict, FilePlan]:
@@ -75,8 +76,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=100)
     args = parser.parse_args(argv)
     receiver = args.command == "receive"
+    receiver_output = None
     try:
+        if receiver:
+            # Bound even configuration-error replies before a plan is available.
+            receiver_output = DeadlineWriter(sys.stdout.fileno(), time.monotonic() + 15)
         config, plan = configuration(args.config)
+        if receiver:
+            receiver_output.deadline = time.monotonic() + plan.transfer_timeout
         # Validate the complete role/transport contract even for offline reads.
         # Constructors do not connect, create directories or submit a backup.
         require(config.get("role") in {"source", "receiver"}, "INVALID_CONFIGURATION_ROLE")
@@ -92,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise ReplicationError("RECEIVER_DEADLINE_EXCEEDED")
             signal.signal(signal.SIGALRM, expired)
             signal.setitimer(signal.ITIMER_REAL, plan.transfer_timeout)
-            receive_one(configured, sys.stdin.buffer, sys.stdout.buffer)
+            receive_one(configured, sys.stdin.buffer, receiver_output)
             signal.setitimer(signal.ITIMER_REAL, 0)
             return 0
         if args.command in {"inspect", "check-config"}:
@@ -135,7 +142,8 @@ def main(argv: list[str] | None = None) -> int:
         if receiver:
             signal.setitimer(signal.ITIMER_REAL, 0)
             try:
-                write_frame(sys.stdout.buffer, result)
+                if receiver_output is not None:
+                    write_frame(receiver_output, result)
             except (OSError, ReplicationError):
                 pass
         else:
