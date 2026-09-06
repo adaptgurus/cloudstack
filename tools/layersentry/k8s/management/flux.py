@@ -101,6 +101,53 @@ def contains(actual,desired):
     return actual==desired
 
 
+def normalized_template(template):
+    """Exact execution template, allowing only audited Kubernetes 1.36.4 defaults.
+
+    ServiceAccount token projections are Pod admission defaults, NOT Deployment
+    template defaults. This observer never compares live Pods to this template.
+    See DESIGN.md for exact native defaulting/conversion sources.
+    """
+    value=copy.deepcopy(template)
+    metadata=value.setdefault('metadata',{})
+    if metadata.get('creationTimestamp','missing') is None:metadata.pop('creationTimestamp')
+    pod=value['spec']
+    for key,default in {'dnsPolicy':'ClusterFirst','restartPolicy':'Always','schedulerName':'default-scheduler','securityContext':{},'terminationGracePeriodSeconds':30}.items():
+        pod.setdefault(key,default)
+    if pod.get('serviceAccount')==pod.get('serviceAccountName') and 'serviceAccount' in pod:pod.pop('serviceAccount')
+    for container in pod['containers']:
+        container.setdefault('terminationMessagePath','/dev/termination-log')
+        container.setdefault('terminationMessagePolicy','File')
+        container.setdefault('imagePullPolicy','IfNotPresent')
+        container.setdefault('resources',{})
+        for resources in (container['resources'].get('limits',{}),container['resources'].get('requests',{})):
+            # This exact export uses 1000m CPU; native Quantity JSON emits 1.
+            if resources.get('cpu')=='1000m':resources['cpu']='1'
+        for env in container.get('env',[]):
+            source=env.get('valueFrom',{})
+            if 'fieldRef' in source:source['fieldRef'].setdefault('apiVersion','v1')
+            if 'resourceFieldRef' in source:
+                selector=source['resourceFieldRef']
+                if selector.get('divisor','0')=='0':selector['divisor']='1'
+        for name in ('livenessProbe','readinessProbe','startupProbe'):
+            if name not in container:continue
+            probe=container[name]
+            for key,default in {'timeoutSeconds':1,'periodSeconds':10,'successThreshold':1,'failureThreshold':3}.items():probe.setdefault(key,default)
+            if 'httpGet' in probe:
+                probe['httpGet'].setdefault('scheme','HTTP');probe['httpGet'].setdefault('path','/')
+    return value
+
+
+def resource_matches(actual,desired):
+    if desired['kind']!='Deployment':return contains(actual,desired)
+    actual=copy.deepcopy(actual);desired=copy.deepcopy(desired)
+    actual_template=normalized_template(actual['spec']['template'])
+    desired_template=normalized_template(desired['spec']['template'])
+    if actual_template!=desired_template:return False
+    actual['spec']['template']=actual_template;desired['spec']['template']=desired_template
+    return contains(actual,desired)
+
+
 def ready(row):
     if row.get('metadata',{}).get('deletionTimestamp'):return False
     if row['kind']=='Namespace':return row.get('status',{}).get('phase')=='Active'
@@ -131,7 +178,7 @@ class FluxInstaller:
             if not isinstance(saved.get('nonce'),str) or len(saved['nonce'])!=32:raise InvalidRequestError('central Flux object intent binding is absent')
             desired=desired_resource(doc,self.bundle.digest,saved['nonce'])
             meta=actual.get('metadata',{});uid=meta.get('uid')
-            if not isinstance(uid,str) or not uid or not contains(actual,desired) or (saved.get('uid') and saved['uid']!=uid):raise InvalidRequestError('central Flux resource ownership or approved specification drifted')
+            if not isinstance(uid,str) or not uid or not resource_matches(actual,desired) or (saved.get('uid') and saved['uid']!=uid):raise InvalidRequestError('central Flux resource ownership or approved specification drifted')
             if meta.get('deletionTimestamp'):raise InvalidRequestError('owned central Flux resource is being deleted')
             if doc['kind']=='ClusterRole' and (actual.get('aggregationRule') or any(k.startswith('rbac.authorization.k8s.io/aggregate-to-') for k in meta.get('labels',{}))):
                 raise InvalidRequestError('central Flux role must not aggregate into tenant permissions')
