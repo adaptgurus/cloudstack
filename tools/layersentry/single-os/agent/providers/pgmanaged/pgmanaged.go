@@ -8,6 +8,7 @@ import (
  "os/user"
  "path/filepath"
  "strconv"
+ "strings"
 
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/model"
@@ -42,6 +43,5 @@ func(p *Provider)prepareExternal(ctx context.Context,r model.ServiceRequest)erro
 func(p *Provider)label(ctx context.Context,root string)error{if _,err:=p.Label.Run(ctx,"/usr/sbin/semanage","fcontext","-a","-e","/var/lib/pgsql",root);err!=nil{if _,err=p.Label.Run(ctx,"/usr/sbin/semanage","fcontext","-m","-e","/var/lib/pgsql",root);err!=nil{return err}};_,err:=p.Label.Run(ctx,"/usr/sbin/restorecon","-RF",root);return err}
 func transformRequest(r model.ServiceRequest)model.ServiceRequest{out:=r;out.Storage=nil;out.LVM=nil;major:=r.ReleaseLine;for _,purpose:=range []string{"database-data","database-wal","database-logs"}{root,err:=storageplan.PathForPurpose(r,purpose);if err!=nil||root==""{continue};path:=root;if isExternal(root){switch purpose{case "database-data":path=filepath.Join("/var/lib/pgsql",major,"data");case "database-wal":path=filepath.Join(root,"wal");case "database-logs":path=filepath.Join(root,"logs")}};out.Storage=append(out.Storage,model.StorageAssignment{MountPoint:path,Purpose:purpose,Filesystem:"xfs"})};return out}
 func withTransformedPlan(plan model.Plan)model.Plan{plan.Request=transformRequest(plan.Request);return plan}
-func isExternal(path string)bool{for _,root:=range []string{"/data","/srv","/opt/layersentry-data"}{rel,err:=filepath.Rel(root,path);if err==nil&&rel!="."&&rel!=".."&&rel[:0]==rel[:0]&&!startsParent(rel){return true}};return false}
-func startsParent(rel string)bool{return rel==".."||len(rel)>=3&&rel[:3]=="../"}
+func isExternal(path string)bool{for _,root:=range []string{"/data","/srv","/opt/layersentry-data"}{rel,err:=filepath.Rel(root,path);if err==nil&&rel!="."&&rel!=".."&&!strings.HasPrefix(rel,".."+string(filepath.Separator)){return true}};return false}
 func prepareOwned(path,name string,mode os.FileMode)error{if err:=os.MkdirAll(path,mode);err!=nil{return err};if err:=os.Chmod(path,mode);err!=nil{return err};u,err:=user.Lookup(name);if err!=nil{return err};uid,err:=strconv.Atoi(u.Uid);if err!=nil{return err};gid,err:=strconv.Atoi(u.Gid);if err!=nil{return err};return os.Chown(path,uid,gid)}
