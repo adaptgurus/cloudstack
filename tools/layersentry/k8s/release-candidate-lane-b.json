@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0",
+  "status": "PENDING",
+  "qualificationLane": "B",
+  "cloudstack": "4.22.1.1",
+  "capi": "1.13.5",
+  "capc": "0.6.1",
+  "caprke2": "0.25.2",
+  "rke2": "1.36.4+rke2r1",
+  "kubernetes": "1.36.x",
+  "cloudstackCsi": "3.0.2",
+  "architecture": {
+    "infrastructureOwner": "CloudStack",
+    "machineOwner": "CAPI/CAPC",
+    "rke2Owner": "CAPRKE2",
+    "packageOwner": "Flux",
+    "databaseOwner": "database-operator",
+    "requiredControlPlanePorts": [6443, 9345]
+  },
+  "hardGates": {
+    "tupleReconciliation": false,
+    "endpoint6443": false,
+    "endpoint9345": false,
+    "fluxRemoteReconcile": false,
+    "capcVolumeOwnershipSafe": false,
+    "csiProjectScope": false,
+    "csiResizeIdempotent": false,
+    "airgapCreateScaleRepair": false,
+    "statefulMachineReplacement": false,
+    "backupRestore": false,
+    "pitrRestore": false
+  },
+  "productionRestrictions": {
+    "statefulDbaas": "BLOCKED",
+    "automaticStatefulMachineHealthRemediation": "DISABLED",
+    "databaseWorkerAutomaticScaleDown": "DISABLED",
+    "directNodeDisks": "PENDING_NODEDISKSET",
+    "projectPvcAutoGrow": "DISABLED",
+    "airGap": "NOT_TESTED"
+  },
+  "sourceOfTruth": [
+    "docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md",
+    "docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_ARCHITECTURE_ADDENDUM.md",
+    "docs/layersentry/evidence/k8s/2026-09-06-k8s-master-context-full-validation.md",
+    "docs/layersentry/codex/WORKSTREAM_E_K8S_DBAAS_APAAS.md"
+  ]
+}
