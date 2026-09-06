@@ -26,6 +26,8 @@ import sys
 from bootstrap.native import Journal, NativeBootstrap, NativeCloudStackClient, canonical, protected_file, validate_plan, verify_image
 from bootstrap.transport import TrustedGuestTransport
 from bootstrap.credentials import ManagementCredentials
+from management.bundle import Bundle
+from management.install import ProviderInstaller
 from controller.cloudstack import CloudStackConfig
 from controller.model import InvalidRequestError
 
@@ -40,7 +42,7 @@ def ready_nodes(observation, names):
     )
 
 
-def reconcile(native, transport, credentials, *, inspect_only=False):
+def reconcile(native, transport, credentials, *, inspect_only=False, provider_installer=None):
     preflight = native.preflight()
     transport.validate_hosts(native.hosts)
     escrow = native.journal.state.get('credentialsEscrowed')
@@ -65,6 +67,9 @@ def reconcile(native, transport, credentials, *, inspect_only=False):
         result['formation'] = observation
         result['stage'] = 'MANAGEMENT_API_INSPECTION'
         if ready_nodes(observation, expected_names) and observation.get('endpoint9345Tls') is True:
+            if provider_installer is None or not provider_installer.inspect(native, credentials):
+                result['stage'] = 'MANAGEMENT_PROVIDER_VERIFICATION'
+                return result
             closed = native.journal.state.get('transportClosed') if inspect_only else native.cleanup_transport()
             if closed:
                 result['status'] = 'LIVE_VERIFIED'
@@ -80,6 +85,13 @@ def reconcile(native, transport, credentials, *, inspect_only=False):
         result['stage'] = 'TEMPORARY_SSH_FORWARDING'
         return result
     transport.bind_endpoints(endpoints)
+    if native.journal.state.get('managementFormationVerified'):
+        observation = credentials.inspect(native.endpoint)
+        result['formation'] = observation
+        if not ready_nodes(observation, expected_names) or observation.get('endpoint9345Tls') is not True:
+            result['stage'] = 'FORMATION_VERIFICATION'
+            return result
+        return complete_provider_install(native, transport, credentials, nodes, provider_installer, result)
     if not native.ensure_endpoints([seed]):
         result['stage'] = 'SEED_ENDPOINT'
         return result
@@ -109,13 +121,23 @@ def reconcile(native, transport, credentials, *, inspect_only=False):
         if not ready_nodes(direct, expected_names) or direct.get('endpoint9345Tls') is not True:
             result['stage'] = 'DIRECT_API_CREDENTIAL_VERIFICATION'
             return result
-        native.journal.state['credentialsEscrowed'] = {'sha256': credentials.digest()}
+        native.journal.state['managementFormationVerified'] = True
         native.journal.save()
         result['formation'] = direct
-        result['stage'] = 'TEMPORARY_SSH_CLEANUP'
-        if native.cleanup_transport():
-            result['status'] = 'LIVE_VERIFIED'
-            result['stage'] = 'MANAGEMENT_API_VERIFIED_TRANSPORT_CLOSED'
+        return complete_provider_install(native, transport, credentials, nodes, provider_installer, result)
+    return result
+
+
+def complete_provider_install(native, transport, credentials, nodes, installer, result):
+    result['stage'] = 'MANAGEMENT_PROVIDER_INSTALLATION'
+    if installer is None or not installer.advance(native, transport, credentials, nodes):
+        return result
+    native.journal.state['credentialsEscrowed'] = {'sha256': credentials.digest()}
+    native.journal.save()
+    result['stage'] = 'TEMPORARY_SSH_CLEANUP'
+    if native.cleanup_transport():
+        result['status'] = 'LIVE_VERIFIED'
+        result['stage'] = 'MANAGEMENT_API_AND_PROVIDERS_VERIFIED_TRANSPORT_CLOSED'
     return result
 
 
@@ -126,7 +148,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         config = json.loads(protected_file(args.config).read_bytes())
-        expected = {'plan', 'image', 'cloudstack', 'journal', 'operatorKeyFile', 'tokenFile', 'hosts', 'managementKubeconfigFile'}
+        expected = {'plan', 'image', 'cloudstack', 'journal', 'operatorKeyFile', 'tokenFile', 'hosts', 'managementKubeconfigFile', 'providerBundle'}
         if not isinstance(config, dict) or set(config) != expected:
             raise InvalidRequestError('bootstrap runtime configuration fields do not match schema')
         plan = validate_plan(config['plan'])
@@ -134,6 +156,11 @@ def main(argv=None):
         if set(image) != {'attestationFile', 'signatureFile', 'publicKeyFile'}:
             raise InvalidRequestError('image trust configuration is invalid')
         verified = verify_image(image['attestationFile'], image['signatureFile'], image['publicKeyFile'], plan['templateId'])
+        provider = config['providerBundle']
+        if not isinstance(provider, dict) or set(provider) != {'directory', 'sha256', 'qualificationEnvironment'}:
+            raise InvalidRequestError('management provider bundle configuration is invalid')
+        bundle = Bundle(provider['directory'], provider['sha256'])
+        installer = ProviderInstaller(bundle, qualification_environment=provider['qualificationEnvironment'])
         credentials = ManagementCredentials(config['managementKubeconfigFile'])
         transport = TrustedGuestTransport(config['hosts'], config['operatorKeyFile'], config['tokenFile'])
         cloud = config['cloudstack']
@@ -145,10 +172,10 @@ def main(argv=None):
             secret_key_file=protected_file(cloud['secretKeyFile']), ca_file=protected_file(cloud['caFile'], private=False),
         ))
         fingerprint = hashlib.sha256(canonical({'plan': plan, 'image': verified['sha256'], 'operatorPublicKey': transport.public_key,
-                                               'tokenSha256': transport.token_sha256, 'cloudstackEndpoint': cloud['endpoint'], 'managementKubeconfigFile': str(credentials.path)})).hexdigest()
+                                               'tokenSha256': transport.token_sha256, 'cloudstackEndpoint': cloud['endpoint'], 'managementKubeconfigFile': str(credentials.path), 'providerBundleSha256': bundle.digest})).hexdigest()
         with Journal(config['journal'], fingerprint) as journal:
             native = NativeBootstrap(client, plan, verified, journal, transport.public_key)
-            result = reconcile(native, transport, credentials, inspect_only=args.action == 'inspect')
+            result = reconcile(native, transport, credentials, inspect_only=args.action == 'inspect', provider_installer=installer)
         print(json.dumps(result, sort_keys=True))
         return 0 if result['status'] == 'LIVE_VERIFIED' else 2
     except (InvalidRequestError, OSError, ValueError, KeyError, TypeError):

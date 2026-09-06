@@ -238,7 +238,7 @@ class TrustedGuestTransport:
                 raise InvalidRequestError('temporary SSH port is invalid')
         self.endpoints = dict(endpoints)
 
-    def guest_call(self, vm, host, script, payload):
+    def guest_call(self, vm, host, script, payload, *, timeout=150):
         endpoint = self.endpoints.get(vm.get('id'))
         if not endpoint:
             raise InvalidRequestError('no verified native SSH forwarding for this VM')
@@ -250,7 +250,7 @@ class TrustedGuestTransport:
             known_hosts.write_text('[' + address + ']:' + str(port) + ' ' + public_key + '\n')
             known_hosts.chmod(0o600)
             argv = self.ssh_options(self.operator_key, known_hosts) + ['-p', str(port), 'root@' + address, 'python3 -c ' + shlex.quote(script)]
-            raw = self.run(argv, payload, timeout=150)
+            raw = self.run(argv, payload, timeout=timeout)
         try:
             result = json.loads(raw)
         except (ValueError, UnicodeError):

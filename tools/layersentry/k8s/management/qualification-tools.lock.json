@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "1.0",
+  "runtimeImage": "docker.io/rancher/rke2-runtime@sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9",
+  "runtimeTag": "v1.36.4-rke2r1",
+  "expectedContainerdVersion": "2.3.4",
+  "scope": "hosted native containerd image-import qualification; no lab or provider activation"
+}

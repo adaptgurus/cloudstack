@@ -155,7 +155,7 @@ class CredentialTests(unittest.TestCase):
         native.cleanup_transport.return_value = True
         credentials.digest.return_value = 'a'*64
         credentials.inspect.return_value = {'nodes': [{'name': 'cp'+str(i), 'ready': True, 'controlPlane': True, 'version': 'v1.36.4+rke2r1'} for i in (1,2,3)], 'endpoint9345Tls': True}
-        result = reconcile(native, transport, credentials)
+        result = reconcile(native, transport, credentials, provider_installer=Mock())
         self.assertEqual(result['status'], 'LIVE_VERIFIED')
         native.ensure_nodes.assert_not_called(); native.ensure_transport.assert_not_called()
         transport.configure.assert_not_called(); transport.formation.assert_not_called(); transport.export_credentials.assert_not_called()
