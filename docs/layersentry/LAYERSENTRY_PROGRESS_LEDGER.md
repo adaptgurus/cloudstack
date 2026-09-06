@@ -49,6 +49,31 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE / BLOCKED — 2026-09-06 E1 immutable component gate
+
+Exact implementation commit:
+
+`20f2336c93ea4ef57d70717261faf9f9ef6c7688`
+
+The Lane B contract now includes exact CloudStack CCM `v1.2.0` commit
+`4740dbcacc7fc5892354b03b2f0be7ebf5c92584`, downstream CSI image readiness
+and central Flux catalog readiness. A strict validator requires digest-only
+CCM/patched-CSI images, exact source/patch IDs, CSI project/resize evidence,
+CCM Kubernetes 1.36 qualification, immutable Flux content and all four E1
+runtime gates before deployment. Current unresolved fields remain null/false,
+so the release correctly refuses deployment.
+
+Exact CCM `go test ./...` passed locally, but its Kubernetes libraries are
+`v0.24.17` while Lane B targets `1.36.x`; runtime compatibility is not proven.
+The CSI chart/raw manifests also cannot identify the patched LayerSentry image.
+All 66 Workstream E Python tests passed. Evidence:
+`docs/layersentry/evidence/k8s/2026-09-06-e1-immutable-component-gate.md`.
+
+No image was built or deployed. SBOM/signature/digest publication, CCM 1.36
+LB lifecycle, CSI project lifecycle, Flux apply and Rocky evidence remain
+`NOT_TESTED`. Next E1 source gate: controller package/service configuration
+that consumes this validator and remains fail-closed until artifacts exist.
+
 ### SOURCE_COMPLETE — 2026-09-06 E1 CloudStack-session BFF authentication/RBAC
 
 Exact implementation commit:

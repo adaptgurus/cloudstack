@@ -12,6 +12,20 @@
 
 ## 0. Latest continuation checkpoint
 
+The immutable E1 component gate is implemented at
+`20f2336c93ea4ef57d70717261faf9f9ef6c7688`. It pins CloudStack CCM `v1.2.0`
+source commit `4740dbcacc7fc5892354b03b2f0be7ebf5c92584`, records its Kubernetes
+`v0.24.17` library skew against the Lane B `1.36.x` candidate, requires
+digest-only CCM and downstream-patched CSI images, and requires immutable Flux
+catalog plus runtime evidence before deployment. Exact CCM source tests and
+all 66 Workstream E Python tests passed locally. Current artifact/catalog and
+runtime fields remain null/false, so E1 is truthfully `BLOCKED`, not deployed.
+Evidence: `docs/layersentry/evidence/k8s/2026-09-06-e1-immutable-component-gate.md`.
+
+Resume with controller package/service wiring which consumes this gate and
+fails closed. Workstream B must eventually publish signed/SBOM-backed images;
+CCM/CSI/Flux and E0/E1 live tests must pass before PostgreSQL mutation.
+
 CloudStack-session BFF authentication and composite authorization are
 implemented at `bc29df96b9405bca263d18cd6deb52c85753f1fb`. The BFF now validates
 the HttpOnly session plus matching session-key cookie/header against
