@@ -391,6 +391,13 @@ CloudStack CSI downstream artifact
   INSTALLS_OFFLINE -> CA trust, mount, ext/XFS filesystem and expansion utilities
   REQUIRES_SEPARATE_PROOF -> project lifecycle, resize and PVC survival qualification
 
+LayerSentry universal CPU node image
+  BUILDS_FROM -> signed dated Rocky GenericCloud QCOW2 and locked RPM/RKE2 inputs
+  CUSTOMIZES_OFFLINE -> host capabilities, SELinux policy and staged Canal images
+  EXCLUDES -> per-cluster credentials, host identity and running RKE2 state
+  BOOTSTRAPS_THROUGH -> CloudStack cloud-init, trusted QGA host-key discovery and strict SSH
+  REQUIRES_SEPARATE_PROOF -> Rocky boot, automatic join, network/storage and signed qualification
+
 CloudStack Disk Offering storageType=shared
   DOES_NOT_IMPLY -> one raw block volume safely writable by all guest VMs
 

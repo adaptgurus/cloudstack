@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "status": "CI_VERIFIED",
+  "scope": "unsigned offline Rocky9 amd64 CPU QCOW2 build and integrity evidence",
+  "sourceCommit": "f05710874613c3a38c2704c28650a04f7bae2aef",
+  "workflowRun": 34050507635,
+  "workflowJob": 101533146612,
+  "workflowUrl": "https://github.com/adaptgurus/cloudstack/actions/runs/34050507635",
+  "artifact": {
+    "id": 9994542246,
+    "name": "layersentry-rke2-cpu-image-f05710874613c3a38c2704c28650a04f7bae2aef-1",
+    "sizeBytes": 2674085864,
+    "sha256": "b9a4abd099ebbd08a5585bc17d6bfad8b7e801c737e1b074f5ddb905201e8ce3",
+    "retentionDays": 14
+  },
+  "image": {
+    "path": "cpu-image/layersentry-rke2-rocky9-amd64.qcow2",
+    "sha256": "8ee4a820fd427abf3f00e0f55b0421c8cb9d5fa054cd84bc0aab62fc1fc4bf77",
+    "sizeBytes": 2673999872,
+    "cloudStackChecksum": "{SHA-256}8ee4a820fd427abf3f00e0f55b0421c8cb9d5fa054cd84bc0aab62fc1fc4bf77"
+  },
+  "inputLockSha256": "4089511224af32c21a8828bd5bf34993ec050a09c6d8e629ed5d5e6b12d4a47b",
+  "rpmInventorySha256": "3b702c9bef0cf78934acf02db45823de2d3ae3ab06029161dc009bd7b58603b7",
+  "os": "Rocky Linux 9.8",
+  "architecture": "amd64",
+  "rke2Version": "v1.36.4+rke2r1",
+  "rke2SourceCommit": "7479a59cdd2c8ce0b8871699a24daa4b7c28cc64",
+  "cni": "canal",
+  "buildChecks": {
+    "sourceTestsPassed": 11,
+    "lockedInputsVerified": true,
+    "rockyBaseSignatureVerified": true,
+    "rpmSignaturesVerified": true,
+    "offlinePackageTransactionPassed": true,
+    "selinuxRelabelCompleted": true,
+    "qemuImageCheckPassed": true,
+    "guestRpmInventoryExtracted": true,
+    "exactRke2BinaryVersionExecuted": true
+  },
+  "independentDownloadedArtifactVerification": {
+    "status": "DELEGATED_NOT_YET_VERIFIED",
+    "runnerRepository": "adaptgurus/cozystack",
+    "workflowRun": 34051209929,
+    "reason": "Runtime owner independently verifies exact ZIP and QCOW2 hashes before boot; duplicate local transfer stopped."
+  },
+  "qualificationStatus": "NOT_TESTED",
+  "signed": false,
+  "runtimeQualified": false,
+  "hostBootTested": false,
+  "qgaChannelTested": false,
+  "sshConnectivityTested": false,
+  "joinTested": false,
+  "storageTested": false,
+  "templateRegistered": false,
+  "rke2Started": false,
+  "bootHarnessCommit": "fb2ec21623fa4429f3353f7f194e0057466843bf"
+}
