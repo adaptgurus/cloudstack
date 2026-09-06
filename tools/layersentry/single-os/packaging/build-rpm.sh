@@ -13,6 +13,7 @@ pushd "$AGENT" >/dev/null
 GOTOOLCHAIN=auto go build -trimpath -buildvcs=true -ldflags='-s -w' -o "$work/rpmbuild/SOURCES/layersentryd" ./cmd/layersentryd
 GOTOOLCHAIN=auto go build -trimpath -buildvcs=true -ldflags='-s -w' -o "$work/rpmbuild/SOURCES/layersentryctl" ./cmd/layersentryctl
 popd >/dev/null
+install -m 0644 "$PKG/layersentry-privileged.service" "$work/rpmbuild/SOURCES/"
 install -m 0644 "$PKG/layersentryd.service" "$work/rpmbuild/SOURCES/"
 install -m 0644 "$PKG/layersentry-firstboot.service" "$work/rpmbuild/SOURCES/"
 install -m 0644 "$PKG/layersentry-maintenance.service" "$work/rpmbuild/SOURCES/"
