@@ -41,6 +41,11 @@ jobs:
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
           mkdir build-evidence
           dpkg-query -W > build-evidence/hosted-builder-packages.tsv
+          # Ubuntu's packaged appliance excludes policycoreutils even when installed.
+          # Extend a private copy using the documented supermin package-list interface.
+          /usr/bin/python3 tools/layersentry/k8s/image/prepare_appliance.py --output build-appliance --evidence build-evidence/appliance-definition.json
+          export LIBGUESTFS_PATH="$PWD/build-appliance"
+          echo "LIBGUESTFS_PATH=$LIBGUESTFS_PATH" >> "$GITHUB_ENV"
           /usr/bin/python3 tools/layersentry/k8s/image/inspect_labels.py --preflight build-evidence/selinux-appliance.json
       - name: Materialize and verify locked inputs
         shell: bash
