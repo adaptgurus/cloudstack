@@ -1,0 +1,59 @@
+name: LayerSentry management provider bundle qualification
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/k8s-management-provider-install]
+    paths:
+      - .github/workflows/layersentry-management-provider-qualification.yml
+      - tools/layersentry/k8s/management/**
+      - tools/layersentry/k8s/bootstrap/**
+      - tools/layersentry/k8s/bootstrap_management.py
+      - tools/layersentry/k8s/test_management*.py
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: layersentry-management-provider-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  qualify:
+    if: github.ref == 'refs/heads/codex/k8s-management-provider-install'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Install locked build parser
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/provider-venv"
+          "$RUNNER_TEMP/provider-venv/bin/pip" install --only-binary=:all: --require-hashes -r tools/layersentry/k8s/management/requirements-build.txt
+      - name: Qualify source contracts
+        env:
+          PYTHONPATH: tools/layersentry/k8s
+        run: python3 -m unittest discover -s tools/layersentry/k8s -p 'test_*.py' -q
+      - name: Fetch exact previously qualified downstream artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 34050386205 --repo adaptgurus/cloudstack --name layersentry-capc-build-6162cc1e40afebd56edbd42cff7325fb2abc5d05-1 --dir "$RUNNER_TEMP/downstream/capc"
+          gh run download 34050386205 --repo adaptgurus/cloudstack --name layersentry-cloudstack-ccm-build-6162cc1e40afebd56edbd42cff7325fb2abc5d05-1 --dir "$RUNNER_TEMP/downstream/cloudstack-ccm"
+      - name: Prepare immutable public bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: tools/layersentry/k8s
+        run: '"$RUNNER_TEMP/provider-venv/bin/python" tools/layersentry/k8s/management/prepare_bundle.py --output "$RUNNER_TEMP/management-bundle" --downstream-dir "$RUNNER_TEMP/downstream"'
+      - name: Qualify native provider generation and isolated RKE2 containerd imports
+        env:
+          PYTHONPATH: tools/layersentry/k8s
+        run: '"$RUNNER_TEMP/provider-venv/bin/python" tools/layersentry/k8s/management/qualify_bundle.py --prepared "$RUNNER_TEMP/management-bundle"'
+      - name: Retain usable unsigned candidate and qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: layersentry-management-provider-bundle-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/management-bundle/bundle/
+            ${{ runner.temp }}/management-bundle/qualification.json
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: error

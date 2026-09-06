@@ -39,7 +39,7 @@ Alternatives considered: native CKS would create a different managed lifecycle; 
 
 ## Operator inputs
 
-Runtime configuration is a private JSON file with exactly `plan`, `image`, `cloudstack`, `journal`, `operatorKeyFile`, `tokenFile`, `hosts` and `managementKubeconfigFile`.
+Runtime configuration is a private JSON file with exactly `plan`, `image`, `cloudstack`, `journal`, `operatorKeyFile`, `tokenFile`, `hosts`, `managementKubeconfigFile` and `providerBundle`.
 
 | Object | Required inputs |
 | --- | --- |
@@ -47,6 +47,7 @@ Runtime configuration is a private JSON file with exactly `plan`, `image`, `clou
 | `image` | `attestationFile`, detached `signatureFile`, operator-trusted `publicKeyFile` |
 | `cloudstack` | HTTPS `endpoint`, protected `apiKeyFile`, protected `secretKeyFile`, verified `caFile` |
 | `hosts` | Map from exact host UUID to approved `address`, `user` = `root`, protected `keyFile`, pinned `knownHostsFile` |
+| `providerBundle` | Exact immutable bundle `directory`, `sha256` and `qualificationEnvironment=disposable-lab`; see the management installer README |
 | Other | Private existing journal directory, stable protected Ed25519 operator key and strong RKE2 token files; explicit management kubeconfig output file in an existing private operator directory |
 
 The image attestation requires `schemaVersion=1.0`, `artifactType=layersentry-rke2-node-image`, exact `templateId`, `os=rocky9`, `architecture=amd64`, `rke2Version=v1.36.4+rke2r1`, `qualificationStatus=LIVE_VERIFIED`, `rke2Installed=true`, `qemuGuestAgentInstalled=true`, `sshEnabled=true`, `selinuxEnforcing=true`, `sha256` and `qualificationEvidenceSha256`. Those values must come from the image release/qualification path, not be fabricated to pass preflight.
@@ -78,3 +79,7 @@ The initial source implementation assumed direct Runner access to an isolated gu
 Protected inputs additionally reject unexpected owners and hardlinks. The management credential output requires a private, operator-owned existing directory. A completed journal stores only the kubeconfig digest and transport state. Subsequent provider installation consumes that runtime kubeconfig through its native tooling; installation is not performed by this bounded bootstrap.
 
 Correction qualification: the full E regression passes 114 tests, including 40 focused offline bootstrap tests (27 original plus 13 new transport/credential/lifecycle tests). Tests cover foreign-rule rejection, exact VM/address/port binding, restricted source rules, ambiguous-delete no replay, mandatory escrow before cleanup, no private-IP fallback, no reopened forwarding after completion, kubeconfig hook/TLS bypass rejection, private exclusive output, unsafe owner/hardlink/symlink rejection, and authenticated-API-only completed reconciliation. No runtime credentials or live lab endpoints were used by the tests.
+
+## Provider installation completion gate
+
+The subsequent management installer source extends this lifecycle: protected kubeconfig export occurs after formation, but credential escrow completion and temporary SSH cleanup now wait for the bound provider bundle to be imported on all three nodes and native CAPI/CAPRKE2/CAPC plus cert-manager readiness to be observed. See [management installer contract](../../../../../tools/layersentry/k8s/management/README.md). CCM stays unactivated and all production gates remain false. Historical validation counts above describe their original commits, not this later installer qualification.
