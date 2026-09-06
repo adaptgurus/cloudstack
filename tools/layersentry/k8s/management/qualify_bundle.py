@@ -13,8 +13,9 @@ import time
 
 import yaml
 
-from management.bundle import Bundle, sha256, retain_archive
+from management.bundle import Bundle, sha256, retain_archive, verify_oci
 from management.install import clusterctl_config, clusterctl_env
+from management.flux import render_manifest
 
 ROOT = Path(__file__).resolve().parent
 
@@ -108,6 +109,9 @@ def main():
     parser.add_argument('--prepared',type=Path,required=True)
     args=parser.parse_args();prepared=args.prepared.resolve()
     bundle=Bundle(prepared/'bundle',sha256(prepared/'bundle/bundle.json'))
+    flux=render_manifest(bundle.file('bin/flux'),json.loads((ROOT/'inputs.lock.json').read_text()))
+    if flux!=json.loads(bundle.file('central-flux.json').read_text()):raise ValueError('native Flux export differs from retained reviewed manifest')
+    attestations={i['image']:verify_oci(bundle.file(i['file']),i['image']) for i in bundle.value['images'] if i['image'].startswith('ghcr.io/fluxcd/')}
     with tempfile.TemporaryDirectory(prefix='layersentry-management-qualification-') as directory:
         output=Path(directory)
         generated=generate(bundle,output)
@@ -122,7 +126,7 @@ def main():
               'status':'CI_VERIFIED','liveVerified':False,'productionCertified':False,'signed':False,
               'sourceCommit':os.environ['GITHUB_SHA'],'workflowRunId':os.environ['GITHUB_RUN_ID'],
               'bundleManifestSha256':sha256(manifest),'bundleArchiveSha256':sha256(retained),'inputLockSha256':sha256(ROOT/'inputs.lock.json'),
-              'generatedProviders':generated,'nativeImport':imported}
+              'generatedProviders':generated,'nativeImport':imported,'centralFlux':{'version':'v2.9.5','manifestSha256':sha256(bundle.file('central-flux.json')),'resourceCount':len(flux),'imageAttestations':attestations}}
     (prepared/'qualification.json').write_text(json.dumps(evidence,indent=2)+'\n')
     print(json.dumps({'status':evidence['status'],'bundleManifestSha256':evidence['bundleManifestSha256'],'liveVerified':False,'productionCertified':False}))
 

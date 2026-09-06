@@ -3,17 +3,20 @@
 This path installs the selected native CAPI controllers after first-plane RKE2
 formation. It is restricted to a designated disposable lab and a `CI_VERIFIED`
 bundle. It does not certify a production release, qualify a node image, activate
-CloudStack CCM, install Flux, or complete DBaaS/APaaS acceptance.
+CloudStack CCM, or complete DBaaS/APaaS acceptance.
 
 The public input lock fixes CAPI/clusterctl 1.13.5, CAPRKE2 0.25.2, downstream
 CAPC 0.6.1, cert-manager 1.21.1 and the already built downstream CCM candidate.
-All eight image indices and all release assets are immutable. CAPC retains its
+Flux 2.9.5 supplies source 1.9.5, kustomize 1.9.5 and helm 1.6.4.
+All eleven image indices and all release assets are immutable. CAPC retains its
 native v1beta1 contract metadata. The bundle includes complete OCI archives,
-native local provider repositories and the exact clusterctl executable.
+native local provider repositories, reviewed central Flux JSON and exact clusterctl
+and Flux executables. Flux export uses embedded manifests with no runtime download.
 
 The hosted qualification workflow builds this bundle from public inputs,
 verifies every OCI blob/descriptor, generates each provider using native
-clusterctl, and imports/reimports every archive into an isolated instance of
+clusterctl, regenerates the exact minimal Flux export, checks its runtime-bound
+OCI SBOM/provenance (without claiming signature verification), and imports/reimports every archive into an isolated instance of
 the exact RKE2 containerd runtime. Only those successful checks promote the
 candidate bundle from `SOURCE_COMPLETE` to `CI_VERIFIED`. The artifact includes
 `qualification.json` and `management-provider-bundle.tar`; its retention is 14 days. Copy it into
@@ -22,7 +25,7 @@ unsigned; no runtime credentials or deployment inputs are included.
 
 Verify the retained tar SHA-256 against `qualification.json`, then extract it
 with file modes preserved into the approved artifact directory. Its `bundle/`
-directory includes executable clusterctl. The artifact ZIP itself does not
+directory includes executable clusterctl and Flux. The artifact ZIP itself does not
 preserve Unix executable modes, which is why the complete bundle is inside a tar.
 
 Add the following object to the existing protected bootstrap runtime config,
@@ -62,7 +65,23 @@ repair or uninstall occurs.
 
 Completion requires observed native provider inventory, established expected
 CRDs, exact controller image identities and current-generation ready replicas.
-Only then is credential escrow marked complete and temporary SSH cleaned up.
+Central Flux then creates at most one reviewed native object per reconcile. All
+objects carry bundle/nonce ownership annotations; the journal records observed
+UIDs. It rejects foreign objects, changed permissions/args/images, extra containers,
+deleted objects, stale deployment generations and unestablished CRDs. Namespace
+and CRD readiness precede controllers. API timeouts remain unknown until observed,
+and create-only retries cannot overwrite an existing object. Both CAPI and all
+three Flux controllers must be observed ready before credential escrow is marked
+complete and temporary SSH is cleaned up.
+
+Central Flux resides in layersentry-flux-system and reconciles approved project
+resources remotely with same-namespace CAPRKE2 kubeconfig Secrets. Cross-namespace
+source references and remote Kustomize bases are denied; optional controllers,
+tenant aggregate roles and the management cluster-admin binding are removed.
+Default remote ServiceAccount impersonation is intentionally absent until a
+workload SA bootstrap exists. Customer direct Flux CRD writes must remain denied.
+NetworkPolicy retains native controller egress and does not prove Internet denial.
+
 Later inspection uses only the protected API credentials and cannot reopen SSH.
 An older completed journal without provider proof stays pending for an explicit
 operator migration; it does not silently create a new transport.

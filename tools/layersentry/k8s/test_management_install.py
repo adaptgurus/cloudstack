@@ -72,7 +72,7 @@ class BundleTests(unittest.TestCase):
 
 class StagingTests(unittest.TestCase):
     def setUp(self):
-        self.images=[{'image':f'registry.example/provider{i}@sha256:'+'a'*64,'file':f'images/{i}.tar','sha256':'b'*64,'activate':True} for i in range(8)]
+        self.images=[{'image':f'registry.example/provider{i}@sha256:'+'a'*64,'file':f'images/{i}.tar','sha256':'b'*64,'activate':True} for i in range(11)]
         self.bundle=SimpleNamespace(digest='c'*64,value={'images':self.images})
         self.transport=Mock();self.journal=Mock();self.journal.state={}
         self.stager=NativeImageStager(self.bundle,self.transport,self.journal)
@@ -105,6 +105,8 @@ class InstallerTests(unittest.TestCase):
         self.rows={}
         self.api=SimpleNamespace(get=lambda path:self.rows.get(path))
         self.runner=Mock(return_value=subprocess.CompletedProcess([],0,b'not proof',b''))
+        flux=patch('management.install.FluxInstaller');self.addCleanup(flux.stop)
+        self.flux=flux.start().return_value;self.flux.advance.return_value=True;self.flux.inspect.return_value=True
         self.installer=ProviderInstaller(self.bundle,qualification_environment='disposable-lab',runner=self.runner,api_factory=lambda *_:self.api)
         self.native=Mock();self.native.journal.state={};self.native.endpoint='192.0.2.10';self.native.hosts={}
         self.credentials=SimpleNamespace(path=Path('/protected/management.json'))
@@ -148,6 +150,15 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(self.installer.advance(self.native,Mock(),self.credentials,[]))
         self.runner.assert_not_called()
         self.assertEqual(self.native.journal.state['providerInstall']['state'],'OBSERVED_READY')
+
+    def test_capi_ready_does_not_complete_before_central_flux(self):
+        self.native.journal.state['providerInstall']={'state':'UNKNOWN','bundleSha256':self.bundle.digest}
+        self.ready();self.flux.advance.return_value=False
+        self.assertFalse(self.installer.advance(self.native,Mock(),self.credentials,[]))
+        self.flux.advance.assert_called_once_with(self.api,self.native.journal)
+        self.runner.assert_not_called()
+        self.flux.inspect.return_value=False
+        self.assertFalse(self.installer.inspect(self.native,self.credentials))
 
     def test_bundle_rebinding_and_nonlab_or_unqualified_install_are_rejected(self):
         self.native.journal.state['providerBundleSha256']='d'*64

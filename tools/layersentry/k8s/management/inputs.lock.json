@@ -67,6 +67,12 @@
       "url": "https://github.com/cert-manager/cert-manager/releases/download/v1.21.1/cert-manager.yaml",
       "sha256": "5f6a499b8c1857d57f560f536e0dcc830914b45c420899fe7ad0692c8624e408",
       "size": 1034400
+    },
+    {
+      "repository": "fluxcd/flux2",
+      "version": "v2.9.5",
+      "name": "flux_2.9.5_linux_amd64.tar.gz",
+      "sha256": "b853df82adfd7736f580692f9f734473d571606307139f8fd20c2a80dd1ff473"
     }
   ],
   "images": [
@@ -93,6 +99,18 @@
     {
       "source": "quay.io/jetstack/cert-manager-webhook:v1.21.1",
       "image": "quay.io/jetstack/cert-manager-webhook@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42"
+    },
+    {
+      "source": "ghcr.io/fluxcd/source-controller:v1.9.5",
+      "image": "ghcr.io/fluxcd/source-controller@sha256:6f20d232d596a758c923d2861f23511718fc303b8a2e36a1434a7c736b9f4268"
+    },
+    {
+      "source": "ghcr.io/fluxcd/kustomize-controller:v1.9.5",
+      "image": "ghcr.io/fluxcd/kustomize-controller@sha256:a3a955eb2bc432c2eaa94d2d3714e3beae7fdf17586fd23aadf71ab597ac3339"
+    },
+    {
+      "source": "ghcr.io/fluxcd/helm-controller:v1.6.4",
+      "image": "ghcr.io/fluxcd/helm-controller@sha256:8ff15409e46d354338045f483d58ca9cb35dffa2f87e4addd1f5eba1e6a9175f"
     }
   ],
   "crane": {
@@ -199,6 +217,16 @@
           ]
         }
       }
+    ]
+  },
+  "centralFlux": {
+    "version": "v2.9.5",
+    "namespace": "layersentry-flux-system",
+    "binarySha256": "392a85dd1126875c1ab677e18b6edb73f292c9e9ebcbb2e5402eb98bcfd81974",
+    "components": [
+      "source-controller",
+      "kustomize-controller",
+      "helm-controller"
     ]
   }
 }

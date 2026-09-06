@@ -40,7 +40,7 @@ def retain_archive(bundle, target):
         for name in sorted(set(bundle.value['files'])|{'bundle.json'}):
             path=safe_file(bundle.root,name)
             info=tarfile.TarInfo('bundle/'+name)
-            info.size=path.stat().st_size;info.mode=0o755 if name=='bin/clusterctl' else 0o644
+            info.size=path.stat().st_size;info.mode=0o755 if name in ('bin/clusterctl','bin/flux') else 0o644
             with path.open('rb') as stream:archive.addfile(info,stream)
 
 
@@ -89,6 +89,28 @@ def verify_oci(path, expected_image):
     if not any(isinstance(blobs[key][1],dict) and blobs[key][1].get('architecture')=='amd64' and blobs[key][1].get('os')=='linux' for key in visited):
         raise InvalidRequestError('OCI archive contains no Linux amd64 runtime')
 
+    evidence={}
+    if expected_image.startswith('ghcr.io/fluxcd/'):
+        root=blobs[digest][1]
+        runtimes={d['digest'] for d in root.get('manifests',[]) if d.get('platform',{}).get('os')=='linux' and d.get('platform',{}).get('architecture')=='amd64'}
+        if len(runtimes)!=1:raise InvalidRequestError('Flux OCI amd64 runtime is ambiguous')
+        runtime=next(iter(runtimes));found={}
+        for desc in root.get('manifests',[]):
+            annotations=desc.get('annotations',{})
+            if annotations.get('vnd.docker.reference.digest')!=runtime:continue
+            if annotations.get('vnd.docker.reference.type')!='attestation-manifest':continue
+            for layer in blobs[desc['digest']][1].get('layers',[]):
+                statement=blobs[layer['digest']][1]
+                if not isinstance(statement,dict):raise InvalidRequestError('Flux attestation statement is invalid')
+                subjects=statement.get('subject',[])
+                if not subjects or any(s.get('digest',{}).get('sha256')!=runtime.split(':')[1] for s in subjects):raise InvalidRequestError('Flux attestation subject differs from runtime')
+                predicate=statement.get('predicateType','');detail=statement.get('predicate',{})
+                if predicate=='https://spdx.dev/Document' and detail.get('packages'):found['sbom']=layer['digest']
+                if predicate in ('https://slsa.dev/provenance/v1','https://slsa.dev/provenance/v0.2') and detail:found['provenance']=layer['digest']
+        if set(found)!={'sbom','provenance'}:raise InvalidRequestError('Flux OCI lacks runtime-bound SBOM/provenance')
+        evidence={'runtimeManifest':runtime,'attestations':found,'signatureVerified':False}
+    return evidence
+
 
 class Bundle:
     def __init__(self, directory, digest):
@@ -99,7 +121,7 @@ class Bundle:
         manifest = protected_file(self.root/'bundle.json',private=False)
         if sha256(manifest) != digest:raise InvalidRequestError('management bundle manifest digest changed')
         self.value = json.loads(manifest.read_bytes())
-        expected = {'schemaVersion','status','productionCertified','rke2Version','files','images','providers','deployments','crds','namespaceNames','sourceLockSha256'}
+        expected = {'schemaVersion','status','productionCertified','rke2Version','files','images','providers','deployments','crds','namespaceNames','sourceLockSha256','centralFlux'}
         if set(self.value) != expected or self.value['schemaVersion']!='1.0' or self.value['status'] not in ('SOURCE_COMPLETE','CI_VERIFIED') or self.value['productionCertified'] is not False or self.value['rke2Version']!='v1.36.4+rke2r1':
             raise InvalidRequestError('management bundle qualification contract is invalid')
         lock_path = Path(__file__).with_name('inputs.lock.json')
@@ -118,7 +140,7 @@ class Bundle:
         if not os.access(self.root/'bin/clusterctl',os.X_OK):
             raise InvalidRequestError('pinned clusterctl is not executable; extract the retained bundle tar with file modes preserved')
         images = self.value['images']
-        if not isinstance(images,list) or len(images)!=8 or len({image['image'] for image in images})!=8:
+        if not isinstance(images,list) or len(images)!=11 or len({image['image'] for image in images})!=11:
             raise InvalidRequestError('management provider image closure is incomplete')
         for image in images:
             if set(image)!={'image','file','sha256','activate'} or image['file'] not in files or image['sha256']!=files[image['file']]['sha256']:
@@ -126,6 +148,13 @@ class Bundle:
             if image['activate'] is not (not image['image'].startswith('layersentry.local/cloudstack-ccm@')):
                 raise InvalidRequestError('management image activation gate differs from the approved tuple')
             verify_oci(self.root/image['file'],image['image'])
+        flux=self.value['centralFlux']
+        if set(flux)!={'version','namespace','file'} or flux['version']!=lock['centralFlux']['version'] or flux['namespace']!=lock['centralFlux']['namespace'] or flux['file']!='central-flux.json' or flux['file'] not in files:
+            raise InvalidRequestError('central Flux manifest binding is invalid')
+        from .flux import validate_manifest
+        validate_manifest(json.loads(self.file(flux['file']).read_bytes()),lock)
+        if sha256(self.file('bin/flux'))!=lock['centralFlux']['binarySha256'] or not os.access(self.root/'bin/flux',os.X_OK):
+            raise InvalidRequestError('central Flux CLI executable differs from the pin')
         if [(p['name'],p['type'],p['version'],p['label'],p['namespace']) for p in self.value['providers']] != [('cluster-api','CoreProvider','v1.13.5','cluster-api','capi-system'),('rke2','BootstrapProvider','v0.25.2','bootstrap-rke2','rke2-bootstrap-system'),('rke2','ControlPlaneProvider','v0.25.2','control-plane-rke2','rke2-control-plane-system'),('cloudstack','InfrastructureProvider','v0.6.1','infrastructure-cloudstack','capc-system')]:
             raise InvalidRequestError('management provider contract is incomplete')
 

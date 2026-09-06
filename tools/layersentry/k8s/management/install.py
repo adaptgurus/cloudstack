@@ -15,6 +15,7 @@ import urllib.parse
 from bootstrap.native import canonical
 from controller.model import InvalidRequestError
 from .remote import NativeImageStager
+from .flux import FluxInstaller,route
 
 
 class ManagementAPI:
@@ -22,10 +23,19 @@ class ManagementAPI:
         self.credentials,self.endpoint=credentials,endpoint
 
     def get(self,path):
-        if not re.fullmatch(r'/(?:api/v1|apis/(?:apps|apiextensions.k8s.io)/v1|apis/clusterctl.cluster.x-k8s.io/v1alpha3)/[A-Za-z0-9_./-]+',path) or '..' in path:
+        return self.request('GET',path)
+
+    def create(self,path,value):
+        if route(value)[0]!=path:raise InvalidRequestError('central Flux create path differs from approved identity')
+        return self.request('POST',path,value)
+
+    def request(self,method,path,value=None):
+        if not re.fullmatch(r'/(?:api/v1|apis/(?:apps|apiextensions.k8s.io|rbac.authorization.k8s.io|networking.k8s.io)/v1|apis/clusterctl.cluster.x-k8s.io/v1alpha3)/[A-Za-z0-9_./-]+',path) or '..' in path:
             raise InvalidRequestError('management installer read is outside its fixed API scope')
-        value=self.credentials.read(self.endpoint)
-        cluster=value['clusters'][0]['cluster'];user=value['users'][0]['user']
+        payload=canonical(value) if method=='POST' else None
+        if payload is not None and len(payload)>4*1024**2:raise InvalidRequestError('central Flux object exceeds request limit')
+        credentials=self.credentials.read(self.endpoint)
+        cluster=credentials['clusters'][0]['cluster'];user=credentials['users'][0]['user']
         try:
             with tempfile.TemporaryDirectory(prefix='layersentry-provider-tls-') as directory:
                 paths=[]
@@ -37,16 +47,16 @@ class ManagementAPI:
                 context=ssl.create_default_context(cafile=str(paths[0]));context.load_cert_chain(str(paths[1]),str(paths[2]))
                 connection=http.client.HTTPSConnection(self.endpoint,6443,context=context,timeout=20)
                 try:
-                    connection.request('GET',path,headers={'Accept':'application/json'})
+                    connection.request(method,path,body=payload,headers={'Accept':'application/json','Content-Type':'application/json'})
                     response=connection.getresponse();raw=response.read(8*1024**2+1)
-                    if response.status==404:return None
-                    if response.status!=200 or len(raw)>8*1024**2:raise ValueError()
+                    if method=='GET' and response.status==404:return None
+                    if response.status!=(201 if method=='POST' else 200) or len(raw)>8*1024**2:raise ValueError()
                     result=json.loads(raw)
                     if not isinstance(result,dict):raise ValueError()
                     return result
                 finally:connection.close()
         except (OSError,ValueError,http.client.HTTPException):
-            raise InvalidRequestError('management provider observation failed; no mutation was inferred') from None
+            raise InvalidRequestError('management API request failed; mutation outcome must be observed before retry') from None
 
 
 def clusterctl_config(bundle):
@@ -123,7 +133,7 @@ class ProviderInstaller:
         before=self.observe(api,started=record is not None)
         if before['ready']:
             journal.state['providerInstall']={'state':'OBSERVED_READY','bundleSha256':self.bundle.digest}
-            journal.save();return True
+            journal.save();return FluxInstaller(self.bundle).advance(api,journal)
         if not NativeImageStager(self.bundle,transport,journal).advance(nodes,native.hosts):return False
         if before['inventoryComplete']:
             # Native init skips installed providers; do not pretend that rerunning
@@ -144,10 +154,11 @@ class ProviderInstaller:
         journal.state['providerInstall']={'state':state,'bundleSha256':self.bundle.digest};journal.save()
         after=self.observe(api,started=True)
         if after['ready']:
-            journal.state['providerInstall']['state']='OBSERVED_READY';journal.save();return True
+            journal.state['providerInstall']['state']='OBSERVED_READY';journal.save();return FluxInstaller(self.bundle).advance(api,journal)
         return False
 
     def inspect(self,native,credentials):
         record=native.journal.state.get('providerInstall',{})
         if record.get('bundleSha256')!=self.bundle.digest or record.get('state')!='OBSERVED_READY':return False
-        return self.observe(self.api_factory(credentials,native.endpoint),started=True)['ready']
+        api=self.api_factory(credentials,native.endpoint)
+        return self.observe(api,started=True)['ready'] and FluxInstaller(self.bundle).inspect(api,native.journal)
