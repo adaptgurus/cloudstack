@@ -1,6 +1,6 @@
 # Completed libvirt incremental capture sealing
 
-Status: IMPLEMENTED_SOURCE_QUALIFIED. Source-only scope; no live mutation or recovery claim.
+Status: SOURCE_COMPLETE. Source-only scope; no live mutation or recovery claim.
 
 The retained full point committed, but incremental capture34057792718 failed the
 sealed-only QCOW gate. Read-only probe34058283613 found an exact source-disk backing

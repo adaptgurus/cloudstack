@@ -49,6 +49,35 @@ Before changing anything:
 
 ## Current checkpoint
 
+### PARTIAL / CI_VERIFIED — 2026-09-07 durable incremental sealing and preserved old fixture
+
+Sealing source `8f94ee6e2ac1e360e39b71b8247e64b62187ef0d` passed Rocky9.8 workflow
+`34059422380`: 196 Kubernetes and 41 DR tests, no skips. Artifact `9996990879`,
+SHA256 `bed2fa12a3292acd0e064fd3272415fb3ab917a47bfae19ba4723a1194e054c9`.
+Exact provider-completion and per-disk sealing receipts precede metadata-only
+backing-reference detach. Real offline full/incremental/allocated-zero
+reconstruction passes. Catalog no-external-reference validation is unchanged;
+this is not yet target libvirt capture/recovery acceptance.
+
+Old fixture retirement attempt `34059266361` failed because checkpoint bindings
+use `getXMLDesc`, not domain-style `XMLDesc`. Read-only outcome probe `34059389128`
+confirmed the old domain still active/transient, no job, both original checkpoints,
+matching ownership SHA and retirement intent absent; the stop had not submitted.
+Corrected exact retirement `34059434238` passed at runner
+`163d7a0a105a9d7c3b3264080db937312648436e`: old domain absent, original runtime disk,
+ownership, replication catalog/journals retained. Transient domain and checkpoint
+XML were durably saved in its private retirement intent before shutdown. No files
+were deleted. A fresh UUID/image copy is required for the next capture; the old
+ambiguous incremental remains preserved and must not be replayed.
+
+DC bridge Plan `34059076116` passed; exact management MAC spoof already On. Apply
+`34059522309` failed and is awaiting exact outcome reconciliation by the DC owner;
+no replay or successful bridge claim is made at this checkpoint. The shared live
+queue must stay serialized. Served browser/replication UI, E0 storage survival,
+client RKE2 formation, native two-Zone recovery and service package installation
+remain unverified.
+
+
 ### PARTIAL / CI_VERIFIED — 2026-09-07 integrated package UI, central Flux and first actual DR capture
 
 Combined source `482c52330571420b7e29c412c332057225735c2c` passed UI workflow
