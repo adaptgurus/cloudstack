@@ -4,6 +4,7 @@ const providerMeta={
 'mysql':{name:'MySQL',category:'database',release:'8.0',port:3306,network:true,storage:false,backup:true,adminSecret:true,cluster:false},
 'mariadb':{name:'MariaDB',category:'database',release:'10.5',port:3306,network:true,storage:false,backup:true,adminSecret:true,cluster:false},
 'redis':{name:'Redis',category:'database',release:'6.2',port:6379,network:true,storage:false,backup:true,adminSecret:true,cluster:false},
+'valkey':{name:'Valkey',category:'database',release:'8.0',port:6379,network:true,storage:false,backup:true,adminSecret:true,cluster:false},
 'nginx':{name:'Nginx',category:'application',release:'stable',port:8080,network:true,storage:false,backup:false,adminSecret:false,cluster:false},
 'apache-httpd':{name:'Apache HTTPD',category:'application',release:'stable',port:8080,network:true,storage:false,backup:false,adminSecret:false,cluster:false},
 'tomcat':{name:'Tomcat',category:'application',release:'stable',port:8080,network:true,storage:false,backup:false,adminSecret:false,cluster:false},
