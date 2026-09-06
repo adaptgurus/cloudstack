@@ -53,6 +53,7 @@
 import store from '@/store'
 import { postAPI } from '@/api'
 import _ from 'lodash'
+import Cookies from 'js-cookie'
 
 export default {
   name: 'SamlDomainSwitcher',
@@ -69,6 +70,11 @@ export default {
   },
   methods: {
     fetchData () {
+      if (Cookies.get('isSAML') !== 'true') {
+        this.showSwitcher = false
+        this.loading = false
+        return
+      }
       var page = 1
       const samlAccounts = []
       const getNextPage = () => {
@@ -84,6 +90,7 @@ export default {
         }).catch(error => {
           console.log(error)
         }).finally(() => {
+          this.loading = false
           if (samlAccounts.length < 2) {
             this.showSwitcher = false
             return
@@ -110,7 +117,7 @@ export default {
           this.$message.success(`Switched to "${account.accountName} (${account.domainPath})"`)
           this.$router.go()
         })
-      }).else(error => {
+      }).catch(error => {
         console.log('error refreshing with new user context: ' + error)
       })
     }
