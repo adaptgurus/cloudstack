@@ -19,6 +19,7 @@ import (
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/journal"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lifecycle"
+	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lvmexec"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/maintenance"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/model"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/nodeexec"
@@ -41,6 +42,7 @@ const root = "/var/lib/layersentryd"
 
 type runtimeState struct {
 	runner     executor.Runner
+	lvmRunner  executor.Runner
 	reg        *provider.Registry
 	store      *journal.Store
 	secrets    *secrets.Store
@@ -70,6 +72,7 @@ func buildRuntime() (*runtimeState, error) {
 	runner := providerexec.Router{Core: coreRunner, Provider: providerRunner}
 	valkeyRunner := valkeyexec.NewClient(valkeyexec.DefaultSocket)
 	nodeRunner := nodeexec.NewClient(nodeexec.DefaultSocket)
+	lvmRunner := lvmexec.NewClient(lvmexec.DefaultSocket)
 	st, err := journal.New(root); if err != nil { return nil, err }
 	sec, err := secrets.Open(root+"/secrets", root+"/identity/secret.key"); if err != nil { return nil, err }
 	backupKeys, err := backupcrypto.Open(root + "/identity/backup.agekeys"); if err != nil { return nil, err }
@@ -109,8 +112,8 @@ func buildRuntime() (*runtimeState, error) {
 	}
 	for _, p := range providers { if err = reg.Register(p); err != nil { return nil, err } }
 	clusterClient := &cluster.Client{Secrets: sec}
-	eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, Cluster: clusterClient, LockPath: root + "/state/mutation.lock"}
-	return &runtimeState{runner: runner, reg: reg, store: st, secrets: sec, backupKeys: backupKeys, enrollment: enrollment, eng: eng}, nil
+	eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, LVMRunner: lvmRunner, Cluster: clusterClient, LockPath: root + "/state/mutation.lock"}
+	return &runtimeState{runner: runner, lvmRunner:lvmRunner, reg: reg, store: st, secrets: sec, backupKeys: backupKeys, enrollment: enrollment, eng: eng}, nil
 }
 
 func serve() error {
@@ -128,12 +131,13 @@ func maintenanceRun() error { rt,err:=buildRuntime();if err!=nil{return err};ret
 
 func privilegedHelper() error {
 	if os.Geteuid()!=0{return errors.New("privileged-helper requires root")}
-	runner:=executor.OSRunner{Timeout:5*time.Minute,MaxOutput:1<<20};ctx,cancel:=context.WithCancel(context.Background());defer cancel();errCh:=make(chan error,4)
+	runner:=executor.OSRunner{Timeout:5*time.Minute,MaxOutput:1<<20};ctx,cancel:=context.WithCancel(context.Background());defer cancel();errCh:=make(chan error,5)
 	go func(){errCh<-privileged.Serve(ctx,privileged.DefaultSocket,"layersentry",runner)}()
 	go func(){errCh<-providerexec.Serve(ctx,providerexec.DefaultSocket,"layersentry",runner)}()
 	go func(){errCh<-valkeyexec.Serve(ctx,valkeyexec.DefaultSocket,"layersentry",runner)}()
 	go func(){errCh<-nodeexec.Serve(ctx,nodeexec.DefaultSocket,"layersentry",runner)}()
-	first:=<-errCh;cancel();errs:=[]error{first,<-errCh,<-errCh,<-errCh};for _,err:=range errs{if err!=nil&&!errors.Is(err,context.Canceled){return err}};return nil
+	go func(){errCh<-lvmexec.Serve(ctx,lvmexec.DefaultSocket,"layersentry",runner)}()
+	first:=<-errCh;cancel();errs:=[]error{first,<-errCh,<-errCh,<-errCh,<-errCh};for _,err:=range errs{if err!=nil&&!errors.Is(err,context.Canceled){return err}};return nil
 }
 
 func localIPs()[]net.IP{ifs,_:=net.Interfaces();var out []net.IP;for _,i:=range ifs{addrs,_:=i.Addrs();for _,a:=range addrs{ip,_,err:=net.ParseCIDR(a.String());if err==nil&&ip!=nil&&!ip.IsUnspecified(){out=append(out,ip)}}};return out}
