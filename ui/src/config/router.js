@@ -217,6 +217,16 @@ export function asyncRouterMap () {
       },
       component: () => import('@/views/layersentry/QuickProvision.vue')
     },
+    {
+      path: '/kubernetes-data-services',
+      name: 'kubernetesDataServices',
+      hidden: !isLayersentryKvmProfile() || vueProps.$config?.layersentry?.features?.kubernetesDataServices?.enabled === false,
+      meta: {
+        title: 'Kubernetes & Data Services',
+        icon: 'ClusterOutlined'
+      },
+      component: () => import('@/views/layersentry/KubernetesDataServices.vue')
+    },
 
     generateRouterMap(compute),
     generateRouterMap(storage),
