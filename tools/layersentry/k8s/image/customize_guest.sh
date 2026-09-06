@@ -17,6 +17,8 @@ PY
 rpmkeys --import trust/RPM-GPG-KEY-Rocky-9 trust/RPM-GPG-KEY-Rancher
 rpmkeys --checksig ./*.rpm
 dnf -y --disablerepo='*' --setopt=localpkg_gpgcheck=1 --setopt=install_weak_deps=False install ./*.rpm
+install -d -m 0755 /usr/share/layersentry/node-image
+python3 "$bundle/configure_qga.py" > /usr/share/layersentry/node-image/qga-policy.json
 # The verified official archive uses only bin/, lib/systemd/ and share/rke2/.
 tar -xzf rke2.linux-amd64.tar.gz -C /usr/local
 install -d -m 0755 /var/lib/rancher/rke2/agent/images /etc/rancher/rke2 /etc/sysconfig
