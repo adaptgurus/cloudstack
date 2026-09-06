@@ -49,6 +49,43 @@ Before changing anything:
 
 ## Current checkpoint
 
+### PARTIAL / SOURCE_COMPLETE — 2026-09-07 package API and active runtime qualification
+
+Source `526ccf9b69` connects approved package profiles to authenticated BFF routes,
+immutable catalog/Cluster UID intent, durable same-cluster reservations and
+native central Flux lifecycle. Historical approved catalogs remain available
+for existing releases; native full-profile ownership survives unrelated catalog
+additions. Admission rejects missing dependencies before reserving the cluster,
+and package objects block cluster deletion. Exact spec checks reject added Helm
+values/overrides; only the audited OCIRepository provider default is accepted.
+Explicit UNKNOWN observation requires the original mutation capability. Local
+Kubernetes suite: 179 tests pass, one environment-dependent Nginx skip. Detailed
+scope: `evidence/k8s/2026-09-07-package-bff-saga-source.md`. The package GUI and
+combined Rocky CI still await this source's own evidence.
+
+- Earlier combined source `2b7f06773216d76c455be1ab32d483cebbd38804` passed Rocky
+  workflow `34056716860`. It predates the package BFF continuation.
+- Replacement image build `34056395384` passed at builder
+  `4d0d323569805ae022d6094dfa2cfa0ced0ea071`; artifact `9996215787`, image SHA-256
+  `7580d64a5b9f27d930d7a5f5688f67063db042252dd43c7cf280fdb3e101a34d`. All eight
+  critical SELinux label checks pass offline; the ordering cycle is corrected.
+  Exact manifest: `evidence/k8s/2026-09-06-rke2-cpu-image-ordering-build.json`.
+- Actual DR boot `34057059334`, job `101550774366`, runner
+  `c9c352a7b851fde8dc6109e90c4a4919ad97e546`, consumes this exact new image and
+  helper `2b7f06773216d76c455be1ab32d483cebbd38804`. Artifact binding/download
+  passed; guest acceptance remains pending. No recovery pass is inferred.
+- DC storage registration attempt `34056971769` exited at launch without a
+  bounded remote receipt. Shell quoting is reproduced as the source defect, but
+  outcome observers `34057107214` and `34057101769` must establish journal/API
+  state before any corrected execution. No blind replay or storage success claim.
+- Hyper-V network inventory `34056883119` confirms the guest gateway
+  `10.10.20.1/24` belongs to `LayerSentry-DR-Internal`, while both DC and DR NICs
+  attach only to `Cozystack-NAT` (`10.10.10.0/24`). Zone activation remains held
+  pending exact guest adjacency and fixed management-address exclusions.
+
+All live production gates remain unchanged. This is ongoing source/artifact/lab
+qualification, not production-ready DC/DR, DBaaS or APaaS certification.
+
 ### PARTIAL / CI_VERIFIED — 2026-09-07 confined image correction, provider installer and verified DC inventory
 
 Combined source `9dcd8ea01be5b6463488e7e9660f7106f0f4fdda` integrates the reviewed native management-provider installer, confined public SSH-key reader, corrected image builder and real libvirt capture acceptance harness. Local verification: 146 Kubernetes tests (one environment-dependent Nginx skip), 18 image tests and five capture-harness guards pass. Exact Rocky container qualification run `34055310115`, job `101546049874`, passed all 146 Kubernetes and 32 DR tests with no skips; container results cannot establish guest acceptance. Previous source `bae4285c80` also passed UI workflow `34052268435`; the new integration changes no UI source.
