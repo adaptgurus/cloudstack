@@ -31,12 +31,12 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 16
+          node-version: 24.20.0
 
       - name: Env details
         run: |
@@ -49,11 +49,11 @@ jobs:
       - name: Build UI
         run: |
           cd ui
-          sudo npm install -g @vue/cli npm-check-updates
-          npm install
+          npm ci
           npm run build
-          npm run lint
-          npm run test:unit
+          npm run lint -- --no-fix
+          npm run test:unit -- --runInBand
+          git diff --exit-code -- public/config.json package-lock.json
 
       - uses: codecov/codecov-action@v4
         if: github.repository == 'apache/cloudstack'
