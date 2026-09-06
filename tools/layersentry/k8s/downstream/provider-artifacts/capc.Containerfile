@@ -4,7 +4,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go test -mod=readonly ./pkg/cloud -args '-ginkgo.label-filter=!integ'
+RUN REPO_ROOT=/src go test -mod=readonly ./pkg/cloud -args '-ginkgo.label-filter=!integ'
 RUN go build -mod=readonly -trimpath -buildvcs=false -ldflags '-s -w -extldflags -static' -o /out/manager .
 RUN cd hack/tools && go build -mod=readonly -trimpath -buildvcs=false -o /out/kustomize sigs.k8s.io/kustomize/kustomize/v5
 FROM scratch AS tools
