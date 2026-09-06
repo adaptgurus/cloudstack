@@ -262,6 +262,36 @@ class ReplicationCase(unittest.TestCase):
             self.assertEqual(worker.call_count, 1)
         self.assertIsNone(engine.status()["head"])
 
+    def test_provider_receipt_routes_retry_only_to_offline_sealing(self):
+        engine, epoch = self.engine(), uid()
+        with patch.object(engine, "_worker") as worker:
+            with self.assertRaises(ReplicationError):
+                engine.replicate(epoch)
+            journal = engine.state_root / self.plan.plan_id / "epochs" / epoch
+            (journal / "provider-complete.json").write_text('{}')
+            complete = self.capture_worker(engine)
+            def seal(plan, intent, output, state, tools, deadline):
+                complete(intent, state)
+            with patch("dr_libvirt_capture.QcowTools"), patch("dr_libvirt_capture._seal_completed_capture", side_effect=seal) as sealer:
+                self.assertEqual(engine.replicate(epoch, allow_capture=False)["state"], "COMMITTED")
+                sealer.assert_called_once()
+            self.assertEqual(worker.call_count, 1)
+
+    def test_offline_sealing_refuses_an_existing_capture_worker(self):
+        engine, epoch = self.engine(), uid()
+        with patch.object(engine, "_worker") as worker:
+            with self.assertRaises(ReplicationError):
+                engine.replicate(epoch)
+            journal = engine.state_root / self.plan.plan_id / "epochs" / epoch
+            (journal / "provider-complete.json").write_text('{}')
+            identity = {"pid": 123, "start_ticks": 1, "boot_id": uid()}
+            (journal / "worker.json").write_text(json.dumps(identity))
+            with patch("dr_libvirt_capture.process_identity", return_value=identity), patch("dr_libvirt_capture._seal_completed_capture") as sealer:
+                with self.assertRaisesRegex(ReplicationError, "CAPTURE_WORKER_STILL_RUNNING"):
+                    engine.replicate(epoch, allow_capture=False)
+                sealer.assert_not_called()
+            self.assertEqual(worker.call_count, 1)
+
     def test_lost_destination_ack_resumes_transfer_without_new_capture(self):
         engine, epoch = self.engine(), uid()
         real_send = engine.transport.send

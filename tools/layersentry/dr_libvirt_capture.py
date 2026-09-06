@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from dr_file_replication import (
-    FilePlan, QcowTools, check_qcow2, replace_json, secure_root,
+    FilePlan, QcowTools, check_qcow2, capture_qcow2_header, replace_json, secure_root,
     validate_manifest, verify_disks,
 )
 from dr_replication import (
@@ -40,6 +40,111 @@ def _checkpoint(domain, name: str, plan: FilePlan) -> ET.Element:
     require(set(disks) == {disk.device for disk in plan.disks}
             and all(item.get("checkpoint") == "bitmap" for item in disks.values()), "CHECKPOINT_DISK_MISMATCH")
     return value
+
+
+def _file_binding(info) -> dict:
+    return {"device": info.st_dev, "inode": info.st_ino, "size": info.st_size}
+
+
+def _completed_provider_receipt(plan: FilePlan, intent: dict, output: Path,
+                                journal_path: Path, captured_at: int) -> None:
+    """Called only after exact provider completion and private ownership claim."""
+    with secure_root(output) as folder:
+        info = os.fstat(folder)
+        disks = []
+        for disk in plan.disks:
+            fd = regular_file(folder, disk.device + ".qcow2")
+            try:
+                item = os.fstat(fd)
+                require(item.st_uid == os.geteuid() and stat.S_IMODE(item.st_mode) == 0o400
+                        and 0 < item.st_size <= plan.max_bytes,
+                        "COMPLETED_CAPTURE_NOT_PRIVATE")
+                disks.append({"disk": disk.device, "binding": _file_binding(item)})
+            finally:
+                os.close(fd)
+        proof = {"schema": 1, "intent_sha256": fingerprint(intent), "scope_sha256": fingerprint(plan.scope()),
+                 "epoch_id": intent["epoch_id"], "checkpoint": "lsdr-" + intent["epoch_id"],
+                 "captured_at_epoch": captured_at, "provider_state": "COMPLETED_BACKUP",
+                 "directory": {"device": info.st_dev, "inode": info.st_ino}, "disks": disks}
+    with secure_root(journal_path) as journal:
+        write_json_once(journal, "provider-complete.json", proof)
+
+
+def _seal_completed_capture(plan: FilePlan, intent: dict, output: Path,
+                            journal_path: Path, tools: QcowTools, deadline: float) -> dict:
+    """Offline, receipt-bound sealing; never contacts libvirt or replays capture."""
+    with secure_root(journal_path) as journal, secure_root(output) as folder:
+        proof = read_json(journal, "provider-complete.json")
+        info = os.fstat(folder)
+        require(set(proof) == {"schema", "intent_sha256", "scope_sha256", "epoch_id", "checkpoint",
+                              "captured_at_epoch", "provider_state", "directory", "disks"}
+                and proof["schema"] == 1 and proof["provider_state"] == "COMPLETED_BACKUP"
+                and proof["intent_sha256"] == fingerprint(intent)
+                and proof["scope_sha256"] == fingerprint(plan.scope())
+                and proof["epoch_id"] == intent["epoch_id"] and proof["checkpoint"] == "lsdr-" + intent["epoch_id"]
+                and proof["directory"] == {"device": info.st_dev, "inode": info.st_ino}
+                and isinstance(proof["disks"], list) and len(proof["disks"]) == len(plan.disks),
+                "PROVIDER_COMPLETION_BINDING_MISMATCH")
+        tools.check_version(deadline)
+        entries = []
+        for disk, binding in zip(plan.disks, proof["disks"]):
+            filename = disk.device + ".qcow2"
+            require(set(binding) == {"disk", "binding"} and binding["disk"] == disk.device,
+                    "PROVIDER_COMPLETION_DISKS_MISMATCH")
+            fd = regular_file(folder, filename)
+            try:
+                info = os.fstat(fd)
+                require(info.st_uid == os.geteuid() and stat.S_IMODE(info.st_mode) in {0o400, 0o600}
+                        and 0 < info.st_size <= plan.max_bytes
+                        and _file_binding(info) == binding["binding"], "COMPLETED_CAPTURE_FILE_CHANGED")
+                entry = {"device": disk.device, "volume_id": disk.volume_id,
+                         "virtual_bytes": disk.virtual_bytes, "filename": filename}
+                name = "seal-" + disk.device + ".json"
+                try:
+                    sealing = read_json(journal, name)
+                except FileNotFoundError:
+                    sealing = None
+                expected = disk.source_path if intent["mode"] == "INCREMENTAL" else None
+                if sealing is not None:
+                    require(set(sealing) == {"provider_sha256", "binding", "header_sha256", "expected_backing"}
+                            and sealing["provider_sha256"] == fingerprint(proof)
+                            and sealing["binding"] == binding["binding"] and sealing["expected_backing"] == expected,
+                            "SEALING_INTENT_BINDING_MISMATCH")
+                header = capture_qcow2_header(folder, entry, expected, allow_detached=sealing is not None)
+                if sealing is None:
+                    sealing = {"provider_sha256": fingerprint(proof), "binding": binding["binding"],
+                               "header_sha256": header["header_sha256"], "expected_backing": expected}
+                    write_json_once(journal, name, sealing)
+                if header["backing"] is not None:
+                    require(header["header_sha256"] == sealing["header_sha256"], "CAPTURE_HEADER_CHANGED_BEFORE_DETACH")
+                    os.fchmod(fd, 0o600);os.fsync(fd)
+                    tools.detach_completed_capture(output / filename, deadline)
+                # A crash after detach can resume from the saved intent and
+                # observe the sealed header. Never run convert on an epoch delta.
+                require(_file_binding(os.fstat(fd)) == binding["binding"], "CAPTURE_FILE_CHANGED_DURING_DETACH")
+                current = regular_file(folder, filename)
+                try:
+                    require(_file_binding(os.fstat(current)) == binding["binding"], "CAPTURE_PATH_REPLACED")
+                finally:
+                    os.close(current)
+                check_qcow2(folder, entry)
+                tools.check(output / filename, deadline)
+                os.fchmod(fd, 0o400);os.fsync(fd)
+            finally:
+                os.close(fd)
+            size, digest = file_digest(folder, filename, deadline, plan.max_bytes)
+            entry.update(size=size, sha256=digest)
+            write_json_once(journal, "sealed-" + disk.device + ".json", entry)
+            entries.append(entry)
+        manifest = {"schema": 1, "provider": "LIBVIRT_QCOW2", "scope": plan.scope(),
+                    "epoch_id": intent["epoch_id"], "mode": intent["mode"], "parent": intent["parent"],
+                    "captured_at_epoch": proof["captured_at_epoch"], "checkpoint": proof["checkpoint"],
+                    "consistency": "CRASH", "disks": entries}
+        validate_manifest(manifest, plan)
+        write_json_once(journal, "manifest.json", manifest)
+        write_json_once(journal, "capture-complete.json", {"intent_sha256": fingerprint(intent),
+                                                           "manifest_sha256": fingerprint(manifest)})
+        return manifest
 
 
 def _capture_worker(plan: FilePlan, intent: dict, capture_root: str, journal_path: str,
@@ -143,6 +248,7 @@ def _capture_worker(plan: FilePlan, intent: dict, capture_root: str, journal_pat
         captured = _checkpoint(domain, name, plan)
         captured_at = int(captured.findtext("creationTime"))
         require(started - 1 <= captured_at <= int(time.time()) + 1, "CHECKPOINT_TIME_MISMATCH")
+        require(domain.jobStats(0).get("type") == libvirt.VIR_DOMAIN_JOB_NONE, "HYPERVISOR_JOB_STILL_ACTIVE")
         # The provider job has completed. Remove QEMU write access before sealing.
         raw = os.open(output, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
@@ -163,26 +269,12 @@ def _capture_worker(plan: FilePlan, intent: dict, capture_root: str, journal_pat
             os.fsync(raw)
         finally:
             os.close(raw)
-        tools = QcowTools(Path(qemu_img), plan.qemu_version)
-        tools.check_version(deadline)
-        entries = []
-        with secure_root(output) as folder:
-            for disk in plan.disks:
-                filename = disk.device + ".qcow2"
-                size, digest = file_digest(folder, filename, deadline, plan.max_bytes)
-                entry = {"device": disk.device, "volume_id": disk.volume_id, "virtual_bytes": disk.virtual_bytes,
-                         "filename": filename, "size": size, "sha256": digest}
-                check_qcow2(folder, entry)
-                tools.check(output / filename, deadline)
-                entries.append(entry)
-        manifest = {"schema": 1, "provider": "LIBVIRT_QCOW2", "scope": plan.scope(),
-                    "epoch_id": intent["epoch_id"], "mode": intent["mode"], "parent": intent["parent"],
-                    "captured_at_epoch": captured_at, "checkpoint": name, "consistency": "CRASH", "disks": entries}
-        validate_manifest(manifest, plan)
-        with secure_root(Path(journal_path)) as journal:
-            write_json_once(journal, "manifest.json", manifest)
-            write_json_once(journal, "capture-complete.json", {"intent_sha256": fingerprint(intent),
-                                                               "manifest_sha256": fingerprint(manifest)})
+        # Completion is durable BEFORE metadata changes/hashing. Old epochs
+        # without this receipt remain ambiguous and cannot be salvaged by retry.
+        _completed_provider_receipt(plan, intent, output, Path(journal_path), captured_at)
+        _seal_completed_capture(plan, intent, output, Path(journal_path),
+                                QcowTools(Path(qemu_img), plan.qemu_version), deadline)
+
     except BaseException as error:
         code = str(error) if isinstance(error, ReplicationError) else "LIBVIRT_CAPTURE_UNCERTAIN"
         try:
@@ -352,7 +444,7 @@ class FileReplicationEngine:
                     # have been saved. Recover only that pre-submission window;
                     # any provider evidence without state remains ambiguous.
                     require(not ({"worker.json", "manifest.json", "capture-complete.json",
-                                  "capture-error.json"} & set(os.listdir(epoch))),
+                                  "capture-error.json", "provider-complete.json"} & set(os.listdir(epoch))),
                             "CAPTURE_STATE_MISSING_RECONCILE_REQUIRED")
                     require(not os.path.lexists(self.capture_root / epoch_id),
                             "CAPTURE_STATE_MISSING_RECONCILE_REQUIRED")
@@ -372,6 +464,17 @@ class FileReplicationEngine:
                     replace_json(epoch, "state.json", {"state": "CAPTURING"})
                     journal = self.state_root / self.plan.plan_id / "epochs" / epoch_id
                     self._worker(intent, journal)
+                # Only a durable provider completion permits offline sealing
+                # resume. Never enter _worker/backupBegin for an ambiguous epoch.
+                if ("provider-complete.json" in os.listdir(epoch)
+                        and "capture-complete.json" not in os.listdir(epoch)):
+                    recorded = self._optional(epoch, "worker.json", {})
+                    require(not recorded or process_identity(recorded["pid"]) != recorded,
+                            "CAPTURE_WORKER_STILL_RUNNING")
+                    _seal_completed_capture(self.plan, intent, self.capture_root / epoch_id,
+                                            self.state_root / self.plan.plan_id / "epochs" / epoch_id,
+                                            QcowTools(self.qemu_img, self.plan.qemu_version),
+                                            time.monotonic() + self.plan.transfer_timeout)
                 try:
                     manifest = self._captured(epoch, intent)
                 except Exception:

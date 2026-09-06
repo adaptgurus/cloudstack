@@ -215,6 +215,68 @@ def check_qcow2(parent: int, entry: dict) -> None:
             "UNSAFE_OR_UNSEALED_QCOW2")
 
 
+def capture_qcow2_header(parent: int, entry: dict, expected_backing: str | None,
+                         *, allow_detached: bool = False) -> dict:
+    """Capture-only transition gate; never used to relax catalog validation.
+
+    Inspect bounded bytes directly before qemu-img can parse external references.
+    Only the completed native capture's exact original source is permitted here.
+    """
+    import hashlib
+    fd = regular_file(parent, entry["filename"])
+    with os.fdopen(fd, "rb") as handle:
+        header = handle.read(104)
+        require(len(header) == 104 and header[:4] == b"QFI\xfb", "QCOW2_HEADER_REQUIRED")
+        version = struct.unpack_from(">I", header, 4)[0]
+        offset, length = struct.unpack_from(">QI", header, 8)
+        bits = struct.unpack_from(">I", header, 20)[0]
+        require(version in {2, 3} and 9 <= bits <= 21, "UNSAFE_CAPTURE_QCOW2_HEADER")
+        cluster_bytes = 1 << bits
+        header_length = struct.unpack_from(">I", header, 100)[0] if version == 3 else 72
+        require(header_length in ({104, 112} if version == 3 else {72}), "UNSUPPORTED_CAPTURE_QCOW2_HEADER")
+        require(struct.unpack_from(">Q", header, 24)[0] == entry["virtual_bytes"]
+                and struct.unpack_from(">I", header, 32)[0] == 0
+                and struct.unpack_from(">I", header, 60)[0] == 0
+                and struct.unpack_from(">Q", header, 64)[0] == 0,
+                "UNSAFE_CAPTURE_QCOW2_FEATURES")
+        if version == 3:
+            require(struct.unpack_from(">Q", header, 72)[0] == 0
+                    and struct.unpack_from(">Q", header, 80)[0] in {0, 1}
+                    and struct.unpack_from(">Q", header, 88)[0] == 0,
+                    "UNSAFE_CAPTURE_QCOW2_FEATURES")
+        handle.seek(0);first = handle.read(cluster_bytes)
+    require(len(first) == cluster_bytes and not any(first[104:header_length]), "TRUNCATED_OR_UNKNOWN_CAPTURE_HEADER")
+    require((offset == 0 and length == 0) or
+            (header_length <= offset < cluster_bytes and 0 < length <= 1023 and offset + length <= cluster_bytes),
+            "UNSAFE_CAPTURE_BACKING_BOUNDS")
+    backing = first[offset:offset + length] if offset else None
+    if backing is None:
+        require(expected_backing is None or allow_detached, "CAPTURE_BACKING_REFERENCE_MISMATCH")
+    else:
+        require(expected_backing is not None and backing == os.fsencode(absolute_path(expected_backing)),
+                "CAPTURE_BACKING_REFERENCE_MISMATCH")
+    # Full images terminate extensions within the first cluster; incremental
+    # images terminate before the separately bounded backing filename.
+    position, end, seen = header_length, offset or cluster_bytes, set()
+    while True:
+        require(position + 8 <= end, "UNTERMINATED_CAPTURE_QCOW2_EXTENSIONS")
+        magic, size = struct.unpack_from(">II", first, position);position += 8
+        if magic == 0:
+            require(size == 0, "INVALID_CAPTURE_QCOW2_EXTENSION_END")
+            break
+        require(magic in {0xE2792ACA, 0x6803F857} and magic not in seen,
+                "EXTERNAL_OR_UNSUPPORTED_CAPTURE_QCOW2_EXTENSION")
+        seen.add(magic)
+        require(position + ((size + 7) & ~7) <= end, "UNSAFE_CAPTURE_QCOW2_EXTENSION_BOUNDS")
+        if magic == 0xE2792ACA:
+            require(first[position:position + size] == b"qcow2", "CAPTURE_BACKING_FORMAT_MISMATCH")
+        else:
+            require(size % 48 == 0, "INVALID_CAPTURE_FEATURE_TABLE")
+        position += (size + 7) & ~7
+    return {"backing": expected_backing if backing is not None else None,
+            "header_sha256": hashlib.sha256(first).hexdigest()}
+
+
 def verify_disks(folder: int, manifest: dict, plan: FilePlan, deadline: float) -> None:
     validate_manifest(manifest, plan)
     for entry in manifest["disks"]:
@@ -577,6 +639,11 @@ class QcowTools:
 
     def check(self, path: Path, deadline: float) -> None:
         self.run(["check", "-f", "qcow2", "--output=json", str(path)], deadline)
+
+    def detach_completed_capture(self, path: Path, deadline: float) -> None:
+        # -u is metadata-only and opens with BDRV_O_NO_BACKING. Never convert
+        # a delta or read its active source; allocated zero clusters must survive.
+        self.run(["rebase", "-u", "-f", "qcow2", "-b", "", str(path)], deadline)
 
     def rebase_copy(self, path: Path, parent: Path, deadline: float) -> None:
         self.run(["rebase", "-u", "-f", "qcow2", "-F", "qcow2", "-b", str(parent), str(path)], deadline)
