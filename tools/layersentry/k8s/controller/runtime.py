@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -39,7 +40,7 @@ from .store import SagaStore
 _ROOT_KEYS = {"schemaVersion", "releaseManifest", "stateDatabase", "cloudstack", "kubernetes", "clusterProfile", "flux"}
 _CLOUDSTACK_KEYS = {"endpoint", "apiKeyFile", "secretKeyFile", "caFile", "allowInsecureHttp", "trustedBrowserOrigins"}
 _KUBERNETES_KEYS = {"server", "caFile", "tokenFile"}
-_PROFILE_KEYS = {"namespacePrefix", "credentialSecretName", "credentialSecretNamespace"}
+_PROFILE_KEYS = {"namespacePrefix", "credentialSecretName", "credentialSecretNamespace", "qualifiedImages"}
 _FLUX_KEYS = {"path", "sourceNamespace"}
 
 
@@ -164,12 +165,19 @@ def load_runtime_config(path: Path | str) -> RuntimeConfig:
         token_file=_absolute_file(kubernetes["tokenFile"], "kubernetes.tokenFile", secret=True),
     )
     profile = _object(root["clusterProfile"], "clusterProfile", _PROFILE_KEYS)
-    if not all(isinstance(profile[key], str) and profile[key] for key in _PROFILE_KEYS):
+    if not all(isinstance(profile[key], str) and profile[key] for key in _PROFILE_KEYS - {"qualifiedImages"}):
         raise InvalidRequestError("runtime clusterProfile fields must be non-empty strings")
+    images = profile["qualifiedImages"]
+    if (not isinstance(images, Mapping) or len(images) > 100
+            or any(not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,64}", key)
+                   or not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+                   for key, value in images.items())):
+        raise InvalidRequestError("qualifiedImages must bind at most 100 template IDs to SHA-256 digests")
     cluster_profile = ClusterProfile(
         namespace_prefix=profile["namespacePrefix"],
         cloudstack_secret_name=profile["credentialSecretName"],
         cloudstack_secret_namespace=profile["credentialSecretNamespace"],
+        qualified_images=dict(images),
     )
     flux = _object(root["flux"], "flux", _FLUX_KEYS)
     if not all(isinstance(flux[key], str) and flux[key] for key in _FLUX_KEYS):

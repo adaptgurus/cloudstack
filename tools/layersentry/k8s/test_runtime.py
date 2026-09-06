@@ -63,7 +63,7 @@ class RuntimeConfigTest(unittest.TestCase):
             },
             "clusterProfile": {
                 "namespacePrefix": "lsk8s", "credentialSecretName": "capc-credentials",
-                "credentialSecretNamespace": "capc-system",
+                "credentialSecretNamespace": "capc-system", "qualifiedImages": {},
             },
             "flux": {"path": "./clusters/e1", "sourceNamespace": "flux-system"},
         }
@@ -94,6 +94,14 @@ class RuntimeConfigTest(unittest.TestCase):
         self.config.write_text('{"schemaVersion":"1.0","schemaVersion":"2.0"}')
         with self.assertRaisesRegex(InvalidRequestError, "duplicate"):
             load_runtime_config(self.config)
+
+    def test_qualified_image_map_rejects_unbounded_or_weak_checksums(self):
+        for images in ([], {"image-1": "f" * 32}, {"image-1": True},
+                       {str(i): "a" * 64 for i in range(101)}):
+            self.values["clusterProfile"]["qualifiedImages"] = images
+            self.write()
+            with self.assertRaisesRegex(InvalidRequestError, "qualifiedImages"):
+                load_runtime_config(self.config)
 
     def test_state_parent_must_not_be_writable_by_other_principals(self):
         os.chmod(self.state, 0o777)

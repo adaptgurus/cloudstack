@@ -78,7 +78,7 @@ class InventoryClient:
         if command == "listServiceOfferings":
             return {"serviceoffering": [{"id": resource_id, "name": "compute", "issystem": False}]}
         if command == "listTemplates":
-            return {"template": [{"id": resource_id, "name": "rke2", "isready": True, "hypervisor": "KVM"}]}
+            return {"template": [{"id": resource_id, "name": "rke2", "isready": True, "hypervisor": "KVM", "checksum": "{SHA-256}" + "a" * 64}]}
         if command == "listPublicIpAddresses":
             return {"publicipaddress": [{
                 "id": resource_id, "ipaddress": "192.0.2.10", "projectid": params.get("projectid"),
@@ -101,7 +101,7 @@ def request():
 def profile():
     return ClusterProfile(
         namespace_prefix="lsk8s",
-        cloudstack_secret_name="capc-credentials", cloudstack_secret_namespace="capc-system",
+        cloudstack_secret_name="capc-credentials", cloudstack_secret_namespace="capc-system", qualified_images={"image-1": "a" * 64},
     )
 
 
@@ -185,10 +185,16 @@ class CloudStackControllerTest(unittest.TestCase):
 
         bad = ClusterProfile(
             namespace_prefix="INVALID", cloudstack_secret_name="capc-credentials",
-            cloudstack_secret_namespace="capc-system",
+            cloudstack_secret_namespace="capc-system", qualified_images={"image-1": "a" * 64},
         )
         with self.assertRaisesRegex(InvalidRequestError, "namespace prefix"):
             CloudStackResolver(InventoryClient(), bad).resolve_cluster(request())
+
+    def test_ready_template_requires_exact_server_owned_image_binding(self):
+        from dataclasses import replace
+        for images in ({}, {"image-1": "b" * 64}, {"image-1": "a" * 32}):
+            with self.assertRaisesRegex(InvalidRequestError, "qualified"):
+                CloudStackResolver(InventoryClient(), replace(profile(), qualified_images=images)).resolve_cluster(request())
 
     def test_credentials_with_broad_permissions_are_rejected(self):
         config = self.credential_config()

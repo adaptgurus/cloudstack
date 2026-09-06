@@ -23,11 +23,12 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import re
 import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -63,6 +64,7 @@ class ClusterProfile:
     namespace_prefix: str
     cloudstack_secret_name: str
     cloudstack_secret_namespace: str
+    qualified_images: Mapping[str, str] = field(default_factory=dict)
 
 
 class CloudStackClient:
@@ -191,12 +193,17 @@ class CloudStackResolver:
         template_ids = {request["control_plane_image_id"]}
         template_ids.update(pool["image_id"] for pool in request["node_pools"])
         for template_id in template_ids:
+            checksum = self.profile.qualified_images.get(template_id)
+            if not isinstance(checksum, str) or not re.fullmatch(r"[0-9a-f]{64}", checksum):
+                raise InvalidRequestError("Kubernetes node image has no qualified SHA-256 binding")
             template = self._exact(
                 "listTemplates", "template", template_id,
                 templatefilter="executable", zoneid=zone["id"],
             )
             if template.get("isready") is not True or template.get("hypervisor") != "KVM":
                 raise InvalidRequestError("Kubernetes node image is not Ready for KVM")
+            if template.get("checksum") != "{SHA-256}" + checksum:
+                raise InvalidRequestError("Kubernetes node image checksum differs from the qualified image")
 
         endpoint_public_ip_id = request.get("api_frontend_id")
         if not endpoint_public_ip_id:
