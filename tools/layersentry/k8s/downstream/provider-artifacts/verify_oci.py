@@ -52,6 +52,12 @@ def verify(archive, docker_inspect, component, source_commit):
         if json.load(tar.extractfile('oci-layout')).get('imageLayoutVersion') != '1.0.0':
             raise VerificationError('unsupported OCI layout')
 
+    roots = index.get('manifests', [])
+    if len(roots) != 1 or roots[0].get('digest') not in blobs:
+        raise VerificationError('archive must name exactly one attested image index')
+    image_index_digest = roots[0]['digest']
+    if not isinstance(blobs[image_index_digest][1], dict) or 'manifests' not in blobs[image_index_digest][1]:
+        raise VerificationError('archive root must preserve runtime and attestation index')
     reachable = set()
     def walk(descriptor):
         digest = descriptor.get('digest')
@@ -109,7 +115,7 @@ def verify(archive, docker_inspect, component, source_commit):
         'status': 'CI_VERIFIED', 'scope': 'OCI identity, attestation binding and isolated build smoke tests',
         'productionCertified': False, 'liveVerified': False, 'signed': False,
         'layersentrySourceCommit': source_commit, 'component': component,
-        'archiveSha256': archive_hash.hexdigest(), 'imageManifestDigest': image_digest,
+        'archiveSha256': archive_hash.hexdigest(), 'imageIndexDigest': image_index_digest, 'imageManifestDigest': image_digest,
         'imageConfigDigest': config_digest, 'attestations': attestations,
     }
 
