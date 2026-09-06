@@ -220,6 +220,8 @@ Detailed contract: `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`.
 
 ## 7. Backup and DR graph
 
+The [file replication module](DR_FILE_REPLICATION.md) connects sealed native NAS copies and the request-bound native recovery adapter to the existing recovery state machine; libvirt checkpoint epochs use a separate dependency catalog and private QCOW2 reconstruction path. Source-journal uncertainty prohibits capture replay, destination acknowledgement precedes source-cursor advancement, and retained replicas remain immutable. Its [source qualification](evidence/dr/2026-09-06-dr-module-source-qualification.md) distinguishes real local reconstruction tests from required Rocky guest/provider acceptance. Neither path implements independent witness/fencing or automatic failover.
+
 The first native NAS acceptance path uses `createVMFromBackup` with explicit older/latest backup UUIDs and fresh stopped clones. It requires both Zones in one CloudStack management database, the retained source/backup metadata, and the original backup offering/repository. Exact 4.22.1.1 source rejects the network-ID list supplied by backup allocation for a Basic destination; use an Advanced recovery Zone candidate and validate it live before promoting readiness. Separate DR Management installation and NAS file copies do not create native catalog identity. Fixture/journal tooling and current runtime observations are linked from the Progress Ledger.
 
 ```text

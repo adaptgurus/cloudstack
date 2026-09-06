@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LayerSentry operator DC/DR replication CLI. Source status: NOT_TESTED.
+"""LayerSentry operator DC/DR replication CLI. Live qualification: NOT_TESTED.
 
 No command is a deployment instruction. Mutations require --execute and enabled
 operator configuration. CloudStack still owns VM import, networking and startup.
@@ -24,7 +24,8 @@ def configuration(path: str) -> tuple[dict, FilePlan]:
     config_path = absolute_path(path)
     with secure_root(config_path.parent, private=False) as parent:
         value = read_json(parent, config_path.name)
-    require(value.get("schema") == 1 and type(value.get("enabled")) is bool, "INVALID_CONFIGURATION_SCHEMA")
+    require(type(value.get("schema")) is int and value["schema"] == 1
+            and type(value.get("enabled")) is bool, "INVALID_CONFIGURATION_SCHEMA")
     plan = FilePlan.from_dict(value.get("plan"))
     plan.validate()
     return value, plan
@@ -35,6 +36,7 @@ def catalog(config: dict, plan: FilePlan) -> FileCatalog:
         "schema", "enabled", "role", "plan", "destination_root", "allowed_scope_sha256", "qemu_img",
     }, "INVALID_RECEIVER_CONFIGURATION")
     require(config["allowed_scope_sha256"] == fingerprint(plan.scope()), "PINNED_RECEIVER_SCOPE_REQUIRED")
+    absolute_path(config["qemu_img"])
     return FileCatalog(Repository(absolute_path(config["destination_root"]), plan.recovery_site_id, plan.repository_id), plan)
 
 
@@ -60,7 +62,7 @@ def source(config: dict, plan: FilePlan) -> FileReplicationEngine:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("inspect", "status", "capture", "resume", "tick", "abandon",
+    parser.add_argument("command", choices=("check-config", "inspect", "status", "capture", "resume", "tick", "abandon",
                                              "receive", "list", "verify", "materialize", "retention", "retire"))
     parser.add_argument("--config", required=True)
     parser.add_argument("--execute", action="store_true")
@@ -75,25 +77,32 @@ def main(argv: list[str] | None = None) -> int:
     receiver = args.command == "receive"
     try:
         config, plan = configuration(args.config)
+        # Validate the complete role/transport contract even for offline reads.
+        # Constructors do not connect, create directories or submit a backup.
+        require(config.get("role") in {"source", "receiver"}, "INVALID_CONFIGURATION_ROLE")
+        configured = source(config, plan) if config["role"] == "source" else catalog(config, plan)
         mutating = args.command in {"capture", "resume", "tick", "abandon", "receive", "materialize", "retire"}
         require(not mutating or (args.execute and config["enabled"]), "EXPLICIT_EXECUTION_AND_ENABLED_CONFIG_REQUIRED")
         if args.command in {"capture", "resume", "abandon", "verify", "materialize"}:
             require(args.epoch is not None, "EXPLICIT_EPOCH_REQUIRED")
             identifier(args.epoch)
         if receiver:
+            require(config["role"] == "receiver", "RECEIVER_CONFIGURATION_REQUIRED")
             def expired(_number, _frame):
                 raise ReplicationError("RECEIVER_DEADLINE_EXCEEDED")
             signal.signal(signal.SIGALRM, expired)
             signal.setitimer(signal.ITIMER_REAL, plan.transfer_timeout)
-            receive_one(catalog(config, plan), sys.stdin.buffer, sys.stdout.buffer)
+            receive_one(configured, sys.stdin.buffer, sys.stdout.buffer)
             signal.setitimer(signal.ITIMER_REAL, 0)
             return 0
-        if args.command == "inspect":
+        if args.command in {"inspect", "check-config"}:
             # Offline configuration identity only; no provider inspection/claim.
             result = {"scope_sha256": fingerprint(plan.scope()), "enabled": config["enabled"],
-                      "plan_id": plan.plan_id, "source_status": "NOT_TESTED"}
+                      "plan_id": plan.plan_id, "configuration_valid": True,
+                      "runtime_verification": "NOT_TESTED"}
         elif args.command in {"status", "capture", "resume", "tick", "abandon"}:
-            engine = source(config, plan)
+            require(config["role"] == "source", "SOURCE_CONFIGURATION_REQUIRED")
+            engine = configured
             if args.command == "status":
                 result = engine.status()
             elif args.command == "tick":
@@ -103,7 +112,8 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 result = engine.replicate(args.epoch, mode=args.mode, allow_capture=args.command == "capture")
         else:
-            replica = catalog(config, plan)
+            require(config["role"] == "receiver", "RECEIVER_CONFIGURATION_REQUIRED")
+            replica = configured
             if args.command == "list":
                 result = replica.listing(offset=args.offset, limit=args.limit)
             elif args.command == "verify":

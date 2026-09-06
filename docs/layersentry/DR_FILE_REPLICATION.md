@@ -1,6 +1,6 @@
 # DC/DR file-backed replication module
 
-Status: `NOT_TESTED`. Source implementation and manual logic review only; no tests, lint, build, CI, provider calls, transfer, reconstruction or deployment were run. This module implements the NAS/QCOW2 replication data path. It does not claim LINSTOR/Ceph/array support or production DR certification.
+Status: `PARTIAL`. The NAS/QCOW2 data path has local filesystem, protocol, journal and real QEMU reconstruction tests; exact Rocky Linux 9 libvirt capture, deployed transport and native guest recovery remain `NOT_TESTED`. See [the source qualification checkpoint](evidence/dr/2026-09-06-dr-module-source-qualification.md). This module does not claim LINSTOR/Ceph/array support or production DR certification.
 
 ## Components
 
@@ -33,11 +33,11 @@ The receiver additionally requires `destination_root`, `allowed_scope_sha256` an
 
 ## Commands
 
-All commands take `--config PATH`. Nothing below has been executed for this change.
+All commands take `--config PATH`. Local tests exercise the offline configuration/enablement gates; operator commands have not been deployed to DC or DR by this source qualification.
 
 | Command | Behavior |
 | --- | --- |
-| `inspect` | Print offline plan scope digest and enablement |
+| `check-config` / `inspect` | Validate the entire role/transport configuration and print offline scope digest and enablement; no connection, runtime-directory creation or provider health claim |
 | `status` | Read source cursor and active epoch; destination health remains `UNKNOWN` |
 | `capture --epoch UUID --mode AUTO --execute` | Create a first full point or incremental from the acknowledged parent; periodically choose a new full baseline at the chain limit |
 | `resume --epoch UUID --execute` | Reconcile existing capture proof and retry sealed-byte transfer; never resubmit an uncertain capture |
@@ -51,6 +51,8 @@ All commands take `--config PATH`. Nothing below has been executed for this chan
 | `retire --catalog-sha256 DIGEST --pin UUID --execute` | Re-evaluate the exact catalog and move eligible points to recoverable trash |
 
 `capture` requires an explicit epoch UUID. Reusing one with different intent fails. `tick` generates an ID only for a new operation. Source state progresses through `PREPARED`, `CAPTURING`, `TRANSFERRING` and `COMMITTED`; missing durable completion proof becomes `RECONCILIATION_REQUIRED`. A destination acknowledgement is journaled before source-head advancement. An acknowledgement lost in transit is resolved by re-sending the same manifest and only missing files. Capture creates a new tracking checkpoint, but the acknowledged source cursor remains on its prior point until complete destination acknowledgement; older tracking checkpoints are retained.
+
+A durable intent without its first state record can resume only when there is no worker/capture evidence. Missing state alongside any provider evidence requires reconciliation and never causes a new capture. A transfer interrupted after sealing a private partial file can reopen that exact partial under the catalog lock; published recovery points remain immutable.
 
 `materialize` verifies all parent hashes and disk identities, copies each layer into a fresh workspace, attaches predecessor paths only on those private copies, and flattens each final disk. It never redefines a libvirt domain, edits a retained replica, imports a fake native backup record, attaches storage, starts a VM or changes traffic. CloudStack-supported VM/volume import and isolated guest validation remain the recovery integration boundary. Failed workspaces are retained for inspection and do not receive a completion receipt.
 
