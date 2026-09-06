@@ -1,0 +1,392 @@
+nameOverride: "cloudstack-csi"
+fullnameOverride: ""
+
+# Additional labels to add to all resources
+extraLabels: {}
+
+## Annotations to apply to all resources
+commonAnnotations: {}
+# commonAnnotations:
+#   "helm.sh/hook": pre-install,pre-upgrade
+#   "helm.sh/hook-weight": "-100"
+#   "helm.sh/hook-delete-policy": before-hook-creation
+
+# Create Prometheus Operator PodMonitor.
+# See https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#monitoring.coreos.com/v1.PodMonitor
+podMonitor:
+  enabled: false
+
+# -- Custom labels to add into metadata
+customLabels: {}
+
+sidecars:
+  provisioner:
+    env: []
+    image:
+      pullPolicy: IfNotPresent
+      repository: registry.k8s.io/sig-storage/csi-provisioner
+      tag: "v5.0.1"
+    logLevel: 2
+    # Feature gates to enable
+    featureGates: "Topology=true"
+    # Extra arguments passed to external-provisioner.
+    extraArgs: []
+    resources: {}
+    # Tune leader lease election for csi-provisioner.
+    # Leader election is on by default.
+    leaderElection:
+      enabled: true
+      # Optional values to tune lease behavior.
+      # The arguments provided must be in an acceptable time.ParseDuration format.
+      # Ref: https://pkg.go.dev/flag#Duration
+      # leaseDuration: "15s"
+      # renewDeadline: "10s"
+      # retryPeriod: "5s"
+    securityContext:
+      seccompProfile:
+        type: RuntimeDefault
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  attacher:
+    env: []
+    image:
+      pullPolicy: IfNotPresent
+      repository: registry.k8s.io/sig-storage/csi-attacher
+      tag: "v4.6.1"
+    # Tune leader lease election for csi-attacher.
+    # Leader election is on by default.
+    leaderElection:
+      enabled: true
+      # Optional values to tune lease behavior.
+      # The arguments provided must be in an acceptable time.ParseDuration format.
+      # Ref: https://pkg.go.dev/flag#Duration
+      # leaseDuration: "15s"
+      # renewDeadline: "10s"
+      # retryPeriod: "5s"
+    logLevel: 2
+    # Extra arguments passed to external-attacher.
+    extraArgs: []
+    resources: {}
+    securityContext:
+      seccompProfile:
+        type: RuntimeDefault
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  livenessProbe:
+    image:
+      pullPolicy: IfNotPresent
+      repository: registry.k8s.io/sig-storage/livenessprobe
+      tag: "v2.12.0"
+    # Extra arguments passed to livenessprobe.
+    extraArgs: []
+    resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  resizer:
+    env: []
+    image:
+      pullPolicy: IfNotPresent
+      repository: registry.k8s.io/sig-storage/csi-resizer
+      tag: "v1.11.1"
+    # Tune leader lease election for csi-resizer.
+    # Leader election is on by default.
+    leaderElection:
+      enabled: true
+      # Optional values to tune lease behavior.
+      # The arguments provided must be in an acceptable time.ParseDuration format.
+      # Ref: https://pkg.go.dev/flag#Duration
+      # leaseDuration: "15s"
+      # renewDeadline: "10s"
+      # retryPeriod: "5s"
+    logLevel: 2
+    # Extra arguments passed to external-resizer.
+    extraArgs: []
+    resources: {}
+    securityContext:
+      seccompProfile:
+        type: RuntimeDefault
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  nodeDriverRegistrar:
+    env: []
+    image:
+      pullPolicy: IfNotPresent
+      repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
+      tag: "v2.10.1"
+    logLevel: 2
+    # Extra arguments passed to node-driver-registrar.
+    extraArgs: []
+    resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+    livenessProbe:
+      exec:
+        command:
+          - /csi-node-driver-registrar
+          - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+          - --mode=kubelet-registration-probe
+      initialDelaySeconds: 30
+      periodSeconds: 90
+      timeoutSeconds: 15
+
+## CloudStack CSI Controller Defaults
+controller:
+  enabled: true
+  image:
+    repository: ghcr.io/cloudstack/cloudstack-csi-driver
+    # Overrides the image tag whose default is v{{ .Chart.AppVersion }}
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  # Extra arguments passed to cloudstack-csi-driver controller.
+  extraArgs: []
+  loggingFormat: text
+  logLevel: 2
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: "app.kubernetes.io/name"
+                operator: In
+                values:
+                  - cloudstack-csi-controller
+          topologyKey: "kubernetes.io/hostname"
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+  # The default filesystem type of the volume to provision when fstype is unspecified in the StorageClass.
+  # If the default is not set and fstype is unset in the StorageClass, then no fstype will be set
+  defaultFsType: ext4
+  env: []
+  # Use envFrom to reference ConfigMaps and Secrets across all containers in the deployment
+  envFrom: []
+  # If set, add pv/pvc metadata to plugin create requests as parameters.
+  extraCreateMetadata: true
+  nodeSelector: {}
+  deploymentAnnotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  priorityClassName: system-cluster-critical
+  revisionHistoryLimit: 10
+  updateStrategy:
+    # RollingUpdate strategy replaces old pods with new ones gradually,
+    # without incurring downtime.
+    type: RollingUpdate
+    rollingUpdate:
+      # maxUnavailable is the maximum number of pods that can be
+      # unavailable during the update process.
+      maxUnavailable: 1
+      # maxSurge is the maximum number of pods that can be
+      # created over the desired number of pods.
+      maxSurge: 0
+  resources:
+    requests:
+      cpu: 10m
+      memory: 40Mi
+    limits:
+      memory: 256Mi
+  serviceAccount:
+    # A service account will be created for you if set to true. Set to false if you want to use your own.
+    create: true
+    name: cloudstack-csi-controller
+    annotations: {}
+    automountServiceAccountToken: true
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: CriticalAddonsOnly
+      operator: Exists
+    - effect: NoExecute
+      operator: Exists
+      tolerationSeconds: 300
+  # securityContext on the controller pod
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    fsGroupChangePolicy: OnRootMismatch
+  # securityContext on the controller container (see sidecars for securityContext on sidecar containers)
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+  # Add additional volume mounts on the controller with controller.volumes and controller.volumeMounts
+  volumes: []
+  # Add additional volumes to be mounted onto the controller:
+  # - name: custom-dir
+  #   hostPath:
+  #     path: /path/to/dir
+  #     type: Directory
+  volumeMounts: []
+  # And add mount paths for those additional volumes:
+  # - name: custom-dir
+  #   mountPath: /mount/path
+  #
+  # Allow for specifying internal IP addresses for multiple hostnames
+  hostAliases: {}
+  #   - ip: "10.0.0.1"
+  #     hostnames:
+  #     - "keystone.hostname.com"
+
+## CloudStack CSI Node Defaults
+node:
+  enabled: true
+  image:
+    repository: ghcr.io/cloudstack/cloudstack-csi-driver
+    # Overrides the image tag whose default is v{{ .Chart.AppVersion }}
+    tag: ""
+    pullPolicy: IfNotPresent
+  env: []
+  envFrom: []
+  kubeletPath: /var/lib/kubelet
+  loggingFormat: text
+  logLevel: 2
+  priorityClassName: ""
+  # Extra arguments passed to cloudstack-csi-driver controller.
+  extraArgs: []
+  affinity: {}
+  nodeSelector: {}
+  daemonSetAnnotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  terminationGracePeriodSeconds: 30
+  tolerations:
+    - effect: NoSchedule
+      operator: Exists
+    - effect: NoExecute
+      operator: Exists
+      tolerationSeconds: 300
+  resources:
+    requests:
+      cpu: 10m
+      memory: 40Mi
+    limits:
+      memory: 256Mi
+  revisionHistoryLimit: 10
+  probeDirVolume:
+    emptyDir: {}
+  serviceAccount:
+    create: true
+    name: cloudstack-csi-node
+    annotations: {}
+    automountServiceAccountToken: true
+  # Metadata source to try to find instance ID.
+  # Possible values 'cloud-init' & 'ignition' or ''
+  metadataSource: ignition
+  # The maximum number of volumes that can be attached to a node
+  volumeAttachLimit:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "10%"
+  # securityContext on the node pod
+  podSecurityContext:
+    # The node pod must be run as root to bind to the registration/driver sockets
+    runAsNonRoot: false
+    runAsUser: 0
+    runAsGroup: 0
+    fsGroup: 0
+  # securityContext on the node container (see sidecars for securityContext on sidecar containers)
+  # Privileged containers always run as `Unconfined`, which means that they are not restricted by a seccomp profile.
+  securityContext:
+    # readOnlyRootFilesystem: true
+    privileged: true
+  # Add additional volume mounts on the node pods with node.volumes and node.volumeMounts
+  volumes: []
+  # Add additional volumes to be mounted onto the node pods:
+  # - name: custom-dir
+  #   hostPath:
+  #     path: /path/to/dir
+  #     type: Directory
+  volumeMounts: []
+  # And add mount paths for those additional volumes:
+  # - name: custom-dir
+  #   mountPath: /mount/path
+  #
+  # Allow for specifying internal IP addresses for multiple hostnames
+  hostAliases:
+  #   - ip: "10.0.0.1"
+  #     hostnames:
+  #     - "keystone.hostname.com"
+
+## CloudStack Storage Class Syncer Job Defaults
+syncer:
+  enabled: true
+  # Job image
+  image:
+    repository: "ghcr.io/cloudstack/cloudstack-csi-sc-syncer"
+    # Overrides the image tag. Default is {{ .Chart.AppVersion }}
+    tag: ""
+    imagePullPolicy: IfNotPresent
+
+  # Extra arguments passed to cloudstack-csi-sc-syncer.
+  extraArgs: {}
+  affinity: {}
+  nodeSelector: {}
+  podAnnotations: {}
+  podLabels: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: node.kubernetes.io/not-ready
+      operator: Exists
+      effect: NoSchedule
+  resources: {}
+  serviceAccount:
+    create: true
+    name: cloudstack-csi-sc-syncer
+    annotations: {}
+    automountServiceAccountToken: true
+
+  # Job configurations
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 60
+  restartPolicy: Never
+
+  # securityContext on the syncer job
+  # securityContext on the controller pod
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    fsGroupChangePolicy: OnRootMismatch
+  # securityContext on the controller container (see sidecars for securityContext on sidecar containers)
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+
+# The secret should contain the CloudStack credentials
+# There are several options to inject the credentials:
+# 1) from kubernetes secret that doesn't exist: set "enabled" and "create" to true, this will create a secret from the values written to "data" down below
+# 2) from kubernetes secret that already exists: set "enabled" to true and "create" to false
+# 3) from host system path /etc/cloud/cloud.conf: set "enabled" to false and "hostMount" to true
+# 4) via agent-injector (e.g. hashicorp vault): set "enabled" and "hostMount" to false, you have to provide credentials on your own by injecting credentials into the pod
+secret:
+  enabled: true
+  create: false
+  name: cloudstack-secret
+  cloudConfigData:
+    global:
+      api-url: ""
+      api-key: ""
+      secret-key: ""
+  hostMount: false
+
+imagePullSecrets: []
+# - name: my-imagepull-secret
+
+rbac:
+  create: true

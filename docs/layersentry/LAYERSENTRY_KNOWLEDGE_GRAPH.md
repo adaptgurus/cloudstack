@@ -207,6 +207,13 @@ CloudStack CSI retained OCI artifact lock
   REQUIRES -> complete-index preservation and destination digest verification before registry binding
   EVIDENCE -> docs/layersentry/evidence/k8s/2026-09-07-csi-artifact-binding.md
 
+Native CSI review bundle
+  RENDERS -> exact upstream chart with pinned amd64 runtime digests and existing project Secret reference
+  COLLECTS -> unchanged driver/syncer attestation indexes plus verified sidecar runtime layers
+  REQUIRES -> real CloudStack node/project metadata binding, trusted namespace ownership and E0 data survival
+  DOES_NOT_PROVIDE -> registry publication, signature trust or live storage qualification
+  SOURCE -> tools/layersentry/k8s/downstream/cloudstack-csi/native/README.md
+
 Qualified package UI
   DISCOVERS -> approved current/historical profiles through authenticated project BFF
   BINDS -> selected cluster + exact profile + approved catalog digest

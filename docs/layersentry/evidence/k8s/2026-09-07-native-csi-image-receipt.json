@@ -1,0 +1,81 @@
+{
+  "archives": [
+    {
+      "archive": "cloudstack-csi-driver.oci.tar",
+      "component": "cloudstack-csi-driver",
+      "fullRetainedIndex": true,
+      "runtimeDigest": "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+      "sha256": "0a52fdf6194ac4efa5ac3f155f3a14a07f12d0fc98e9565db55e137fe53e5919"
+    },
+    {
+      "archive": "cloudstack-csi-sc-syncer.oci.tar",
+      "component": "cloudstack-csi-sc-syncer",
+      "fullRetainedIndex": true,
+      "runtimeDigest": "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+      "sha256": "f0839c00895f754be994760d82ee4a0d498fbbc4bc2a88b407b7406634ecdd59"
+    },
+    {
+      "archive": "csi-provisioner.oci.tar",
+      "component": "csi-provisioner",
+      "fullRetainedIndex": false,
+      "provenanceVerified": false,
+      "runtimeDigest": "sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb",
+      "sha256": "6a58b77073754bea5736e2468ecab7a6c047b49e7f8992aa8c1f26dcac28d480",
+      "signatureVerified": false
+    },
+    {
+      "archive": "csi-attacher.oci.tar",
+      "component": "csi-attacher",
+      "fullRetainedIndex": false,
+      "provenanceVerified": false,
+      "runtimeDigest": "sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43",
+      "sha256": "dbab1a00d025d543eda729245d2f2b518e5821f434f0f42667a08e10c2d341b6",
+      "signatureVerified": false
+    },
+    {
+      "archive": "csi-resizer.oci.tar",
+      "component": "csi-resizer",
+      "fullRetainedIndex": false,
+      "provenanceVerified": false,
+      "runtimeDigest": "sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73",
+      "sha256": "4caa0527921f800c73cfa6a10eefadcbdbcc928c3874105cbcd2ddf093738e6c",
+      "signatureVerified": false
+    },
+    {
+      "archive": "livenessprobe.oci.tar",
+      "component": "livenessprobe",
+      "fullRetainedIndex": false,
+      "provenanceVerified": false,
+      "runtimeDigest": "sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa",
+      "sha256": "8fbb92c82cc97029fa54d00287089238dafb720a8f89b920cc471c0b2d95e349",
+      "signatureVerified": false
+    },
+    {
+      "archive": "csi-node-driver-registrar.oci.tar",
+      "component": "csi-node-driver-registrar",
+      "fullRetainedIndex": false,
+      "provenanceVerified": false,
+      "runtimeDigest": "sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db",
+      "sha256": "f3c69061c588a43b85b2a63fe929615bfe2f6053f35ee4f74d2539707f2a9d5e",
+      "signatureVerified": false
+    }
+  ],
+  "artifactType": "layersentry-native-csi-image-collection",
+  "deployable": false,
+  "inputsSha256": "2aaeb1c2d969bcb69aac68cdaa8bf179adc8a82f2165d427605cc631158912da",
+  "qualification": {
+    "credentialsProjectScopeVerified": false,
+    "kubernetes136SidecarsVerified": false,
+    "liveVerified": false,
+    "machineDataSurvivalQualified": false,
+    "nodeIdentityQualified": false,
+    "productionCertified": false,
+    "projectLifecycleQualified": false,
+    "registryPublicationVerified": false,
+    "resizeIdempotencyQualified": false
+  },
+  "registryPublished": false,
+  "schemaVersion": "1.0",
+  "signed": false,
+  "status": "SOURCE_COMPLETE"
+}
