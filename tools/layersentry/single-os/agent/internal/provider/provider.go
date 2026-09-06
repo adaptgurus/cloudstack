@@ -25,8 +25,8 @@ type Provider interface {
  Restart(context.Context,model.Operation,model.ServiceState) error
  Upgrade(context.Context,model.Operation,model.Plan) error
  Repair(context.Context,model.Operation,model.Plan) error
- Backup(context.Context,model.Operation,model.ServiceState) error
- Restore(context.Context,model.Operation,model.ServiceState) error
+ Backup(context.Context,model.Operation,model.ServiceState) (model.BackupRecord,error)
+ Restore(context.Context,model.Operation,model.ServiceState,model.BackupRecord) error
  Uninstall(context.Context,model.Operation,model.ServiceState,bool) error
  ResidueAudit(context.Context,model.ServiceState)(map[string]string,error)
 }
