@@ -1,5 +1,5 @@
 diff --git a/cmd/cloudstack-csi-driver/Dockerfile b/cmd/cloudstack-csi-driver/Dockerfile
-index 00ef7a3..0f8efc2 100644
+index 00ef7a3..e80e170 100644
 --- a/cmd/cloudstack-csi-driver/Dockerfile
 +++ b/cmd/cloudstack-csi-driver/Dockerfile
 @@ -1,4 +1,7 @@
@@ -11,7 +11,7 @@ index 00ef7a3..0f8efc2 100644
 
  ARG TARGETOS
  ARG TARGETARCH
-@@ -17,7 +20,7 @@ COPY . .
+@@ -17,25 +20,25 @@ COPY . .
  RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
      go build -ldflags "${LDFLAGS}" -o cloudstack-csi-driver ./cmd/cloudstack-csi-driver
 
@@ -20,8 +20,39 @@ index 00ef7a3..0f8efc2 100644
 
  LABEL \
      org.opencontainers.image.description="CloudStack CSI driver" \
+     org.opencontainers.image.source="https://github.com/cloudstack/cloudstack-csi-driver/"
+
+-RUN apk add --no-cache \
+-    ca-certificates \
+-    # Provides mkfs.ext2, mkfs.ext3, mkfs.ext4 (used by k8s.io/mount-utils)
+-    e2fsprogs \
+-    e2fsprogs-extra \
+-    # Provides mkfs.xfs
+-    xfsprogs \
+-    # blkid, mount and umount are required by k8s.io/mount-utils \
+-    blkid \
+-    mount \
+-    umount \
+-    # Provides udevadm for device path detection \
+-    udev
++ARG TARGETARCH
++RUN --network=none --mount=type=bind,source=.layersentry-apk,target=/locked \
++    set -eu; \
++    case "${TARGETARCH}" in \
++      amd64) expected=9445ecfd3c403aac3ba27de994c472d96e1b62452b54355361752d61cfb0489b ;; \
++      arm64) expected=a407ff73ad8264eaad421f014edae0dcbe9f03f1bb8d0bc6d2a69a7536ddac57 ;; \
++      *) echo "Unsupported locked APK architecture" >&2; exit 1 ;; \
++    esac; \
++    cd "/locked/${TARGETARCH}/driver"; \
++    echo "${expected}  SHA256SUMS" | sha256sum -c -; \
++    sha256sum -c SHA256SUMS; \
++    test "$(find . -maxdepth 1 -name '*.apk' | wc -l)" -eq "$(wc -l < SHA256SUMS)"; \
++    apk add --no-network --no-cache --repositories-file /dev/null ./*.apk
+
+ COPY --from=builder /workspace/cloudstack-csi-driver /cloudstack-csi-driver
+ ENTRYPOINT ["/cloudstack-csi-driver"]
 diff --git a/cmd/cloudstack-csi-sc-syncer/Dockerfile b/cmd/cloudstack-csi-sc-syncer/Dockerfile
-index f825ddc..10429c8 100644
+index f825ddc..530eaf6 100644
 --- a/cmd/cloudstack-csi-sc-syncer/Dockerfile
 +++ b/cmd/cloudstack-csi-sc-syncer/Dockerfile
 @@ -1,4 +1,7 @@
@@ -33,7 +64,7 @@ index f825ddc..10429c8 100644
 
  ARG TARGETOS
  ARG TARGETARCH
-@@ -17,7 +20,7 @@ COPY . .
+@@ -17,13 +20,25 @@ COPY . .
  RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
      go build -ldflags "${LDFLAGS}" -o cloudstack-csi-sc-syncer ./cmd/cloudstack-csi-sc-syncer
 
@@ -42,8 +73,22 @@ index f825ddc..10429c8 100644
 
  LABEL \
      org.opencontainers.image.description="CloudStack disk offering to Kubernetes storage class syncer" \
-@@ -26,4 +29,4 @@ LABEL \
- RUN apk add --no-cache ca-certificates
+     org.opencontainers.image.source="https://github.com/cloudstack/cloudstack-csi-driver/"
+
+-RUN apk add --no-cache ca-certificates
++ARG TARGETARCH
++RUN --network=none --mount=type=bind,source=.layersentry-apk,target=/locked \
++    set -eu; \
++    case "${TARGETARCH}" in \
++      amd64) expected=a929de9bb04205887e36abc34e4891556f38c9a6e5ead964e3f2b6d0beaa16a0 ;; \
++      arm64) expected=3157cf1c022648f235d6849528393bba04988e42b5520613cee648e1246389fb ;; \
++      *) echo "Unsupported locked APK architecture" >&2; exit 1 ;; \
++    esac; \
++    cd "/locked/${TARGETARCH}/syncer"; \
++    echo "${expected}  SHA256SUMS" | sha256sum -c -; \
++    sha256sum -c SHA256SUMS; \
++    test "$(find . -maxdepth 1 -name '*.apk' | wc -l)" -eq "$(wc -l < SHA256SUMS)"; \
++    apk add --no-network --no-cache --repositories-file /dev/null ./*.apk
 
  COPY --from=builder /workspace/cloudstack-csi-sc-syncer /cloudstack-csi-sc-syncer
 -ENTRYPOINT ["/cloudstack-csi-sc-syncer"]

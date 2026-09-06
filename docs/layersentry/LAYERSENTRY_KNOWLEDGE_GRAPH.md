@@ -385,6 +385,12 @@ StorageProfile
   MAY_MAP_TO -> certified NVMe/TCP
   MAY_MAP_TO -> advanced certified NVMe/RDMA
 
+CloudStack CSI downstream artifact
+  BUILDS_FROM -> digest-pinned OCI bases and per-architecture APK closure
+  VERIFIES -> embedded checksum list, package SHA-256 and Alpine signatures
+  INSTALLS_OFFLINE -> CA trust, mount, ext/XFS filesystem and expansion utilities
+  REQUIRES_SEPARATE_PROOF -> project lifecycle, resize and PVC survival qualification
+
 CloudStack Disk Offering storageType=shared
   DOES_NOT_IMPLY -> one raw block volume safely writable by all guest VMs
 
