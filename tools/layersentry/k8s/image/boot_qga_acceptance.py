@@ -214,9 +214,11 @@ else:
  facts=json.loads(report.read_text())
  exported=key.read_text().split()
  assert len(exported)==2 and exported[0]=='ssh-ed25519'
- assert facts['sshHostEd25519PublicKey'].split()[:2]==exported
- facts['hostPublicKeyExportVerified']=True
- print(json.dumps(facts,sort_keys=True))
+ if facts['sshHostEd25519PublicKey'].split()[:2]!=exported:
+  print('{}') # Recovered disks can retain the preceding boot export until the oneshot runs.
+ else:
+  facts['hostPublicKeyExportVerified']=True
+  print(json.dumps(facts,sort_keys=True))
 """
     deadline = time.monotonic() + 240
     process = agent(identity, {'execute': 'guest-exec', 'arguments': {'path': '/usr/bin/python3', 'arg': ['-c', script], 'capture-output': True}})
