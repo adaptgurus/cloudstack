@@ -258,7 +258,8 @@ def boot(args):
         passed = True
         record['retainForDrQualification'] = bool(args.retain_for_dr_qualification)
         ownership.write_text(json.dumps(record, indent=2) + '\n')
-        report = {'status': 'LIVE_BOOT_QGA_VERIFIED', 'sourceSha256': args.sha256, 'domainUuid': identity,
+        report = {'status': 'LIVE_VERIFIED', 'scope': 'networkless Rocky CPU image boot and QGA',
+                  'sourceSha256': args.sha256, 'domainUuid': identity,
                   'ownershipManifest': str(ownership) if args.retain_for_dr_qualification else None,
                   'productionQualified': False, 'joinTested': False, 'storageTested': False,
                   'sshConnectivityTested': False, 'rke2Started': False}
