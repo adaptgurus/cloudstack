@@ -27,7 +27,17 @@
     "image": null,
     "projectLifecycleQualified": false,
     "resizeIdempotencyQualified": false,
-    "apkLockSha256": "52a13676a019716187edb17110cfb77459a096ef7aaf5d35b93664580979796c"
+    "apkLockSha256": "52a13676a019716187edb17110cfb77459a096ef7aaf5d35b93664580979796c",
+    "buildArtifact": {
+      "lock": "tools/layersentry/k8s/downstream/cloudstack-csi/artifact-lock.json",
+      "sha256": "ecbe36013f66bf6015321f07bb2ebbc5ed3d87125c60c5958099b1f0b297d19f",
+      "status": "CI_VERIFIED",
+      "platforms": [
+        "linux/amd64"
+      ],
+      "registryPublished": false,
+      "signed": false
+    }
   },
   "cloudstackCcm": {
     "version": "1.2.0",
@@ -54,7 +64,10 @@
     "rke2Owner": "CAPRKE2",
     "packageOwner": "Flux",
     "databaseOwner": "database-operator",
-    "requiredControlPlanePorts": [6443, 9345]
+    "requiredControlPlanePorts": [
+      6443,
+      9345
+    ]
   },
   "hardGates": {
     "tupleReconciliation": false,
