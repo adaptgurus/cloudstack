@@ -27,6 +27,21 @@ for (const host of targets) {
       record.browserVersion = browser.version()
       const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' })
       const page = await context.newPage()
+      record.rejectedRequests = []
+      await page.exposeFunction('recordRequestRejection', detail => record.rejectedRequests.push(detail))
+      await page.addInitScript(() => {
+        window.addEventListener('unhandledrejection', event => {
+          const error = event.reason
+          const config = error?.config
+          const safeIdentifier = value => String(value || '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 80)
+          // Deliberately omit config, URLs, payloads, headers and error stacks.
+          window.recordRequestRejection({
+            command: safeIdentifier(config?.params?.command || (typeof config?.data === 'string' ? new URLSearchParams(config.data).get('command') : config?.data?.get?.('command'))),
+            code: safeIdentifier(error?.code),
+            status: Number(error?.response?.status) || null
+          })
+        })
+      })
       page.setDefaultTimeout(30000)
       page.setDefaultNavigationTimeout(45000)
       const pageErrors = []
