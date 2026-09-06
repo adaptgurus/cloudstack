@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "1.0",
+  "scope": "downstream CAPC and CCM hosted build qualification",
+  "status": "CI_VERIFIED",
+  "liveVerified": false,
+  "productionCertified": false,
+  "signed": false,
+  "workflowRunId": 34050386205,
+  "workflowRunUrl": "https://github.com/adaptgurus/cloudstack/actions/runs/34050386205",
+  "layersentrySourceCommit": "6162cc1e40afebd56edbd42cff7325fb2abc5d05",
+  "components": [
+    {
+      "component": "capc",
+      "upstreamCommit": "7521b14a31e6c46f81f16aae3738a27c08ad063f",
+      "patches": [
+        {
+          "path": "0001-layersentry-rke2-endpoint-volume-ownership.diff",
+          "sha256": "6d3fc88ccf986bd025fc6d714ec7b4fa19d0c2afe6f10c50ef02a198286cea74",
+          "purpose": "CAPC-owned RKE2 6443/9345 endpoint and ownership-safe Machine data-disk deletion"
+        }
+      ],
+      "artifactId": 9994484772,
+      "artifactName": "layersentry-capc-build-6162cc1e40afebd56edbd42cff7325fb2abc5d05-1",
+      "artifactUrl": "https://github.com/adaptgurus/cloudstack/actions/runs/34050386205/artifacts/9994484772",
+      "artifactZipDigest": "sha256:7c3d675d81cbdc15f5c6e9315c4c9345c1deadde0492979f2dafce856ba4877e",
+      "artifactExpiresAt": "2026-09-20T18:10:20Z",
+      "archiveSha256": "fc01a322223083d8c56660c9499f6c4a8152be7d027a7b77d4f17a6d8672fca3",
+      "imageIndexDigest": "sha256:68cd841cda9d4a8160e9564f11a687b1e36515d8f78383428fca1428734558b5",
+      "imageManifestDigest": "sha256:a88c3b9120495e5eec64a9dddc5db7720a9c554b53a98bfa7207f5cb90475432",
+      "imageConfigDigest": "sha256:02d700ee9ad8011ece90a7ce456c1871712b3d78a175237dc77f3ef034da50b8",
+      "attestationDigests": {
+        "provenance": "sha256:d36627f2f16c49b31158809f8518760abe467a02f30d9792c303548643f5ccf8",
+        "sbom": "sha256:926ebbf97ae1fbefc51a4952a302ae9bff32a2c35bdc81a75d389046ed963161"
+      },
+      "componentBinding": {
+        "schemaVersion": "1.0",
+        "component": "capc",
+        "status": "CI_VERIFIED",
+        "productionCertified": false,
+        "liveVerified": false,
+        "signed": false,
+        "image": "layersentry.local/capc@sha256:68cd841cda9d4a8160e9564f11a687b1e36515d8f78383428fca1428734558b5",
+        "runtimeImageManifestDigest": "sha256:a88c3b9120495e5eec64a9dddc5db7720a9c554b53a98bfa7207f5cb90475432",
+        "archiveSha256": "fc01a322223083d8c56660c9499f6c4a8152be7d027a7b77d4f17a6d8672fca3",
+        "manifest": "infrastructure-components.yaml",
+        "manifestSha256": "bd197b1fda90b35ba07f77b10fea74f34427978a71703dd81351b0236242c3d4",
+        "layersentrySourceCommit": "6162cc1e40afebd56edbd42cff7325fb2abc5d05",
+        "requirements": [
+          "Import the retained OCI archive on every scheduled node: ctr -n k8s.io images import --all-platforms --digests --base-name layersentry.local/capc capc.oci.tar; verify the exact index digest image exists. Or mirror preserving the index digest.",
+          "Install pinned CAPI core, CAPRKE2 and cert-manager dependencies before CAPC.",
+          "Provide scoped CloudStack credentials through the provider native Secret contract; no credentials are included."
+        ]
+      }
+    },
+    {
+      "component": "cloudstack-ccm",
+      "upstreamCommit": "4740dbcacc7fc5892354b03b2f0be7ebf5c92584",
+      "patches": [
+        {
+          "path": "0001-layersentry-kubernetes-1.36-build-compatibility.diff",
+          "sha256": "a6689998f2a46b9622ac69f97f8e67e231f075ffa8cca16a85a97fd0f4893726",
+          "purpose": "Build the selected CloudStack CCM source against Kubernetes 1.36 libraries and the current CCM command contract"
+        }
+      ],
+      "artifactId": 9994441961,
+      "artifactName": "layersentry-cloudstack-ccm-build-6162cc1e40afebd56edbd42cff7325fb2abc5d05-1",
+      "artifactUrl": "https://github.com/adaptgurus/cloudstack/actions/runs/34050386205/artifacts/9994441961",
+      "artifactZipDigest": "sha256:2f7f45d24e776cd066cf76947390c99ee429ee2a6dc333a3f73b781a6a10f123",
+      "artifactExpiresAt": "2026-09-20T18:07:28Z",
+      "archiveSha256": "3a29c2f6eef540dc07047c13217e7ea7f770da2133c2e1467f22ed6caca31605",
+      "imageIndexDigest": "sha256:edc1f8164c7b958c215d70e2b19aa8e4a248d1c531d83134dc542bb29b0f55be",
+      "imageManifestDigest": "sha256:6fb9c82a27a3f7ee1848766424a0b2fa3f9345e184de660f761a6fddc9793aae",
+      "imageConfigDigest": "sha256:6d4d54952fb1ba8b0b6f7614305608526b2414731ccaa832cbcada3b2e1aa2c2",
+      "attestationDigests": {
+        "sbom": "sha256:81e836252e572668f0a4372658c89c78977a01be84887bb9691505b59ff76430",
+        "provenance": "sha256:ed15dbb7fea048222195a48fe2a8730372deef78ecf0ea1cba82aa142b83f377"
+      },
+      "componentBinding": {
+        "schemaVersion": "1.0",
+        "component": "cloudstack-ccm",
+        "status": "CI_VERIFIED",
+        "productionCertified": false,
+        "liveVerified": false,
+        "signed": false,
+        "image": "layersentry.local/cloudstack-ccm@sha256:edc1f8164c7b958c215d70e2b19aa8e4a248d1c531d83134dc542bb29b0f55be",
+        "runtimeImageManifestDigest": "sha256:6fb9c82a27a3f7ee1848766424a0b2fa3f9345e184de660f761a6fddc9793aae",
+        "archiveSha256": "3a29c2f6eef540dc07047c13217e7ea7f770da2133c2e1467f22ed6caca31605",
+        "manifest": "cloud-controller-manager.yaml",
+        "manifestSha256": "5880c6f361b6288bbc727a819c246a3a5aecbd227370251e2cc0235d11a09e2f",
+        "layersentrySourceCommit": "6162cc1e40afebd56edbd42cff7325fb2abc5d05",
+        "requirements": [
+          "Import the retained OCI archive on every scheduled node: ctr -n k8s.io images import --all-platforms --digests --base-name layersentry.local/cloudstack-ccm cloudstack-ccm.oci.tar; verify the exact index digest image exists. Or mirror preserving the index digest.",
+          "Install pinned CAPI core, CAPRKE2 and cert-manager dependencies before CAPC.",
+          "Provide scoped CloudStack credentials through the provider native Secret contract; no credentials are included."
+        ]
+      }
+    }
+  ]
+}
