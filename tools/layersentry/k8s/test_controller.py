@@ -22,7 +22,14 @@ import unittest
 from pathlib import Path
 
 from controller.bff import BFFApplication
-from controller.model import Actor, AmbiguousMutationError, AuthorizationError, ConflictError, OperationStatus
+from controller.model import (
+    Actor,
+    AmbiguousMutationError,
+    AuthenticationError,
+    AuthorizationError,
+    ConflictError,
+    OperationStatus,
+)
 from controller.service import ControllerService, StepOutcome, StepResult
 from controller.store import SagaStore
 from layersentry_k8s_policy import ReleaseGates
@@ -179,6 +186,25 @@ class ControllerTest(unittest.TestCase):
         )
         self.assertEqual(status, 202)
         self.assertEqual(response["operation"]["status"], "REQUESTED")
+
+    def test_bff_maps_authentication_failure_and_malformed_query(self):
+        class MissingSession:
+            def authenticate(self, environ):
+                del environ
+                raise AuthenticationError("CloudStack session credentials are missing")
+
+        status, response = self._request(
+            BFFApplication(self.service(), MissingSession()), "GET", "/v1/kubernetes/readiness",
+        )
+        self.assertEqual(status, 401)
+        self.assertIn("session", response["error"])
+
+        app = BFFApplication(self.service(), StaticAuthenticator())
+        status, response = self._request(
+            app, "GET", "/v1/kubernetes/clusters/cluster-a", query="namespace",
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("query", response["error"])
 
     def test_bff_scale_status_and_path_tampering(self):
         app = BFFApplication(self.service(), StaticAuthenticator())

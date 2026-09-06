@@ -28,7 +28,14 @@ import urllib.parse
 from http import HTTPStatus
 from typing import Any, Callable, Mapping, Protocol
 
-from .model import Actor, AuthorizationError, ConflictError, InvalidRequestError, NotFoundError
+from .model import (
+    Actor,
+    AuthenticationError,
+    AuthorizationError,
+    ConflictError,
+    InvalidRequestError,
+    NotFoundError,
+)
 from .service import ControllerService
 
 
@@ -113,7 +120,14 @@ class BFFApplication:
                 status = HTTPStatus.ACCEPTED if created else HTTPStatus.OK
                 return self._response(start_response, status, {"operation": operation.public_dict()})
             if match and method == "GET" and match.group(2) is None:
-                query = urllib.parse.parse_qs(str(environ.get("QUERY_STRING", "")), strict_parsing=True)
+                try:
+                    query = urllib.parse.parse_qs(
+                        str(environ.get("QUERY_STRING", "")),
+                        strict_parsing=True,
+                        keep_blank_values=True,
+                    )
+                except ValueError as exc:
+                    raise InvalidRequestError("query string is malformed") from exc
                 if set(query) != {"namespace", "projectId"} or any(len(value) != 1 for value in query.values()):
                     raise InvalidRequestError("namespace and projectId query parameters are required exactly once")
                 status = self.service.cluster_status(
@@ -129,6 +143,8 @@ class BFFApplication:
                     "events": self.service.store.events(operation.id),
                 })
             return self._response(start_response, HTTPStatus.NOT_FOUND, {"error": "route not found"})
+        except AuthenticationError as exc:
+            return self._response(start_response, HTTPStatus.UNAUTHORIZED, {"error": str(exc)})
         except AuthorizationError as exc:
             return self._response(start_response, HTTPStatus.FORBIDDEN, {"error": str(exc)})
         except InvalidRequestError as exc:

@@ -29,6 +29,10 @@ class AuthorizationError(ControllerError):
     pass
 
 
+class AuthenticationError(AuthorizationError):
+    """The caller did not present a currently valid upstream identity."""
+
+
 class ConflictError(ControllerError):
     pass
 
@@ -67,6 +71,7 @@ class Actor:
     domain_id: str
     project_ids: Tuple[str, ...] = ()
     roles: Tuple[str, ...] = ()
+    capabilities: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
