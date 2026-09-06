@@ -37,7 +37,9 @@ type runtimeState struct {
 
 func main() {
     mode := "serve"
-    if len(os.Args) > 1 { mode = os.Args[1] }
+    if len(os.Args) > 1 {
+        mode = os.Args[1]
+    }
     switch mode {
     case "firstboot":
         must(firstBoot())
@@ -59,24 +61,46 @@ func firstBoot() error { return bootstrap.Ensure(bootstrap.DefaultPaths(), local
 func buildRuntime() (*runtimeState, error) {
     runner := privileged.NewClient(privileged.DefaultSocket)
     st, err := journal.New(root)
-    if err != nil { return nil, err }
+    if err != nil {
+        return nil, err
+    }
     sec, err := secrets.Open(root+"/secrets", root+"/identity/secret.key")
-    if err != nil { return nil, err }
+    if err != nil {
+        return nil, err
+    }
     reg := provider.NewRegistry()
-    if err = reg.Register(pgprovider.New(runner, sec)); err != nil { return nil, err }
-    if err = reg.Register(nginxprovider.New(runner)); err != nil { return nil, err }
-    eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, LockPath: root+"/state/mutation.lock"}
+    if err = reg.Register(pgprovider.New(runner, sec)); err != nil {
+        return nil, err
+    }
+    if err = reg.Register(nginxprovider.New(runner)); err != nil {
+        return nil, err
+    }
+    eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, LockPath: root + "/state/mutation.lock"}
     return &runtimeState{runner: runner, reg: reg, store: st, secrets: sec, eng: eng}, nil
 }
 
 func serve() error {
-    if err := firstBoot(); err != nil { return err }
+    if err := firstBoot(); err != nil {
+        return err
+    }
     rt, err := buildRuntime()
-    if err != nil { return err }
+    if err != nil {
+        return err
+    }
     authm := auth.New(root + "/identity/admin.json")
-    srv := &api.Server{Engine: rt.eng, Auth: authm, Secrets: rt.secrets, Journal: rt.store, Registry: rt.reg, BootstrapFile: root+"/identity/bootstrap-token", AllowedOrigin: os.Getenv("LAYERSENTRY_ALLOWED_ORIGIN")}
+    srv := &api.Server{
+        Engine:        rt.eng,
+        Auth:          authm,
+        Secrets:       rt.secrets,
+        Journal:       rt.store,
+        Registry:      rt.reg,
+        BootstrapFile: root + "/identity/bootstrap-token",
+        AllowedOrigin: os.Getenv("LAYERSENTRY_ALLOWED_ORIGIN"),
+    }
     handler, err := srv.Handler()
-    if err != nil { return err }
+    if err != nil {
+        return err
+    }
     hs := &http.Server{
         Addr:              ":9443",
         Handler:           handler,
@@ -93,12 +117,16 @@ func serve() error {
 
 func maintenanceRun() error {
     rt, err := buildRuntime()
-    if err != nil { return err }
-    return (maintenance.Runner{Store: rt.store, Engine: rt.eng}).Run(context.Background())
+    if err != nil {
+        return err
+    }
+    return (maintenance.Runner{Store: rt.store, Engine: rt.eng, Secrets: rt.secrets}).Run(context.Background())
 }
 
 func privilegedHelper() error {
-    if os.Geteuid() != 0 { return errors.New("privileged-helper requires root") }
+    if os.Geteuid() != 0 {
+        return errors.New("privileged-helper requires root")
+    }
     runner := executor.OSRunner{Timeout: 5 * time.Minute, MaxOutput: 1 << 20}
     return privileged.Serve(context.Background(), privileged.DefaultSocket, "layersentry", runner)
 }
@@ -110,7 +138,9 @@ func localIPs() []net.IP {
         addrs, _ := i.Addrs()
         for _, a := range addrs {
             ip, _, err := net.ParseCIDR(a.String())
-            if err == nil && ip != nil && !ip.IsUnspecified() { out = append(out, ip) }
+            if err == nil && ip != nil && !ip.IsUnspecified() {
+                out = append(out, ip)
+            }
         }
     }
     return out
