@@ -1,5 +1,9 @@
 # LayerSentry V1 — Durable Progress Ledger
 
+## 2026-09-07 current module UI deployed on DR
+
+Run 34062120056 succeeded on exact DR 10.10.10.20 with UI commit dc58f76f67dac13aa886c8d45475944f31b0c039. Served HTTP 200/assets match the reviewed production build; backend content hashes and runtime configuration were preserved. Protected backup remains at /var/backups/layersentry/20260906T214807Z-dr-ui-34062120056-1. This is deployed-asset verification; authenticated browser/module lifecycle and production certification remain unverified. [Immutable receipt](evidence/ui/2026-09-07-current-module-ui-dr-deploy.json).
+
 ## Purpose
 
 This file is the **volatile, frequently updated, Git-backed operational checkpoint** for LayerSentry work. Current HEADs, workflow/job/artifact IDs, live target observations, completion state, blockers and next execution gates belong here rather than in the canonical Super Master Context.
