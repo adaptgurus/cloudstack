@@ -66,7 +66,7 @@ for (const host of targets) {
       })
       page.on('response', response => {
         const url = new URL(response.url())
-        if (url.pathname.endsWith('/client/api') && response.status() >= 400) {
+        if (/\/client\/api\/?$/.test(url.pathname) && response.status() >= 400) {
           const body = new URLSearchParams(response.request().postData() || '')
           record.failedReads.push({ command: (url.searchParams.get('command') || body.get('command') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 80), status: response.status() })
         }
