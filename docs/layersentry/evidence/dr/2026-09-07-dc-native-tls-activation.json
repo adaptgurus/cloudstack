@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "status": "PARTIAL",
+  "target": "10.10.10.14",
+  "runnerCommit": "fe52c719de89da3a2267d1c9062c81dd18552869",
+  "planSha256": "2279b43d2a215a1d7c23fd535ca78c7049b93b15fb79cbd62e605f00881fb105",
+  "originalCaDerSha256": "67885ce20afcea82d0912937adb7a5d72c2f2cfff7fe894745a5574a4720b1bd",
+  "preparedLeafDerSha256": "bf3a4879d200003c1453a2c9be402187c73d7a9e17030dd9fa6b2c9b18f9273f",
+  "phases": [
+    {
+      "workflowRunId": 34064547454,
+      "receiptSha256": "5030dbdb3a0b3c53d1ad1fd0a6fd9db921f874a49c03f5b8d128b406c18ef231",
+      "receipt": {
+        "automaticReplay": false,
+        "configurationInstalled": true,
+        "firewallChanged": false,
+        "httpConfigurationPreserved": true,
+        "httpListenerVerified": false,
+        "phase": "Install",
+        "productionCertified": false,
+        "schema": 1,
+        "serviceRestarted": false,
+        "status": "PARTIAL",
+        "target": "10.10.10.14"
+      }
+    },
+    {
+      "workflowRunId": 34064640493,
+      "receiptSha256": "397778111a9188a9716195e403a2d7128f952cfa207dd5c66ba8f0271ed7af3a",
+      "receipt": {
+        "automaticReplay": false,
+        "httpsVerified": false,
+        "phase": "Activate",
+        "productionCertified": false,
+        "restartAlreadySubmitted": true,
+        "schema": 1,
+        "status": "PENDING",
+        "target": "10.10.10.14"
+      }
+    },
+    {
+      "workflowRunId": 34064699420,
+      "receiptSha256": "2dc5149b9100746f96b3cf52710133fa63d8df1c38bb0154a6961f40345d3138",
+      "receipt": {
+        "authenticatedApiTlsVerified": true,
+        "automaticReplay": false,
+        "firewallChanged": false,
+        "httpPreserved": true,
+        "httpsVerified": true,
+        "phase": "Activate",
+        "productionCertified": false,
+        "schema": 1,
+        "status": "PARTIAL",
+        "target": "10.10.10.14"
+      }
+    }
+  ],
+  "managementRestartsSubmitted": 1,
+  "firewallChanged": false,
+  "externalClientReachabilityVerified": false,
+  "browserTlsVerified": false,
+  "productionCertified": false
+}

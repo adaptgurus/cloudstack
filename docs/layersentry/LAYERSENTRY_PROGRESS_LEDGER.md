@@ -1,5 +1,9 @@
 # LayerSentry V1 — Durable Progress Ledger
 
+## 2026-09-07 DC native HTTPS and authenticated API verified
+
+Install 34064547454 and Activate observation 34064699420 succeeded at exact runner fe52c719de89da3a2267d1c9062c81dd18552869. The native CA-signed prepared leaf was served on 8443 and verified against the original CA; an authenticated native API request over HTTPS succeeded while the original HTTP client remained available. First Activate 34064640493 submitted one journaled management restart and returned PENDING; the continuation observed that existing intent without restarting again. File ownership, SELinux default contexts and cloud-user readability passed installation checks. Firewall was unchanged; external-client/browser TLS and full product lifecycles remain NOT_TESTED. [Actual phase receipts](evidence/dr/2026-09-07-dc-native-tls-activation.json).
+
 ## 2026-09-07 current UI deployed on both targets; DC address/TLS prerequisites advanced
 
 DC UI deployment 34063750260 passed at runner 1feb3f4c2d4c76a6eb1cb696bb5f022cd7f7e630. Both DC and DR now serve exact reviewed UI dc58f76f67dac13aa886c8d45475944f31b0c039 from build 34059760313. DC verified served assets, backend hashes, runtime configuration and server.properties preservation. Protected DC staging /run/layersentry-dr-ui-34063750260-1 remains retained pending owned cleanup. Authenticated Chrome/Firefox and module lifecycles remain NOT_TESTED. [DC deployment receipt](evidence/ui/2026-09-07-current-module-ui-dc-deploy.json).
