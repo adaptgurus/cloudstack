@@ -49,6 +49,64 @@ Before changing anything:
 
 ## Current checkpoint
 
+### PARTIAL / CI_VERIFIED — 2026-09-06 DC/DR and Kubernetes customer lifecycle continuation
+
+User reassigned completion of DC/DR replication and Kubernetes provisioning,
+DBaaS/APaaS to this session. Source is isolated on
+`codex/k8s-service-completion`; exact qualified source is
+`14aa468554d8220eb3dd5d3bb3a2b61297ca30c8`. No historical reset or shared
+worktree overwrite occurred. Latest observed integration refs are CloudStack
+`ae719e0c0a` (Single-OS writer still active) and Cozystack
+`c8ad45c4dca0755ba3091a4ee3f445e5ba9b8361`.
+
+- Kubernetes GUI now connects native discovery to authenticated BFF create,
+  operation recovery/polling, cluster inventory/detail, scale and delete.
+  Project-scoped native reads and durable pagination replace lost-browser-state
+  dependence. Submitted IDs are revalidated through the caller's CloudStack
+  session before privileged reconciliation; exact server-owned image checksum
+  bindings remain required. A same-origin Unix-socket proxy route is supplied.
+- Rocky source workflow `34048152518` passed **84 Kubernetes and 27 DR tests**,
+  without skips, using unprivileged Rocky 9.8 userspace, Python 3.9.25,
+  QEMU 10.1.0 and Nginx 1.20.1. This is container CI, not a running Rocky guest,
+  live libvirt capture or full GUI/API provisioning proof.
+- UI workflow `34048138570` passed after replacing the incompatible Node16 CI
+  toolchain with the previously verified locked Node24.20.0 path. Local combined
+  UI build, lint and **22 suites / 318 tests** also passed. The latest new UI
+  candidate has not been deployed by this continuation; previous served UI
+  evidence remains at `ce1e19934f6ce9eb9f336b97e83f7ae2c890b720` on DR.
+- DR source now preserves native NAS and libvirt file replication, including
+  fixed sealed-partial and pre-capture-journal interruption recovery. Real QEMU
+  tests reconstruct latest and two older points and verify unchanged retained
+  replicas. Native recovery authorization/routing and CloudStack guest import
+  still need complete live integration; no RPO/RTO or failover claim is made.
+- CSI run `34047140051` built both unsigned OCI images with locked APK closure,
+  SBOM/provenance and filesystem smoke checks. The missing XFS grow utility is
+  included. See `evidence/k8s/2026-09-06-csi-oci-build.json` for exact digests.
+  Signing, registry distribution, arm64 build and real CSI lifecycle gates remain.
+- Fresh read-only DC API run `34046294664`: Basic Zone Disabled, one KVM host
+  Up/Enabled, no primary/image storage or guest VMs reported; both templates are
+  not Ready and the shared guest network is Setup. Optional API failures are
+  UNKNOWN, not evidence of absence or bad credentials.
+- Trusted exact Hyper-V DC console snapshot `34046965347` succeeded. The one
+  guarded Login attempt `34047745757` stopped before any keyboard/password input
+  at OCR. Subsequent Observe probes are read-only; Windows OCR type mismatches
+  are being fixed before any credential retry. DC SSH trust is not established.
+- First management RKE2 bootstrap and immutable CPU image build were missing.
+  Dedicated isolated workers are implementing/qualifying them before tenant
+  CAPI formation, E0 storage safety, and operator DBaaS/APaaS acceptance.
+
+**Not complete:** live DC/DR fixtures, latest/older guest recovery, automatic
+Kubernetes formation, stateful storage survival, DBaaS/APaaS lifecycles, browser
+acceptance of those running services, signed release and production certification.
+Generic RAT CI reports 182 unknown licenses across existing overlay/context and
+candidate files; this is recorded, not hidden by broad exclusions or relicensing.
+No release evidence booleans were fabricated. Runtime reservations remain
+coordinated through the DR root thread; no storage/network/VM mutation has been
+performed by this continuation. Detailed design and evidence:
+`evidence/k8s/2026-09-06-customer-lifecycle-integration.md` and
+`evidence/dr/2026-09-06-dr-module-source-qualification.md`.
+
+
 ### SOURCE_COMPLETE / BLOCKED — 2026-09-06 downstream CSI container inputs
 
 Exact implementation commit:
