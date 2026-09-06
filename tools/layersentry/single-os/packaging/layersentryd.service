@@ -1,11 +1,13 @@
 [Unit]
 Description=LayerSentry Single-OS lifecycle agent
-After=network-online.target firewalld.service layersentry-firstboot.service
+After=network-online.target firewalld.service layersentry-firstboot.service layersentry-privileged.service
 Wants=network-online.target
-Requires=layersentry-firstboot.service
+Requires=layersentry-firstboot.service layersentry-privileged.service
 
 [Service]
 Type=simple
+User=layersentry
+Group=layersentry
 ExecStart=/usr/bin/layersentryd serve
 Restart=on-failure
 RestartSec=5s
@@ -13,7 +15,7 @@ UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
-ProtectSystem=full
+ProtectSystem=strict
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true
@@ -22,10 +24,10 @@ LockPersonality=true
 RestrictSUIDSGID=true
 RestrictRealtime=true
 SystemCallArchitectures=native
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
-ReadWritePaths=/var/lib/layersentryd /etc /var/lib/pgsql /var/log /run /tmp
-CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID CAP_SYS_ADMIN CAP_NET_ADMIN CAP_AUDIT_WRITE
-AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/layersentryd /run/layersentryd /etc/fstab /etc/nginx /var/lib/pgsql /var/log/nginx /srv /data /opt/layersentry-data /var/log/layersentry-services
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
+AmbientCapabilities=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
 
 [Install]
 WantedBy=multi-user.target
