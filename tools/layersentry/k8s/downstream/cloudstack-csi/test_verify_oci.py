@@ -27,7 +27,7 @@ def fixture(path, *, subject_wrong=False, sbom_missing=False, corrupt=False):
     if not sbom_missing:
         predicates.append(('https://spdx.dev/Document', {'packages': [{'name': 'fixture'}]}))
     layers = [blob({'predicateType': kind, 'subject': [subject], 'predicate': value}, 'application/vnd.in-toto+json') for kind, value in predicates]
-    attestation = blob({'config': blob({'architecture': 'unknown', 'os': 'unknown'}), 'layers': layers})
+    attestation = blob({'schemaVersion': 2, 'config': blob({'architecture': 'unknown', 'os': 'unknown'}), 'layers': layers})
     with tarfile.open(path, 'w') as tar:
         values = {'oci-layout': b'{"imageLayoutVersion":"1.0.0"}', 'index.json': json.dumps({'manifests': [image, attestation]}).encode()}
         values.update({'blobs/sha256/' + digest.split(':')[1]: data for digest, data in blobs.items()})

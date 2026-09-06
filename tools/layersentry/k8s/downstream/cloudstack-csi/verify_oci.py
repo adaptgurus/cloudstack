@@ -64,7 +64,7 @@ def verify(archive, docker_inspect, component, source_commit):
         if isinstance(document, dict):
             for child in document.get('manifests', []):
                 walk(child)
-            if 'config' in document:
+            if document.get('schemaVersion') == 2 and 'layers' in document:
                 walk(document['config'])
             for child in document.get('layers', []):
                 walk(child)
@@ -73,7 +73,7 @@ def verify(archive, docker_inspect, component, source_commit):
     images = []
     for digest in reachable:
         document = blobs[digest][1]
-        if isinstance(document, dict) and 'config' in document:
+        if isinstance(document, dict) and document.get('schemaVersion') == 2 and 'config' in document and 'layers' in document:
             config_digest = document['config']['digest']
             config = blobs[config_digest][1]
             if config.get('architecture') == 'amd64' and config.get('os') == 'linux':
