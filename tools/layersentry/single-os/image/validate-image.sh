@@ -37,7 +37,10 @@ if [[ "$mode" == "--sealed" ]]; then
     [[ ! -d "$dir" || -z "$(find "$dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]] || { echo "FAIL customer_state_present=$dir"; exit 1; }
   done
   [[ ! -s /etc/machine-id ]] || { echo "FAIL machine_id_not_sealed"; exit 1; }
-  for pkg in nginx postgresql16-server postgresql17-server; do
+  for pkg in \
+    postgresql16-server postgresql17-server \
+    mysql-server mariadb-server redis valkey \
+    nginx httpd tomcat nodejs python3.12 podman; do
     if rpm -q "$pkg" >/dev/null 2>&1; then
       echo "FAIL provider_package_baked_into_image=$pkg"
       exit 1
