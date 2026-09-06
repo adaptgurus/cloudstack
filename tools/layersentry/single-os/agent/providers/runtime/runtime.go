@@ -15,11 +15,11 @@ import (
 )
 
 type Spec struct {
-    ID                   string
-    Package              string
-    RepoID               string
-    AllowedReleaseLines  map[string]string
-    Description          string
+    ID                  string
+    Package             string
+    RepoID              string
+    AllowedReleaseLines map[string]string
+    Description         string
 }
 
 type Provider struct {
@@ -50,6 +50,12 @@ func (p *Provider) Validate(_ context.Context, r model.ServiceRequest) error {
     }
     if r.Backup.Enabled || r.Backup.Schedule != "" || r.Backup.Retention != 0 {
         return errors.New("runtime package providers do not own customer application-data backup; backup policy must be disabled")
+    }
+    if len(r.Storage) != 0 {
+        return errors.New("runtime package providers do not consume attached storage")
+    }
+    if len(r.SecretRefs) != 0 {
+        return errors.New("runtime package providers do not consume secret references")
     }
     return nil
 }
