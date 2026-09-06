@@ -53,6 +53,7 @@
 import store from '@/store'
 import { postAPI } from '@/api'
 import _ from 'lodash'
+import Cookies from 'js-cookie'
 
 export default {
   name: 'SamlDomainSwitcher',
@@ -69,21 +70,23 @@ export default {
   },
   methods: {
     fetchData () {
+      if (Cookies.get('isSAML') !== 'true') {
+        this.showSwitcher = false
+        this.loading = false
+        return
+      }
       var page = 1
       const samlAccounts = []
       const getNextPage = () => {
         this.loading = true
-        postAPI('listAndSwitchSamlAccount', { details: 'min', page: page, pageSize: 500 }).then(json => {
+        return postAPI('listAndSwitchSamlAccount', { details: 'min', page: page, pageSize: 500 }).then(json => {
           if (json && json.listandswitchsamlaccountresponse && json.listandswitchsamlaccountresponse.samluseraccount) {
             samlAccounts.push(...json.listandswitchsamlaccountresponse.samluseraccount)
           }
           if (samlAccounts.length < json.listandswitchsamlaccountresponse.count) {
             page++
-            getNextPage()
+            return getNextPage()
           }
-        }).catch(error => {
-          console.log(error)
-        }).finally(() => {
           if (samlAccounts.length < 2) {
             this.showSwitcher = false
             return
@@ -93,25 +96,32 @@ export default {
           const currentAccount = this.samlAccounts.filter(x => {
             return x.userId === store.getters.userInfo.id
           })[0]
+          if (!currentAccount) {
+            this.showSwitcher = false
+            return
+          }
           this.currentAccount = `${currentAccount.accountName} (${currentAccount.domainName})`
-          this.loading = false
           this.showSwitcher = true
+        }).catch(() => {
+          this.showSwitcher = false
+        }).finally(() => {
+          this.loading = false
         })
       }
-      getNextPage()
+      return getNextPage()
     },
     changeAccount (index) {
       const account = this.samlAccounts[index]
-      postAPI('listAndSwitchSamlAccount', {
+      return postAPI('listAndSwitchSamlAccount', {
         userid: account.userId,
         domainid: account.domainId
       }).then(response => {
-        store.dispatch('GetInfo', true).then(() => {
+        return store.dispatch('GetInfo', true).then(() => {
           this.$message.success(`Switched to "${account.accountName} (${account.domainPath})"`)
           this.$router.go()
         })
-      }).else(error => {
-        console.log('error refreshing with new user context: ' + error)
+      }).catch(() => {
+        this.$message.error(this.$t('message.error.discovering.feature'))
       })
     }
   }

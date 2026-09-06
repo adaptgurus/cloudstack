@@ -19,6 +19,7 @@ import Cookies from 'js-cookie'
 import { axios, sourceToken } from '@/utils/request'
 import { message, notification } from 'ant-design-vue'
 import { vueProps } from '@/vue-app'
+import { isMissingLogoutSession } from '@/utils/authRequests'
 import {
   ACCESS_TOKEN
 } from '@/store/mutation-types'
@@ -83,13 +84,23 @@ export function callAPI (command, args = {}) {
   return call(command, args)
 }
 
-export function login (arg) {
+async function clearSessionBeforeLogin () {
+  try {
+    await postAPI('logout')
+  } catch (error) {
+    // Native 4.22.1.1 explicitly rejects logout when no session exists.
+    // All other failures stop login; never race logout against a new session.
+    if (!isMissingLogoutSession(error)) throw error
+  }
+}
+
+export async function login (arg) {
   if (!sourceToken.checkExistSource()) {
     sourceToken.init()
   }
 
   // Logout before login is called to purge any duplicate sessionkey cookies
-  postAPI('logout')
+  await clearSessionBeforeLogin()
 
   const params = new URLSearchParams()
   params.append('command', 'login')
@@ -116,13 +127,13 @@ export async function logout () {
   return result
 }
 
-export function oauthlogin (arg) {
+export async function oauthlogin (arg) {
   if (!sourceToken.checkExistSource()) {
     sourceToken.init()
   }
 
   // Logout before login is called to purge any duplicate sessionkey cookies
-  postAPI('logout')
+  await clearSessionBeforeLogin()
 
   const params = new URLSearchParams()
   params.append('command', 'oauthlogin')

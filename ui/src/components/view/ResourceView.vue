@@ -28,20 +28,29 @@
         :loading="loading"
         :bordered="true"
         style="width:100%">
-        <keep-alive v-if="tabs.length === 1">
+        <a-alert v-if="networkError" type="warning" show-icon :message="$t('label.layersentry.read.failed')">
+          <template #description>
+            <p>{{ $t('message.layersentry.network.tabs') }}</p>
+            <p style="overflow-wrap: anywhere">{{ networkError.code }} {{ networkError.message }}</p>
+            <a-button @click="fetchData">{{ $t('label.refresh') }}</a-button>
+          </template>
+        </a-alert>
+        <a-empty v-if="!visibleTabs.length && !loading" :description="$t('message.layersentry.no.detail.tabs')" />
+        <keep-alive v-if="visibleTabs.length === 1">
           <component
-            :is="tabs[0].component"
+            :is="visibleTabs[0].component"
             :resource="resource"
+            :resourceType="visibleTabs[0].resourceType"
             :loading="loading"
-            :tab="tabName(tabs[0])" />
+            :tab="tabName(visibleTabs[0])" />
         </keep-alive>
         <a-tabs
-          v-else
+          v-else-if="visibleTabs.length > 1"
           style="width: 100%; margin-top: -12px"
           :animated="false"
-          :activeKey="activeTab || tabName(tabs[0])"
+          :activeKey="activeTab || tabName(visibleTabs[0])"
           @change="onTabChange" >
-          <template v-for="tab in tabs" :key="tabName(tab)">
+          <template v-for="tab in visibleTabs" :key="tabName(tab)">
             <a-tab-pane
               :key="tabName(tab)"
               :tab="$t('label.' + tabName(tab))"
@@ -70,6 +79,7 @@ import InfoCard from '@/components/view/InfoCard'
 import ResourceLayout from '@/layouts/ResourceLayout'
 import { getAPI } from '@/api'
 import { mixinDevice } from '@/utils/mixin.js'
+import { readFailure } from '@/config/layersentryPage'
 
 export default {
   name: 'ResourceView',
@@ -105,6 +115,8 @@ export default {
     return {
       activeTab: '',
       networkService: null,
+      networkError: null,
+      networkGeneration: 0,
       projectAccount: null
     }
   },
@@ -112,7 +124,7 @@ export default {
     resource: {
       deep: true,
       handler (newItem, oldItem) {
-        if (newItem.id === oldItem.id) return
+        if (newItem.id === oldItem.id && newItem.associatednetworkid === oldItem.associatednetworkid) return
 
         this.fetchData()
       }
@@ -124,25 +136,40 @@ export default {
       handler () {
         this.setActiveTab()
       }
+    },
+    visibleTabs () {
+      this.setActiveTab()
+    }
+  },
+  computed: {
+    visibleTabs () {
+      return this.tabs.filter(tab => this.showTab(tab))
     }
   },
   created () {
-    const self = this
     this.setActiveTab()
-    window.addEventListener('popstate', function () {
-      self.setActiveTab()
-    })
+    window.addEventListener('popstate', this.setActiveTab)
     this.fetchData()
+  },
+  beforeUnmount () {
+    this.networkGeneration++
+    window.removeEventListener('popstate', this.setActiveTab)
   },
   methods: {
     fetchData () {
+      const generation = ++this.networkGeneration
+      this.networkService = null
+      this.networkError = null
       if (this.resource.associatednetworkid) {
         getAPI('listNetworks', { id: this.resource.associatednetworkid, listall: true }).then(response => {
+          if (generation !== this.networkGeneration) return
           if (response && response.listnetworksresponse && response.listnetworksresponse.network) {
             this.networkService = response.listnetworksresponse.network[0]
           } else {
             this.networkService = {}
           }
+        }).catch(error => {
+          if (generation === this.networkGeneration) this.networkError = readFailure(error)
         })
       }
     },
@@ -163,6 +190,7 @@ export default {
       this.$emit('onTabChange', key)
     },
     tabName (tab) {
+      if (!tab) return ''
       if (typeof tab.name === 'function') {
         return tab.name(this.resource)
       }
@@ -178,20 +206,9 @@ export default {
       }
     },
     setActiveTab () {
-      if (this.$route.query.tab) {
-        this.activeTab = this.$route.query.tab
-        return
-      }
-      if (!this.historyTab || !this.$route.meta.tabs || this.$route.meta.tabs.length === 0) {
-        this.activeTab = this.tabName(this.tabs[0])
-        return
-      }
-      const tabIdx = this.$route.meta.tabs.findIndex(tab => this.tabName(tab) === this.historyTab)
-      if (tabIdx === -1) {
-        this.activeTab = this.tabName(this.tabs[0])
-      } else {
-        this.activeTab = this.historyTab
-      }
+      const names = this.visibleTabs.map(tab => this.tabName(tab))
+      const requested = this.$route.query.tab || this.historyTab
+      this.activeTab = names.includes(requested) ? requested : (names[0] || '')
     }
   }
 }

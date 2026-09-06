@@ -475,6 +475,43 @@ describe('Views > AutogenView.vue', () => {
     })
 
     describe('fetchData()', () => {
+      it('keeps the latest same-route refresh authoritative when reads complete out of order', async () => {
+        mockAxios.mockResolvedValue({ testapinamecase1response: { count: 0, testapinamecase1: [] } })
+        await router.push({ name: 'testRouter7' })
+        await flushPromises()
+        let finishOld, finishNew
+        mockAxios.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve }))
+        wrapper.vm.fetchData({ irefresh: true })
+        mockAxios.mockImplementationOnce(() => new Promise(resolve => { finishNew = resolve }))
+        wrapper.vm.fetchData({ irefresh: true })
+        finishOld({ testapinamecase1response: { count: 1, testapinamecase1: [{ id: 'stale' }] } })
+        await flushPromises()
+        expect(wrapper.vm.loading).toBe(true)
+        expect(wrapper.vm.items).toEqual([])
+        finishNew({ testapinamecase1response: { count: 1, testapinamecase1: [{ id: 'current' }] } })
+        await flushPromises()
+        expect(wrapper.vm.items[0].id).toBe('current')
+        expect(wrapper.vm.loading).toBe(false)
+        expect(wrapper.vm.readComplete).toBe(true)
+      })
+
+      it('does not replace a successful refresh with a late failure from an older read', async () => {
+        mockAxios.mockResolvedValue({ testapinamecase1response: { count: 0, testapinamecase1: [] } })
+        await router.push({ name: 'testRouter7' })
+        await flushPromises()
+        let failOld
+        mockAxios.mockImplementationOnce(() => new Promise((resolve, reject) => { failOld = reject }))
+        wrapper.vm.fetchData({ irefresh: true })
+        mockAxios.mockResolvedValueOnce({ testapinamecase1response: { count: 1, testapinamecase1: [{ id: 'current' }] } })
+        wrapper.vm.fetchData({ irefresh: true })
+        await flushPromises()
+        failOld(new Error('late network failure'))
+        await flushPromises()
+        expect(wrapper.vm.items[0].id).toBe('current')
+        expect(wrapper.vm.readError).toBeNull()
+        expect(wrapper.vm.readComplete).toBe(true)
+      })
+
       it('fetchData() should be return empty when $route.name equal `deployVirtualMachine`', async (done) => {
         await router.push({ name: 'deployVirtualMachine' })
         await wrapper.vm.fetchData()
