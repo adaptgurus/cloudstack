@@ -1,0 +1,64 @@
+name: LayerSentry CSI artifact qualification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/k8s-artifact-completion]
+    paths:
+      - .github/workflows/layersentry-csi-artifact-qualification.yml
+      - tools/layersentry/k8s/downstream/cloudstack-csi/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layersentry-csi-artifact-qualification
+  cancel-in-progress: false
+
+jobs:
+  build-only:
+    if: github.repository == 'adaptgurus/cloudstack' && github.ref == 'refs/heads/codex/k8s-artifact-completion'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: cloudstack/cloudstack-csi-driver
+          ref: a84477e922d62b82387ab55134fafc9c0b5aaf64
+          path: upstream-csi
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          version: v0.37.0
+          driver-opts: image=moby/buildkit@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+      - name: Verify source and stage immutable runtime inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir evidence
+          git rev-parse HEAD > evidence/layersentry-source.txt
+          git -C upstream-csi rev-parse HEAD > evidence/upstream-source.txt
+          docker version > evidence/docker-version.txt
+          docker buildx version > evidence/buildx-version.txt
+          python3 -m unittest discover -s tools/layersentry/k8s/downstream/cloudstack-csi -p 'test_*.py' -v 2>&1 | tee evidence/source-tests.log
+          python3 tools/layersentry/k8s/downstream/materialize.py --source upstream-csi --manifest tools/layersentry/k8s/downstream/cloudstack-csi/manifest.json --apply | tee evidence/materialize.json
+          python3 tools/layersentry/k8s/downstream/cloudstack-csi/prepare_apk.py --architecture amd64 --output upstream-csi/.layersentry-apk | tee evidence/package-stage.log
+          cp tools/layersentry/k8s/downstream/cloudstack-csi/{manifest.json,apk-lock.json} evidence/
+      - name: Build exact OCI archives and execute isolated smoke checks
+        shell: bash
+        env:
+          BUILDX_METADATA_PROVENANCE: max
+        run: |
+          set -euo pipefail
+          tools/layersentry/k8s/downstream/cloudstack-csi/qualify_images.sh upstream-csi evidence
+      - name: Retain unsigned build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: layersentry-csi-build-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
