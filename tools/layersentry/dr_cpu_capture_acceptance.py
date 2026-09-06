@@ -93,7 +93,7 @@ import hashlib,json,os,pathlib,sys
 stage,operation=sys.argv[1:]
 values={'FULL':0x31,'INC1':0x52,'INC2':0}
 assert stage in values and operation in ['write','read']
-root=pathlib.Path('/var/lib/layersentry-dr-qualification')
+root=pathlib.Path('/tmp/layersentry-dr-qualification')
 if operation=='write':
  root.mkdir(mode=0o700,exist_ok=True)
  assert not root.is_symlink() and root.stat().st_uid==0

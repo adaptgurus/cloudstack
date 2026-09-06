@@ -137,19 +137,18 @@ def agent(identity, command):
     return result['return']
 
 
-def guest_checks(identity):
-    script = r'''
+CHECK_REPORT = '/usr/share/layersentry/node-image/cpuqc-report.json'
+CHECK_SCRIPT = r'''
 set -euo pipefail
-timeout 180 cloud-init status --wait >/tmp/layersentry-cloud-init-status
 python3 - <<'PY'
-import hashlib,json,pathlib,subprocess
+import hashlib,json,os,pathlib,subprocess
 def cmd(*args): return subprocess.check_output(args,text=True).strip()
 def state(unit,verb):
  p=subprocess.run(['systemctl',verb,unit],text=True,capture_output=True)
  return p.stdout.strip()
 root=pathlib.Path('/')
 osdata=dict(line.split('=',1) for line in (root/'etc/os-release').read_text().splitlines() if '=' in line)
-result={'os':osdata['ID'].strip('"'),'osVersion':osdata['VERSION_ID'].strip('"'),
+result={'fixtureId':os.environ['LAYERSENTRY_FIXTURE_ID'],'os':osdata['ID'].strip('"'),'osVersion':osdata['VERSION_ID'].strip('"'),
  'selinux':cmd('getenforce'),'rke2Version':cmd('/usr/local/bin/rke2','--version'),
  'services':{u:{'active':state(u,'is-active'),'enabled':state(u,'is-enabled')} for u in ['qemu-guest-agent','sshd','firewalld','rke2-server','rke2-agent']},
  'machineIdGenerated':len((root/'etc/machine-id').read_text().strip())==32,
@@ -158,7 +157,7 @@ result={'os':osdata['ID'].strip('"'),'osVersion':osdata['VERSION_ID'].strip('"')
  'clusterConfigAbsent':not (root/'etc/rancher/rke2/config.yaml').exists(),
  'serverStateAbsent':not (root/'var/lib/rancher/rke2/server').exists(),
  'interfaces':sorted(p.name for p in (root/'sys/class/net').iterdir()),
- 'cloudInitStatus':(root/'tmp/layersentry-cloud-init-status').read_text().strip(),
+ 'cloudInitStatus':'fixed diagnostic executed by owned cloud-final runcmd',
  'sshdSettings':dict(line.split(' ',1) for line in cmd('sshd','-T').splitlines()),
  'inputLockSha256':hashlib.sha256((root/'usr/share/layersentry/node-image/inputs.lock.json').read_bytes()).hexdigest()}
 assert result['os']=='rocky' and result['osVersion']=='9.8'
@@ -176,8 +175,30 @@ assert result['sshdSettings']['pubkeyauthentication']=='yes'
 print(json.dumps(result,sort_keys=True))
 PY
 '''
-    process = agent(identity, {'execute': 'guest-exec', 'arguments': {'path': '/bin/bash', 'arg': ['-c', script], 'capture-output': True}})
+
+
+def seed_user_data(identity):
+    # Privileged fixed health checks execute through the exact owned NoCloud seed,
+    # not through a widened QGA SELinux domain. The report contains no secrets.
+    script_path = '/usr/local/libexec/layersentry-cpuqc-checks'
+    command = ('export LAYERSENTRY_FIXTURE_ID=' + str(uuid.UUID(identity)) + '; '
+               '/bin/bash ' + script_path + ' > ' + CHECK_REPORT + '.new 2>&1; result=$?; '
+               'mv ' + CHECK_REPORT + '.new ' + CHECK_REPORT + '; '
+               'chmod 0644 ' + CHECK_REPORT + '; restorecon ' + CHECK_REPORT + '; exit "$result"')
+    return '#cloud-config\n' + json.dumps({
+        'ssh_pwauth': False, 'disable_root': False,
+        'write_files': [{'path': script_path, 'owner': 'root:root', 'permissions': '0700',
+                         'content': CHECK_SCRIPT}], 'runcmd': [['/bin/bash', '-c', command]]}) + '\n'
+
+
+def guest_checks(identity):
+    # QGA remains confined and only reads the root-owned, nonsecret fixture report.
+    script = ("import pathlib,stat,sys; p=pathlib.Path(" + repr(CHECK_REPORT) + " ); "
+              "s=p.lstat() if p.exists() else None; "
+              "assert s is None or (stat.S_ISREG(s.st_mode) and s.st_uid==0 and not s.st_mode & 0o022 and s.st_size<=65536); "
+              "sys.stdout.write(p.read_text() if s is not None else '{}')")
     deadline = time.monotonic() + 240
+    process = agent(identity, {'execute': 'guest-exec', 'arguments': {'path': '/usr/bin/python3', 'arg': ['-c', script], 'capture-output': True}})
     while time.monotonic() < deadline:
         status = agent(identity, {'execute': 'guest-exec-status', 'arguments': {'pid': process['pid']}})
         if status.get('exited'):
@@ -187,7 +208,10 @@ PY
             stderr = base64.b64decode(status.get('err-data', ''), validate=True).decode()
             if status.get('exitcode') != 0:
                 raise RuntimeError('guest checks failed: ' + stdout + stderr)
-            return json.loads(stdout)
+            facts = json.loads(stdout)
+            if facts.get('fixtureId') == identity:
+                return facts
+            process = agent(identity, {'execute': 'guest-exec', 'arguments': {'path': '/usr/bin/python3', 'arg': ['-c', script], 'capture-output': True}})
         time.sleep(2)
     raise TimeoutError('guest checks exceeded 240 seconds')
 
@@ -237,7 +261,7 @@ def boot(args):
         seed = work / 'seed'
         seed.mkdir(mode=0o700)
         (seed / 'meta-data').write_text('instance-id: ' + work.name + '\nlocal-hostname: layersentry-cpuqc\n')
-        (seed / 'user-data').write_text('#cloud-config\nssh_pwauth: false\ndisable_root: false\n')
+        (seed / 'user-data').write_text(seed_user_data(identity))
         run([iso, *(['-as', 'mkisofs'] if Path(iso).name == 'xorriso' else []), '-output', record['seedPath'], '-volid', 'cidata', '-joliet', '-rock', str(seed)])
         for key in ['diskPath', 'seedPath']:
             os.chown(record[key], 0, grp.getgrnam('qemu').gr_gid)

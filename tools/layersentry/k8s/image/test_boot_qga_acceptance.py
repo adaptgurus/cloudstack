@@ -1,4 +1,5 @@
 import argparse
+import base64
 import hashlib
 import json
 import subprocess
@@ -22,6 +23,21 @@ class BootAcceptanceTests(unittest.TestCase):
         self.assertEqual(1, diagnostic['returnCode'])
         self.assertEqual(16384, len(diagnostic['output']))
         self.assertTrue(diagnostic['output'].endswith('causal libvirt error'))
+
+    def test_owned_seed_health_report_rejects_stale_fixture(self):
+        identity = str(uuid.uuid4())
+        config = json.loads(boot.seed_user_data(identity).split('\n', 1)[1])
+        self.assertEqual('root:root', config['write_files'][0]['owner'])
+        self.assertEqual('0700', config['write_files'][0]['permissions'])
+        subprocess.run(['bash', '-n'], input=config['write_files'][0]['content'], text=True, check=True)
+        subprocess.run(['bash', '-n'], input=config['runcmd'][0][-1], text=True, check=True)
+        def report(value):
+            return {'exited': True, 'exitcode': 0, 'out-data': base64.b64encode(json.dumps(value).encode()).decode()}
+        fresh = {'fixtureId': identity, 'selinux': 'Enforcing'}
+        with patch.object(boot, 'agent', side_effect=[{'pid': 1}, report({'fixtureId': 'old'}), {'pid': 2}, report(fresh)]) as agent, patch.object(boot.time, 'sleep'):
+            self.assertEqual(fresh, boot.guest_checks(identity))
+        execution = [call.args[1]['arguments']['path'] for call in agent.call_args_list if call.args[1]['execute'] == 'guest-exec']
+        self.assertEqual(['/usr/bin/python3', '/usr/bin/python3'], execution)
 
     def record(self):
         identity = str(uuid.uuid4())
