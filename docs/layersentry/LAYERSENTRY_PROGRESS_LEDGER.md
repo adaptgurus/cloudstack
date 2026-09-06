@@ -1,5 +1,11 @@
 # LayerSentry V1 — Durable Progress Ledger
 
+## 2026-09-07 native Pod range reconciled; fresh modular-libvirt and routing baseline
+
+Pod Apply 34064917403 passed at 0cca70255715af143851517e744c15a640215068, recorded native job c26cfdf1-5f7b-47af-a89c-626aa96f786e and RECONCILED journal, with actual range 10.10.10.2–10.10.10.9. Original Plan hash remains bound; Zone is Disabled and usage remains UNKNOWN. No second Apply was dispatched. [Pod receipt and current lab observations](evidence/dr/2026-09-07-pod-apply-and-current-lab-prerequisites.json).
+
+Fresh DR inventory 34064844600 confirms active virtqemud, inactive libvirtd, absent cloudstack-agent and active management; exact retained source guest remains listed. This corrects the prior generic “libvirt active” wording: modular daemon authority must be preserved until a separately reviewed native transition. Missing meta-RPM and unavailable storage pool query do not prove missing libvirt or empty storage. Network discovery 34064967422 confirms only the existing management-subnet WinNAT prefix with no static mappings and observes distinct HNS metadata/WSL ICS networking. No guest routing or external egress has been established; NAT and HNS remain unchanged.
+
 ## 2026-09-07 DC native HTTPS and authenticated API verified
 
 Install 34064547454 and Activate observation 34064699420 succeeded at exact runner fe52c719de89da3a2267d1c9062c81dd18552869. The native CA-signed prepared leaf was served on 8443 and verified against the original CA; an authenticated native API request over HTTPS succeeded while the original HTTP client remained available. First Activate 34064640493 submitted one journaled management restart and returned PENDING; the continuation observed that existing intent without restarting again. File ownership, SELinux default contexts and cloud-user readability passed installation checks. Firewall was unchanged; external-client/browser TLS and full product lifecycles remain NOT_TESTED. [Actual phase receipts](evidence/dr/2026-09-07-dc-native-tls-activation.json).
