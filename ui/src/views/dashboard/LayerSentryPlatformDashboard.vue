@@ -29,6 +29,7 @@
           v-model:value="selectedSiteId"
           :options="siteOptions"
           :loading="loadingSites"
+          :disabled="refreshing || scopedLoading"
           show-search
           option-filter-prop="label"
           class="ls-site-selector"
@@ -40,7 +41,7 @@
             {{ $t('label.layersentry.quick.provision') }}
           </a-button>
         </router-link>
-        <a-button :loading="refreshing" :aria-label="$t('label.refresh')" @click="refresh">
+        <a-button :loading="refreshing || scopedLoading" :aria-label="$t('label.refresh')" @click="refresh">
           <reload-outlined />
           {{ $t('label.refresh') }}
         </a-button>
@@ -157,6 +158,7 @@
 
           <div v-if="loadingAlerts" class="ls-feed-loading"><a-spin /></div>
           <div v-else-if="!hasApi('listAlerts')" class="ls-inline-empty">{{ $t('label.layersentry.unavailable') }}</div>
+          <a-alert v-else-if="alertsFailed" type="warning" show-icon :message="$t('label.layersentry.read.failed')" :description="$t('message.layersentry.read.failed')" />
           <div v-else-if="alerts.length === 0" class="ls-inline-empty">{{ $t('label.layersentry.no.alerts') }}</div>
           <div v-else class="ls-feed-list">
             <router-link
@@ -189,6 +191,7 @@
 
           <div v-if="loadingEvents" class="ls-feed-loading"><a-spin /></div>
           <div v-else-if="!hasApi('listEvents')" class="ls-inline-empty">{{ $t('label.layersentry.unavailable') }}</div>
+          <a-alert v-else-if="eventsFailed" type="warning" show-icon :message="$t('label.layersentry.read.failed')" :description="$t('message.layersentry.read.failed')" />
           <div v-else-if="events.length === 0" class="ls-inline-empty">{{ $t('label.layersentry.no.events') }}</div>
           <div v-else class="ls-feed-list">
             <router-link
@@ -261,10 +264,13 @@ export default {
       sites: [],
       selectedSiteId: ALL_SITES,
       refreshing: false,
+      scopedLoading: false,
       loadingSites: false,
       loadingCapacity: false,
       loadingAlerts: false,
       loadingEvents: false,
+      eventsFailed: false,
+      alertsFailed: false,
       fatalError: '',
       partialFailures: [],
       counts: {
@@ -475,7 +481,7 @@ export default {
       }
     },
     async refresh () {
-      if (this.refreshing) return
+      if (this.refreshing || this.scopedLoading) return
       this.refreshing = true
       this.fatalError = ''
       this.partialFailures = []
@@ -490,19 +496,25 @@ export default {
       }
     },
     async refreshScopedData () {
+      if (this.scopedLoading) return
+      this.scopedLoading = true
       this.partialFailures = []
-      await Promise.all([
-        this.runSection(this.$t('label.instances'), this.loadInstances),
-        this.runSection(this.$t('label.layersentry.kvm.hosts'), this.loadHosts),
-        this.runSection(this.$t('label.layersentry.storage.pools'), this.loadStoragePools),
-        this.runSection(this.$t('label.network'), this.loadNetworks),
-        this.runSection(this.$t('label.layersentry.compute.clusters'), this.loadInfrastructure),
-        this.runSection(this.$t('label.layersentry.platform.services'), this.loadPlatformServices),
-        this.runSection(this.$t('label.layersentry.capacity'), this.loadCapacity),
-        this.runSection(this.$t('label.layersentry.protection.services'), this.loadServiceFacts),
-        this.runSection(this.$t('label.layersentry.recent.alerts'), this.loadAlerts),
-        this.runSection(this.$t('label.layersentry.recent.activity'), this.loadEvents)
-      ])
+      try {
+        await Promise.all([
+          this.runSection(this.$t('label.instances'), this.loadInstances),
+          this.runSection(this.$t('label.layersentry.kvm.hosts'), this.loadHosts),
+          this.runSection(this.$t('label.layersentry.storage.pools'), this.loadStoragePools),
+          this.runSection(this.$t('label.network'), this.loadNetworks),
+          this.runSection(this.$t('label.layersentry.compute.clusters'), this.loadInfrastructure),
+          this.runSection(this.$t('label.layersentry.platform.services'), this.loadPlatformServices),
+          this.runSection(this.$t('label.layersentry.capacity'), this.loadCapacity),
+          this.runSection(this.$t('label.layersentry.protection.services'), this.loadServiceFacts),
+          this.runSection(this.$t('label.layersentry.recent.alerts'), this.loadAlerts),
+          this.runSection(this.$t('label.layersentry.recent.activity'), this.loadEvents)
+        ])
+      } finally {
+        this.scopedLoading = false
+      }
     },
     async loadSites () {
       if (!this.hasApi('listZones')) return
@@ -678,6 +690,7 @@ export default {
     },
     async loadAlerts () {
       this.alerts = []
+      this.alertsFailed = false
       if (!this.hasApi('listAlerts')) return
       this.loadingAlerts = true
       try {
@@ -687,12 +700,16 @@ export default {
           pagesize: 6
         })
         this.alerts = response?.listalertsresponse?.alert || []
+      } catch (error) {
+        this.alertsFailed = true
+        throw error
       } finally {
         this.loadingAlerts = false
       }
     },
     async loadEvents () {
       this.events = []
+      this.eventsFailed = false
       if (!this.hasApi('listEvents')) return
       this.loadingEvents = true
       try {
@@ -702,6 +719,9 @@ export default {
           pagesize: 6
         })
         this.events = response?.listeventsresponse?.event || []
+      } catch (error) {
+        this.eventsFailed = true
+        throw error
       } finally {
         this.loadingEvents = false
       }

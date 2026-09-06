@@ -50,6 +50,8 @@
             type="text"
             v-focus="true"
             :placeholder="$t('label.username')"
+            :aria-label="$t('label.username')"
+            autocomplete="username"
             v-model:value="form.username"
           >
             <template #prefix>
@@ -62,6 +64,7 @@
             size="large"
             type="text"
             :placeholder="$t('label.domain')"
+            :aria-label="$t('label.domain')"
             v-model:value="form.domain"
           >
             <template #prefix>
@@ -73,7 +76,8 @@
           <a-input-password
             size="large"
             type="password"
-            autocomplete="false"
+            autocomplete="new-password"
+            :aria-label="$t('label.password')"
             :placeholder="$t('label.password')"
             v-model:value="form.password"
           >
@@ -86,7 +90,8 @@
           <a-input-password
             size="large"
             type="password"
-            autocomplete="false"
+            autocomplete="new-password"
+            :aria-label="$t('label.confirmpassword.description')"
             :placeholder="$t('label.confirmpassword.description')"
             v-model:value="form.confirmpassword"
           >

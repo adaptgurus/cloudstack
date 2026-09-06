@@ -26,6 +26,31 @@
   --ls-shadow-sm: 0 2px 8px rgba(16, 24, 40, 0.08);
 }
 
+.ls-skip-link {
+  position: fixed;
+  top: -100px;
+  left: 16px;
+  z-index: 2000;
+  padding: 12px 20px;
+  background: var(--ls-surface);
+  color: var(--ls-primary);
+  border: 2px solid var(--ls-focus);
+  border-radius: var(--ls-radius);
+  &:focus { top: 12px; }
+}
+
+body.dark-mode .ls-page-state {
+  background: #1f1f1f;
+  color: #e4e7ec;
+  border-color: #434343;
+}
+
+@media (max-width: 768px) {
+  .page-header .detail .main .row { flex-wrap: wrap; gap: 12px; }
+  .page-header .detail .main .title { overflow-wrap: anywhere; min-width: 0; }
+  .page-header .detail .main .action { margin-left: 0; min-width: 0; }
+}
+
 html,
 body,
 #app {
