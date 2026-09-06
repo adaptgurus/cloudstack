@@ -86,6 +86,7 @@ class FluxTests(unittest.TestCase):
         with self.assertRaises(InvalidRequestError):self.installer.advance(self.api,self.journal)
         self.api.create=create;self.complete()
         self.assertEqual(len(self.calls),4)
+        self.assertEqual(len({v['metadata']['annotations']['layersentry.io/flux-install-id'] for _,v in self.calls}),4)
         self.assertTrue(all(r['state']=='OBSERVED' for r in self.journal.state['centralFluxInstall']['objects'].values()))
 
     def test_unknown_without_native_object_retries_same_named_request(self):
@@ -93,8 +94,24 @@ class FluxTests(unittest.TestCase):
         create=self.api.create;self.api.create=timeout
         with self.assertRaises(InvalidRequestError):self.installer.advance(self.api,self.journal)
         nonce=self.journal.state['centralFluxInstall']['nonce']
+        object_nonce=self.journal.state['centralFluxInstall']['objects'][route(self.docs[0])[1]]['nonce']
         self.api.create=create;self.complete()
         self.assertEqual(self.journal.state['centralFluxInstall']['nonce'],nonce)
+        self.assertEqual(self.calls[0][1]['metadata']['annotations']['layersentry.io/flux-install-id'],object_nonce)
+
+    def test_earlier_public_nonce_cannot_claim_a_later_resource(self):
+        self.installer.advance(self.api,self.journal)
+        earlier=self.calls[0][1]['metadata']['annotations']['layersentry.io/flux-install-id']
+        create=self.api.create
+        def raced(collection,value):
+            foreign=copy.deepcopy(value);foreign['metadata']['annotations']['layersentry.io/flux-install-id']=earlier
+            create(collection,foreign)
+            raise InvalidRequestError('native conflict')
+        self.api.create=raced
+        with self.assertRaises(InvalidRequestError):self.installer.advance(self.api,self.journal)
+        self.api.create=create
+        with self.assertRaises(InvalidRequestError):self.installer.advance(self.api,self.journal)
+        self.assertEqual(len(self.calls),2)
 
     def test_foreign_resource_even_with_approved_bundle_annotation_rejected(self):
         doc=self.docs[0];row=desired_resource(doc,self.bundle.digest,'f'*32);row['metadata']['uid']='foreign'
