@@ -35,7 +35,9 @@ class FluxBaseline:
     source_namespace: str = "flux-system"
 
 
-def build_flux_baseline(cluster_name: str, tenant_namespace: str, config: FluxBaseline) -> Tuple[Mapping[str, Any], ...]:
+def build_flux_baseline(
+    cluster_name: str, tenant_namespace: str, project_id: str, config: FluxBaseline,
+) -> Tuple[Mapping[str, Any], ...]:
     parsed = urllib.parse.urlsplit(config.repository_url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise InvalidRequestError("Flux source must be an HTTPS URL without userinfo")
@@ -45,7 +47,11 @@ def build_flux_baseline(cluster_name: str, tenant_namespace: str, config: FluxBa
         raise InvalidRequestError("Flux baseline path must be repository-relative")
     source_name = "layersentry-e1-catalog"
     source_labels = {"layersentry.io/managed": "true"}
-    workload_labels = {**source_labels, "layersentry.io/cluster": cluster_name}
+    workload_labels = {
+        **source_labels,
+        "layersentry.io/cluster": cluster_name,
+        "layersentry.io/project": project_id,
+    }
     return (
         {
             "apiVersion": "source.toolkit.fluxcd.io/v1",

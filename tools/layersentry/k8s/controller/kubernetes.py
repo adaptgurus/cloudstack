@@ -81,6 +81,8 @@ class KubernetesClient:
             raise InvalidRequestError("Kubernetes API server must not include a path, query or fragment")
         if not config.ca_file.is_file() or not config.token_file.is_file():
             raise InvalidRequestError("Kubernetes CA or token file is missing")
+        if config.token_file.stat().st_mode & 0o077:
+            raise InvalidRequestError("Kubernetes token file must have mode 0600 or stricter")
         self.config = config
         self.origin = config.server.rstrip("/")
         context = ssl.create_default_context(cafile=str(config.ca_file))

@@ -60,9 +60,7 @@ class CloudStackConfig:
 
 @dataclass(frozen=True)
 class ClusterProfile:
-    namespace: str
-    endpoint_host: str
-    endpoint_public_ip_id: str
+    namespace_prefix: str
     cloudstack_secret_name: str
     cloudstack_secret_namespace: str
 
@@ -191,20 +189,37 @@ class CloudStackResolver:
             if template.get("isready") is not True or template.get("hypervisor") != "KVM":
                 raise InvalidRequestError("Kubernetes node image is not Ready for KVM")
 
+        endpoint_public_ip_id = request.get("api_frontend_id")
+        if not endpoint_public_ip_id:
+            raise InvalidRequestError("api_frontend_id is required for managed Kubernetes")
         endpoint = self._exact(
-            "listPublicIpAddresses", "publicipaddress", self.profile.endpoint_public_ip_id,
+            "listPublicIpAddresses", "publicipaddress", endpoint_public_ip_id,
             projectid=project_id,
         )
+        if (
+            endpoint.get("projectid") != project_id
+            or endpoint.get("zoneid") != zone["id"]
+            or endpoint.get("state") != "Allocated"
+        ):
+            raise InvalidRequestError("Kubernetes frontend IP is not Allocated in the selected project/Site")
         try:
-            host_ip = str(ipaddress.ip_address(self.profile.endpoint_host))
-        except ValueError:
-            host_ip = None
-        if host_ip and endpoint.get("ipaddress") != host_ip:
-            raise InvalidRequestError("endpoint host does not match the reserved CloudStack public IP")
+            endpoint_host = str(ipaddress.ip_address(endpoint.get("ipaddress", "")))
+        except ValueError as exc:
+            raise InvalidRequestError("reserved CloudStack public IP is invalid") from exc
 
+        prefix = self.profile.namespace_prefix
+        if (
+            not prefix
+            or len(prefix) > 40
+            or not prefix[0].isalnum()
+            or not prefix[-1].isalnum()
+            or any(character not in "abcdefghijklmnopqrstuvwxyz0123456789-" for character in prefix)
+        ):
+            raise InvalidRequestError("management namespace prefix is invalid")
+        project_suffix = hashlib.sha256(project_id.encode("utf-8")).hexdigest()[:12]
         return ResolvedInfrastructure(
-            namespace=self.profile.namespace, endpoint_host=self.profile.endpoint_host,
-            endpoint_public_ip_id=self.profile.endpoint_public_ip_id,
+            namespace=f"{prefix}-{project_suffix}", endpoint_host=endpoint_host,
+            endpoint_public_ip_id=endpoint_public_ip_id,
             cloudstack_secret_name=self.profile.cloudstack_secret_name,
             cloudstack_secret_namespace=self.profile.cloudstack_secret_namespace,
             project_id=project_id, project_name=project.get("name", ""),

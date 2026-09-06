@@ -21,7 +21,7 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
-from controller.components import evaluate_component_readiness, load_component_readiness
+from controller.components import evaluate_component_readiness, load_component_readiness, load_release_contract
 from controller.model import InvalidRequestError
 
 
@@ -39,6 +39,8 @@ class ComponentReadinessTest(unittest.TestCase):
         self.assertTrue(any("Flux catalog commit" in item for item in result.blockers))
         with self.assertRaises(InvalidRequestError):
             result.require_deployable()
+        contract = load_release_contract(ROOT / "release-candidate-lane-b.json")
+        self.assertFalse(contract.gates.kubernetes_ready())
 
     def test_exact_qualified_tuple_is_deployable(self):
         candidate = deepcopy(MANIFEST)

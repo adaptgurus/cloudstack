@@ -50,6 +50,7 @@ def cluster_payload(**overrides):
         "control_plane_service_offering_id": "offering-control",
         "control_plane_image_id": "image-rke2",
         "project_id": "project-1",
+        "api_frontend_id": "public-ip-1",
         "node_pools": [{
             "name": "workers", "replicas": 3, "service_offering_id": "offering-worker",
             "image_id": "image-rke2", "storage_profile_ids": [],
@@ -159,6 +160,26 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(current.version, 1)
         with self.assertRaises(ConflictError):
             self.store.update(operation, status=OperationStatus.FAILED, step_index=0)
+
+    def test_restart_queue_excludes_terminal_and_unknown_operations(self):
+        service = self.service()
+        requested, _ = service.submit_cluster_create(ACTOR, cluster_payload(), "queue-requested-0001")
+        terminal, _ = service.submit_cluster_create(ACTOR, cluster_payload(name="cluster-b"), "queue-terminal-00001")
+        terminal = self.store.update(
+            terminal, status=OperationStatus.READY, step_index=len(terminal.plan), detail="done",
+        )
+        unknown, _ = service.submit_cluster_create(ACTOR, cluster_payload(name="cluster-c"), "queue-unknown-000001")
+        self.store.update(unknown, status=OperationStatus.UNKNOWN, step_index=0, detail="observe")
+        self.assertEqual(self.store.actionable_ids(), [requested.id])
+        self.assertEqual(self.store.path, str(Path(self.temp.name) / "controller.sqlite"))
+        self.assertEqual(Path(self.store.path).stat().st_mode & 0o777, 0o600)
+
+    def test_worker_records_redacted_retryable_adapter_failure(self):
+        service = self.service()
+        operation, _ = service.submit_cluster_create(ACTOR, cluster_payload(), "worker-failure-00001")
+        failed = service.record_retryable_adapter_failure(operation.id)
+        self.assertEqual(failed.status, OperationStatus.FAILED_RETRYABLE)
+        self.assertNotIn("secret", failed.last_error)
 
     def test_adapter_secret_metadata_is_not_persisted(self):
         executor = QueueExecutor([

@@ -80,7 +80,10 @@ class InventoryClient:
         if command == "listTemplates":
             return {"template": [{"id": resource_id, "name": "rke2", "isready": True, "hypervisor": "KVM"}]}
         if command == "listPublicIpAddresses":
-            return {"publicipaddress": [{"id": resource_id, "ipaddress": "192.0.2.10"}]}
+            return {"publicipaddress": [{
+                "id": resource_id, "ipaddress": "192.0.2.10", "projectid": params.get("projectid"),
+                "zoneid": "zone-1", "state": "Allocated",
+            }]}
         if command == "listLoadBalancerRules":
             return {"loadbalancerrule": self.rules}
         raise AssertionError(command)
@@ -89,6 +92,7 @@ class InventoryClient:
 def request():
     return {
         "name": "cluster-a", "project_id": "project-1", "zone_id": "zone-1", "network_id": "network-1",
+        "api_frontend_id": "public-ip-1",
         "control_plane_service_offering_id": "cp-offering", "control_plane_image_id": "image-1",
         "node_pools": [{"name": "workers", "service_offering_id": "worker-offering", "image_id": "image-1"}],
     }
@@ -96,7 +100,7 @@ def request():
 
 def profile():
     return ClusterProfile(
-        namespace="tenant-a", endpoint_host="192.0.2.10", endpoint_public_ip_id="public-ip-1",
+        namespace_prefix="lsk8s",
         cloudstack_secret_name="capc-credentials", cloudstack_secret_namespace="capc-system",
     )
 
@@ -133,6 +137,7 @@ class CloudStackControllerTest(unittest.TestCase):
         resolver = CloudStackResolver(InventoryClient(), profile())
         resolved = resolver.resolve_cluster(request())
         self.assertEqual(resolved.project_id, "project-1")
+        self.assertEqual(resolved.namespace, "lsk8s-a33e35d30212")
         self.assertEqual(resolved.endpoint_public_ip_id, "public-ip-1")
         endpoints = resolver.verify_endpoints(resolved)
         self.assertTrue(endpoints["endpoint6443"])
@@ -157,6 +162,33 @@ class CloudStackControllerTest(unittest.TestCase):
 
         with self.assertRaisesRegex(InvalidRequestError, "not Ready"):
             CloudStackResolver(BadImage(), profile()).resolve_cluster(request())
+
+        class ForeignFrontend(InventoryClient):
+            def call(self, command, params):
+                result = super().call(command, params)
+                if command == "listPublicIpAddresses":
+                    result["publicipaddress"][0]["projectid"] = "foreign"
+                return result
+
+        with self.assertRaisesRegex(InvalidRequestError, "project/Site"):
+            CloudStackResolver(ForeignFrontend(), profile()).resolve_cluster(request())
+
+    def test_project_namespace_is_stable_isolated_and_prefix_validated(self):
+        resolver = CloudStackResolver(InventoryClient(), profile())
+        first = resolver.resolve_cluster(request())
+        second = resolver.resolve_cluster(request())
+        other_request = request()
+        other_request["project_id"] = "project-2"
+        other = resolver.resolve_cluster(other_request)
+        self.assertEqual(first.namespace, second.namespace)
+        self.assertNotEqual(first.namespace, other.namespace)
+
+        bad = ClusterProfile(
+            namespace_prefix="INVALID", cloudstack_secret_name="capc-credentials",
+            cloudstack_secret_namespace="capc-system",
+        )
+        with self.assertRaisesRegex(InvalidRequestError, "namespace prefix"):
+            CloudStackResolver(InventoryClient(), bad).resolve_cluster(request())
 
     def test_credentials_with_broad_permissions_are_rejected(self):
         config = self.credential_config()

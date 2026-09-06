@@ -82,6 +82,8 @@ def base_cluster(**overrides):
         control_plane_replicas=3,
         control_plane_service_offering_id="cp-offering",
         control_plane_image_id="rke2-image",
+        project_id="project-1",
+        api_frontend_id="public-ip-1",
         node_pools=(
             NodePoolRequest(
                 name="workers",
@@ -111,6 +113,17 @@ def base_db(**overrides):
 
 
 class ClusterPolicyTest(unittest.TestCase):
+    def test_project_and_frontend_are_mandatory(self):
+        gates = ReleaseGates(
+            tuple_reconciliation=True, endpoint_6443=True, endpoint_9345=True,
+            flux_remote_reconcile=True,
+        )
+        for field in ("project_id", "api_frontend_id"):
+            with self.subTest(field=field):
+                plan = plan_cluster_create(base_cluster(**{field: None}), gates, [GENERAL])
+                self.assertFalse(plan.executable)
+                self.assertIn(field, plan.blockers[0])
+
     def test_cni_outside_exact_caprke2_contract_is_rejected(self):
         plan = plan_cluster_create(base_cluster(cni="flannel"), ReleaseGates(), [GENERAL])
         self.assertFalse(plan.executable)

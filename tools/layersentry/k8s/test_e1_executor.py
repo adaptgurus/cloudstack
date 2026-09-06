@@ -42,6 +42,7 @@ def payload():
         "cluster_class": "layersentry-standard-rke2", "channel": "certified", "cni": "cilium",
         "control_plane_replicas": 3, "control_plane_service_offering_id": "cp-offering",
         "control_plane_image_id": "rke2-image", "project_id": "project-1",
+        "api_frontend_id": "public-ip-id",
         "node_pools": [{
             "name": "workers", "replicas": 3, "service_offering_id": "worker-offering",
             "image_id": "rke2-image", "storage_profile_ids": [],
@@ -142,7 +143,7 @@ class E1ExecutorTest(unittest.TestCase):
         self.assertEqual(operation.status, OperationStatus.READY)
         kinds = [item["kind"] for item in self.kubernetes.applied]
         for expected in (
-            "CloudStackCluster", "CloudStackMachineTemplate", "Cluster", "RKE2ControlPlane",
+            "Namespace", "CloudStackCluster", "CloudStackMachineTemplate", "Cluster", "RKE2ControlPlane",
             "RKE2ConfigTemplate", "MachineDeployment", "GitRepository", "Kustomization",
         ):
             self.assertIn(expected, kinds)
@@ -161,10 +162,11 @@ class E1ExecutorTest(unittest.TestCase):
         self.assertEqual(pending.step_index, operation.step_index)
 
     def test_flux_catalog_is_commit_pinned_and_cluster_scoped(self):
-        source, reconciliation = build_flux_baseline("cluster-a", "tenant-a", self.flux)
+        source, reconciliation = build_flux_baseline("cluster-a", "tenant-a", "project-1", self.flux)
         self.assertEqual(source["spec"]["ref"]["commit"], "a" * 40)
         self.assertNotIn("layersentry.io/cluster", source["metadata"]["labels"])
         self.assertEqual(reconciliation["metadata"]["labels"]["layersentry.io/cluster"], "cluster-a")
+        self.assertEqual(reconciliation["metadata"]["labels"]["layersentry.io/project"], "project-1")
         self.assertTrue(reconciliation["spec"]["prune"])
         self.assertTrue(reconciliation["spec"]["wait"])
 
@@ -219,6 +221,21 @@ class E1ExecutorTest(unittest.TestCase):
             self.service.cluster_status(
                 ACTOR, namespace="tenant-a", name="cluster-a", project_id="project-1",
             )
+
+    def test_reconciliation_never_adopts_foreign_namespace(self):
+        self.kubernetes.objects[("v1", "Namespace", None, "tenant-a")] = {
+            "apiVersion": "v1", "kind": "Namespace",
+            "metadata": {
+                "name": "tenant-a", "uid": "foreign", "generation": 1,
+                "labels": {"layersentry.io/managed": "true", "layersentry.io/project": "foreign"},
+            },
+        }
+        operation, _ = self.service.submit_cluster_create(ACTOR, payload(), "e1-foreign-namespace")
+        operation = self.service.advance(operation.id)
+        operation = self.service.advance(operation.id)
+        failed = self.service.advance(operation.id)
+        self.assertEqual(failed.status, OperationStatus.FAILED)
+        self.assertIn("ownership", failed.last_error)
 
 
 if __name__ == "__main__":

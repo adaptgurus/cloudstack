@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "releaseManifest": "/etc/layersentry/k8s/release-candidate-lane-b.json",
+  "stateDatabase": "/var/lib/layersentry/k8s/controller.sqlite",
+  "cloudstack": {
+    "endpoint": "https://cloud.example.test/client/api",
+    "apiKeyFile": "/run/credentials/layersentry-k8s/cloudstack-api-key",
+    "secretKeyFile": "/run/credentials/layersentry-k8s/cloudstack-secret-key",
+    "caFile": "/etc/pki/ca-trust/source/anchors/layersentry-cloudstack-ca.pem",
+    "allowInsecureHttp": false,
+    "trustedBrowserOrigins": ["https://cloud.example.test"]
+  },
+  "kubernetes": {
+    "server": "https://capi-management.example.test:6443",
+    "caFile": "/etc/layersentry/k8s/management-ca.pem",
+    "tokenFile": "/run/credentials/layersentry-k8s/management-token"
+  },
+  "clusterProfile": {
+    "namespacePrefix": "lsk8s",
+    "credentialSecretName": "capc-credentials",
+    "credentialSecretNamespace": "capc-system"
+  },
+  "flux": {
+    "path": "./clusters/e1",
+    "sourceNamespace": "flux-system"
+  }
+}

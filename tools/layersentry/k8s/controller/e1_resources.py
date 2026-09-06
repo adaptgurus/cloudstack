@@ -115,6 +115,14 @@ def build_cluster_resources(
     control_plane_name = f"{cluster_name}-control-plane"
     resources: list[Mapping[str, Any]] = [
         {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "name": resolved.namespace,
+                "labels": {MANAGED_LABEL: "true", PROJECT_LABEL: resolved.project_id},
+            },
+        },
+        {
             "apiVersion": "infrastructure.cluster.x-k8s.io/v1beta3",
             "kind": "CloudStackCluster",
             "metadata": _metadata(cluster_name, resolved, annotations={CAPC_ENDPOINT_ANNOTATION: "true"}),

@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
+from layersentry_k8s_policy import ReleaseGates
+
 from .model import InvalidRequestError
 
 
@@ -64,6 +66,13 @@ class ComponentReadiness:
     def require_deployable(self) -> None:
         if not self.deployable:
             raise InvalidRequestError("E1 component tuple is blocked: " + "; ".join(self.blockers))
+
+
+@dataclass(frozen=True)
+class ReleaseContract:
+    manifest: Mapping[str, Any]
+    readiness: ComponentReadiness
+    gates: ReleaseGates
 
 
 def _mapping(value: Any, name: str) -> Mapping[str, Any]:
@@ -144,7 +153,7 @@ def evaluate_component_readiness(manifest: Mapping[str, Any]) -> ComponentReadin
     )
 
 
-def load_component_readiness(path: Path | str) -> ComponentReadiness:
+def load_release_contract(path: Path | str) -> ReleaseContract:
     manifest_path = Path(path)
     if not manifest_path.is_file() or manifest_path.stat().st_mode & 0o022:
         raise InvalidRequestError("release manifest must exist and not be group/world writable")
@@ -154,4 +163,30 @@ def load_component_readiness(path: Path | str) -> ComponentReadiness:
         )
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise InvalidRequestError("release manifest is unreadable or invalid") from exc
-    return evaluate_component_readiness(_mapping(manifest, "root"))
+    root = _mapping(manifest, "root")
+    hard_gates = _mapping(root.get("hardGates"), "hardGates")
+    gate_fields = {
+        "tuple_reconciliation": "tupleReconciliation",
+        "endpoint_6443": "endpoint6443",
+        "endpoint_9345": "endpoint9345",
+        "capc_volume_ownership_safe": "capcVolumeOwnershipSafe",
+        "node_disk_set_ownership": "nodeDiskSetOwnership",
+        "csi_project_scope": "csiProjectScope",
+        "csi_resize_idempotent": "csiResizeIdempotent",
+        "airgap_create_scale_repair": "airgapCreateScaleRepair",
+        "stateful_machine_replacement": "statefulMachineReplacement",
+        "flux_remote_reconcile": "fluxRemoteReconcile",
+        "backup_restore": "backupRestore",
+        "pitr_restore": "pitrRestore",
+    }
+    values = {}
+    for field, key in gate_fields.items():
+        value = hard_gates.get(key)
+        if not isinstance(value, bool):
+            raise InvalidRequestError(f"release evidence gate {key} must be boolean")
+        values[field] = value
+    return ReleaseContract(root, evaluate_component_readiness(root), ReleaseGates(**values))
+
+
+def load_component_readiness(path: Path | str) -> ComponentReadiness:
+    return load_release_contract(path).readiness

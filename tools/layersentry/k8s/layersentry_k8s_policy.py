@@ -265,6 +265,8 @@ def validate_cluster_request(
     _validate_dns_label(request.name)
     _required(request.zone_id, "zone_id")
     _required(request.network_id, "network_id")
+    _required(request.project_id, "project_id")
+    _required(request.api_frontend_id, "api_frontend_id")
     _required(request.control_plane_service_offering_id, "control_plane_service_offering_id")
     _required(request.control_plane_image_id, "control_plane_image_id")
 

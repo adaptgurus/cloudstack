@@ -37,6 +37,7 @@ def request(**overrides):
         control_plane_image_id="image-id",
         node_pools=(NodePoolRequest("workers", 3, "worker-offering-id", "image-id"),),
         project_id="project-id",
+        api_frontend_id="public-ip-id",
     )
     values.update(overrides)
     return ClusterRequest(**values)
@@ -61,6 +62,8 @@ class E1ResourceTest(unittest.TestCase):
     def test_exact_mixed_provider_contract_and_automatic_join(self):
         resources = build_cluster_resources(request(), resolved())
         by_kind = {item["kind"]: item for item in resources if item["kind"] != "CloudStackMachineTemplate"}
+        self.assertNotIn("namespace", by_kind["Namespace"]["metadata"])
+        self.assertEqual(by_kind["Namespace"]["metadata"]["labels"]["layersentry.io/project"], "project-id")
         self.assertEqual(by_kind["Cluster"]["apiVersion"], "cluster.x-k8s.io/v1beta2")
         self.assertEqual(by_kind["CloudStackCluster"]["apiVersion"], "infrastructure.cluster.x-k8s.io/v1beta3")
         self.assertEqual(by_kind["RKE2ControlPlane"]["apiVersion"], "controlplane.cluster.x-k8s.io/v1beta2")

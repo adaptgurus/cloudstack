@@ -77,9 +77,32 @@ class E1Executor:
     def _resources(self, operation: Operation):
         return build_cluster_resources(parse_cluster_request(operation.request), self._resolved(operation))
 
-    def _apply(self, resources, detail: str) -> StepResult:
+    @staticmethod
+    def _owned(resource: Mapping[str, Any], actual: Mapping[str, Any], project_id: str) -> bool:
+        labels = actual.get("metadata", {}).get("labels", {})
+        if labels.get("layersentry.io/managed") != "true":
+            return False
+        if resource.get("kind") == "GitRepository":
+            desired_spec = resource.get("spec", {})
+            actual_spec = actual.get("spec", {})
+            return (
+                actual_spec.get("url") == desired_spec.get("url")
+                and actual_spec.get("ref", {}).get("commit") == desired_spec.get("ref", {}).get("commit")
+            )
+        return labels.get("layersentry.io/project") == project_id
+
+    def _apply(self, resources, project_id: str, detail: str) -> StepResult:
         applied = []
         for resource in resources:
+            try:
+                actual = self.kubernetes.get(resource)
+            except NotFoundError:
+                actual = None
+            if actual is not None and not self._owned(resource, actual, project_id):
+                return StepResult(
+                    StepOutcome.FAILED,
+                    detail=f"{resource['kind']}/{resource['metadata']['name']} ownership verification failed",
+                )
             result = self.kubernetes.apply(resource)
             metadata = result.get("metadata", {})
             applied.append({
@@ -155,12 +178,13 @@ class E1Executor:
         resources = self._resources(operation)
         if action == "reconcile-infrastructure":
             selected = [item for item in resources if item["kind"] in {
-                "CloudStackCluster", "CloudStackMachineTemplate", "Cluster",
+                "Namespace", "CloudStackCluster", "CloudStackMachineTemplate", "Cluster",
             }]
-            return self._apply(selected, "CAPI/CAPC infrastructure desired state applied")
+            return self._apply(selected, operation.project_id, "CAPI/CAPC infrastructure desired state applied")
         if action == "reconcile-control-plane":
             return self._apply(
                 [item for item in resources if item["kind"] == "RKE2ControlPlane"],
+                operation.project_id,
                 "CAPRKE2 control plane desired state applied",
             )
         if action == "reconcile-6443-and-9345":
@@ -180,14 +204,23 @@ class E1Executor:
         if action == "reconcile-worker-pools":
             return self._apply(
                 [item for item in resources if item["kind"] in {"RKE2ConfigTemplate", "MachineDeployment"}],
+                operation.project_id,
                 "CAPI worker pools desired state applied",
             )
         if action == "reconcile-cloud-provider":
-            flux = build_flux_baseline(operation.target_name, self._resolved(operation).namespace, self.flux)
-            return self._apply(flux[:1], "immutable central Flux source applied for CCM/CSI baseline")
+            flux = build_flux_baseline(
+                operation.target_name, self._resolved(operation).namespace, operation.project_id, self.flux,
+            )
+            return self._apply(
+                flux[:1], operation.project_id, "immutable central Flux source applied for CCM/CSI baseline",
+            )
         if action == "reconcile-baseline-packages":
-            flux = build_flux_baseline(operation.target_name, self._resolved(operation).namespace, self.flux)
-            return self._apply(flux[1:], "central Flux baseline reconciliation applied")
+            flux = build_flux_baseline(
+                operation.target_name, self._resolved(operation).namespace, operation.project_id, self.flux,
+            )
+            return self._apply(
+                flux[1:], operation.project_id, "central Flux baseline reconciliation applied",
+            )
         if action == "verify-cluster-readiness":
             required = [item for item in resources if item["kind"] in {
                 "Cluster", "RKE2ControlPlane", "MachineDeployment",
@@ -197,7 +230,9 @@ class E1Executor:
                 actual = self.kubernetes.get(desired)
                 if not _ready_condition(actual, "Available") and not _ready_condition(actual):
                     pending.append(f"{desired['kind']}/{desired['metadata']['name']}")
-            flux = build_flux_baseline(operation.target_name, self._resolved(operation).namespace, self.flux)[1]
+            flux = build_flux_baseline(
+                operation.target_name, self._resolved(operation).namespace, operation.project_id, self.flux,
+            )[1]
             if not _ready_condition(self.kubernetes.get(flux)):
                 pending.append(f"Kustomization/{flux['metadata']['name']}")
             if pending:
@@ -215,12 +250,14 @@ class E1Executor:
             return StepResult(StepOutcome.RETRYABLE, detail="read-only resolution may be retried")
         resources = self._resources(operation)
         kinds = {
-            "reconcile-infrastructure": {"CloudStackCluster", "CloudStackMachineTemplate", "Cluster"},
+            "reconcile-infrastructure": {"Namespace", "CloudStackCluster", "CloudStackMachineTemplate", "Cluster"},
             "reconcile-control-plane": {"RKE2ControlPlane"},
             "reconcile-worker-pools": {"RKE2ConfigTemplate", "MachineDeployment"},
         }.get(action)
         if kinds is None and action in {"reconcile-cloud-provider", "reconcile-baseline-packages"}:
-            flux = build_flux_baseline(operation.target_name, self._resolved(operation).namespace, self.flux)
+            flux = build_flux_baseline(
+                operation.target_name, self._resolved(operation).namespace, operation.project_id, self.flux,
+            )
             resources = flux[:1] if action == "reconcile-cloud-provider" else flux[1:]
         elif kinds is not None:
             resources = [item for item in resources if item["kind"] in kinds]
@@ -234,6 +271,11 @@ class E1Executor:
             except NotFoundError:
                 missing.append(f"{resource['kind']}/{resource['metadata']['name']}")
                 continue
+            if not self._owned(resource, actual, operation.project_id):
+                return StepResult(
+                    StepOutcome.FAILED,
+                    detail=f"{resource['kind']}/{resource['metadata']['name']} ownership verification failed",
+                )
             observed.append({
                 "kind": resource["kind"], "name": resource["metadata"]["name"],
                 "uid": actual.get("metadata", {}).get("uid"),

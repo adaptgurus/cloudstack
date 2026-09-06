@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -43,6 +44,7 @@ class SagaStore:
     def __init__(self, path: Path | str):
         self.path = str(path)
         self._initialize()
+        os.chmod(self.path, 0o600)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=15, isolation_level=None)
@@ -182,3 +184,21 @@ class SagaStore:
                 "WHERE operation_id=? ORDER BY sequence", (operation_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def actionable_ids(self, limit: int = 20) -> list[str]:
+        """Return a bounded restart-safe work batch for the single reconciler."""
+
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1 or limit > 100:
+            raise ValueError("operation batch limit must be between 1 and 100")
+        statuses = (
+            OperationStatus.REQUESTED.value,
+            OperationStatus.RUNNING.value,
+            OperationStatus.FAILED_RETRYABLE.value,
+            OperationStatus.DELETING.value,
+        )
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT id FROM operations WHERE status IN (?,?,?,?) ORDER BY updated_at,id LIMIT ?",
+                (*statuses, limit),
+            ).fetchall()
+        return [row["id"] for row in rows]

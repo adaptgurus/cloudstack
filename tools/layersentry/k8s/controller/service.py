@@ -328,6 +328,21 @@ class ControllerService:
             )
         return self._apply_result(operation, operation.plan[operation.step_index], result)
 
+    def record_retryable_adapter_failure(self, operation_id: str) -> Operation:
+        """Persist a redacted retry marker for a classified worker exception."""
+
+        operation = self.store.get(operation_id)
+        if operation.done or operation.status == OperationStatus.UNKNOWN:
+            return operation
+        return self.store.update(
+            operation,
+            status=OperationStatus.FAILED_RETRYABLE,
+            step_index=operation.step_index,
+            last_error="controller adapter failed before a safe outcome was established",
+            recovery="retry after diagnosing the redacted controller service log",
+            detail="reconciler recorded a redacted adapter failure",
+        )
+
     def _apply_result(
         self, operation: Operation, step: Mapping[str, Any], result: StepResult,
     ) -> Operation:
