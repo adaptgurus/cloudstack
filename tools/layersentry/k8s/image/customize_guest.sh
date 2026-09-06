@@ -19,6 +19,30 @@ rpmkeys --checksig ./*.rpm
 dnf -y --disablerepo='*' --setopt=localpkg_gpgcheck=1 --setopt=install_weak_deps=False install ./*.rpm
 install -d -m 0755 /usr/share/layersentry/node-image
 python3 "$bundle/configure_qga.py" > /usr/share/layersentry/node-image/qga-policy.json
+# Export only a validated public key after cloud-init generates unique host keys.
+# Vendor sshd_key_t labels (including the private key) and QGA confinement remain intact.
+install -d -m 0755 /usr/local/libexec
+install -m 0755 "$bundle/export_host_public_key.py" /usr/local/libexec/layersentry-export-host-public-key
+cat > /etc/systemd/system/layersentry-host-public-key.service <<'UNIT'
+[Unit]
+Description=LayerSentry public SSH host key export for confined QGA
+After=cloud-final.service sshd-keygen.target
+Wants=cloud-final.service
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /usr/local/libexec/layersentry-export-host-public-key
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/usr/share/layersentry/node-image
+RestrictAddressFamilies=AF_UNIX
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl enable layersentry-host-public-key.service
 # The verified official archive uses only bin/, lib/systemd/ and share/rke2/.
 tar -xzf rke2.linux-amd64.tar.gz -C /usr/local
 install -d -m 0755 /var/lib/rancher/rke2/agent/images /etc/rancher/rke2 /etc/sysconfig
@@ -71,7 +95,7 @@ done
 rpm -q rke2-selinux container-selinux
 # No image can contain host identity, authentication material or join state.
 cloud-init clean --logs --machine-id
-rm -f /etc/ssh/ssh_host_* /root/.ssh/authorized_keys
+rm -f /etc/ssh/ssh_host_* /root/.ssh/authorized_keys /usr/share/layersentry/node-image/ssh_host_ed25519_key.pub
 find /home -path '*/.ssh/authorized_keys' -type f -delete
 truncate -s 0 /etc/machine-id
 install -d -m 0755 /var/lib/dbus
@@ -81,6 +105,7 @@ rm -rf /var/lib/cloud/instances /var/lib/cloud/instance
 rm -f /root/.bash_history /var/log/secure /var/log/lastlog /var/log/wtmp /var/log/btmp
 test -z "$(find /etc/ssh -maxdepth 1 -name 'ssh_host_*' -print -quit)"
 test ! -e /root/.ssh/authorized_keys
+test ! -e /usr/share/layersentry/node-image/ssh_host_ed25519_key.pub
 test ! -e /etc/rancher/rke2/config.yaml
 test ! -e /var/lib/rancher/rke2/server
 test ! -s /etc/machine-id

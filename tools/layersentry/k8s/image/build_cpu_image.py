@@ -77,7 +77,8 @@ def build(inputs, output):
             os.link(inputs / item['file'], payload / item['file'])
         shutil.copytree(inputs / 'trust', payload / 'trust')
         shutil.copyfile(inputs / 'inputs.lock.json', payload / 'inputs.lock.json')
-        shutil.copyfile(ROOT / 'configure_qga.py', payload / 'configure_qga.py')
+        for script in ['configure_qga.py', 'export_host_public_key.py']:
+            shutil.copyfile(ROOT / script, payload / script)
         log = work / 'customize.log'
         with log.open('wb') as stream:
             run(['virt-customize', '--format=qcow2', '-a', str(image), '--no-network', '--memsize', '4096', '--smp', '2', '--copy-in', f'{payload}:/opt', '--run', str(ROOT / 'customize_guest.sh'), '--selinux-relabel'], timeout=2400, stdout=stream, env=env)
