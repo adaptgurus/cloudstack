@@ -9,6 +9,10 @@ const output = path.resolve(process.env.LAYERSENTRY_GUI_EVIDENCE || 'evidence')
 const username = process.env.LAYERSENTRY_GUI_USERNAME
 const password = process.env.LAYERSENTRY_GUI_PASSWORD
 const targets = (process.env.LAYERSENTRY_GUI_TARGETS || '10.10.10.14,10.10.10.20').split(',')
+const routes = (process.env.LAYERSENTRY_GUI_ROUTES || 'dashboard,vm,volume,guestnetwork,template,event').split(',')
+if (!routes.every(route => ['dashboard', 'vm', 'volume', 'guestnetwork', 'template', 'event', 'kubernetes-data-services'].includes(route))) {
+  throw new Error('EXPLICIT_GUI_ROUTE_REQUIRED')
+}
 if (!username || !password || !targets.every(host => ['10.10.10.14', '10.10.10.20'].includes(host))) {
   throw new Error('EXPLICIT_LAB_IDENTITY_AND_TARGETS_REQUIRED')
 }
@@ -21,12 +25,14 @@ for (const host of targets) {
     const record = { host, browser: browserName, capturedAt: new Date().toISOString(), status: 'FAILED', pages: [], blockedMutations: [], failedReads: [] }
     results.push(record)
     let browser
+    let page
+    let authenticated = false
     let stage = 'BROWSER_START'
     try {
       browser = await engine.launch({ ...options, headless: true })
       record.browserVersion = browser.version()
       const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' })
-      const page = await context.newPage()
+      page = await context.newPage()
       record.rejectedRequests = []
       await page.exposeFunction('recordRequestRejection', detail => record.rejectedRequests.push(detail))
       await page.addInitScript(() => {
@@ -83,7 +89,8 @@ for (const host of targets) {
       await page.waitForURL(/#\/dashboard(?:\?|$)/)
       stage = 'GUI_DASHBOARD_READY'
       await page.locator('.layout-content').first().waitFor({ state: 'visible' })
-      for (const name of ['dashboard', 'vm', 'volume', 'guestnetwork', 'template', 'event']) {
+      authenticated = true
+      for (const name of routes) {
         stage = `GUI_${name.toUpperCase()}`
         const errorsBefore = pageErrors.length
         const readsBefore = record.failedReads.length
@@ -108,6 +115,10 @@ for (const host of targets) {
       await context.close()
     } catch (error) {
       record.failedStage = stage
+      record.failureCode = /^[A-Z_]+$/.test(error.message) ? error.message : 'GUI_OPERATION_FAILED'
+      if (authenticated && page) {
+        await page.screenshot({ path: path.join(output, `${host}-${browserName}-failure.png`), fullPage: true }).catch(() => {})
+      }
       if (stage === 'BROWSER_START') {
         record.launchDiagnostic = String(error.message).split(password).join('[redacted]').split(username).join('[redacted]').slice(0, 2000)
       }
