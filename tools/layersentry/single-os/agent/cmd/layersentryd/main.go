@@ -16,6 +16,7 @@ import (
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/backupcrypto"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/bootstrap"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/cluster"
+	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/dbinitexec"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/journal"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lifecycle"
@@ -30,7 +31,8 @@ import (
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/valkeyexec"
 	apacheprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/apache"
 	keyvalueprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/keyvalue"
-	mysqlprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/mysqlfamily"
+	mysqlbase "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/mysqlfamily"
+	mysqlprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/mysqlmanaged"
 	nginxprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/nginx"
 	nodeprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/nodejsmodule"
 	pgprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/postgresql"
@@ -73,6 +75,7 @@ func buildRuntime() (*runtimeState, error) {
 	valkeyRunner := valkeyexec.NewClient(valkeyexec.DefaultSocket)
 	nodeRunner := nodeexec.NewClient(nodeexec.DefaultSocket)
 	lvmRunner := lvmexec.NewClient(lvmexec.DefaultSocket)
+	dbInitRunner := dbinitexec.NewClient(dbinitexec.DefaultSocket)
 	st, err := journal.New(root); if err != nil { return nil, err }
 	sec, err := secrets.Open(root+"/secrets", root+"/identity/secret.key"); if err != nil { return nil, err }
 	backupKeys, err := backupcrypto.Open(root + "/identity/backup.agekeys"); if err != nil { return nil, err }
@@ -86,30 +89,14 @@ func buildRuntime() (*runtimeState, error) {
 		PreexistingPaths: func(r model.ServiceRequest) []string { return []string{"/var/lib/pgsql/" + r.ReleaseLine + "/data/PG_VERSION"} },
 	})
 	pythonRuntime := runtimeprovider.New(runner, runtimeprovider.Spec{ID: "python-runtime", Package: "python3.12", RepoID: "appstream", AllowedReleaseLines: map[string]string{"3.12": "3.12"}, Description: "Rocky AppStream Python 3.12 runtime"})
-	pythonOwned := provider.NewOwned(pythonRuntime, runner, provider.OwnershipSpec{
-		ScopeForRequest: func(model.ServiceRequest) string { return "python-runtime" }, ScopeForState: func(model.ServiceState) string { return "python-runtime" },
-		PackageForRequest: func(model.ServiceRequest) string { return "python3.12" }, PackageForState: func(model.ServiceState) string { return "python3.12" },
-	})
+	pythonOwned := provider.NewOwned(pythonRuntime, runner, provider.OwnershipSpec{ScopeForRequest: func(model.ServiceRequest) string { return "python-runtime" }, ScopeForState: func(model.ServiceState) string { return "python-runtime" }, PackageForRequest: func(model.ServiceRequest) string { return "python3.12" }, PackageForState: func(model.ServiceState) string { return "python3.12" }})
 	podmanRuntime := runtimeprovider.New(runner, runtimeprovider.Spec{ID: "podman-runtime", Package: "podman", RepoID: "appstream", AllowedReleaseLines: map[string]string{"rocky9": ""}, Description: "Rocky AppStream Podman runtime; no OCI workload is started by this package-only provider"})
-	podmanOwned := provider.NewOwned(podmanRuntime, runner, provider.OwnershipSpec{
-		ScopeForRequest: func(model.ServiceRequest) string { return "podman-runtime" }, ScopeForState: func(model.ServiceState) string { return "podman-runtime" },
-		PackageForRequest: func(model.ServiceRequest) string { return "podman" }, PackageForState: func(model.ServiceState) string { return "podman" },
-	})
+	podmanOwned := provider.NewOwned(podmanRuntime, runner, provider.OwnershipSpec{ScopeForRequest: func(model.ServiceRequest) string { return "podman-runtime" }, ScopeForState: func(model.ServiceState) string { return "podman-runtime" }, PackageForRequest: func(model.ServiceRequest) string { return "podman" }, PackageForState: func(model.ServiceState) string { return "podman" }})
+	mysqlManaged := mysqlprovider.MySQL(mysqlbase.MySQL(runner,sec,backupKeys),dbInitRunner)
+	mariaManaged := mysqlprovider.MariaDB(mysqlbase.MariaDB(runner,sec,backupKeys),dbInitRunner)
 
 	reg := provider.NewRegistry()
-	providers := []provider.Provider{
-		pg,
-		mysqlprovider.MySQL(runner, sec, backupKeys),
-		mysqlprovider.MariaDB(runner, sec, backupKeys),
-		keyvalueprovider.Redis(runner, sec, backupKeys),
-		keyvalueprovider.Valkey(valkeyRunner, sec, backupKeys),
-		nginxprovider.New(runner),
-		apacheprovider.New(runner),
-		tomcatprovider.New(runner),
-		nodeprovider.New(nodeRunner),
-		pythonOwned,
-		podmanOwned,
-	}
+	providers := []provider.Provider{pg,mysqlManaged,mariaManaged,keyvalueprovider.Redis(runner,sec,backupKeys),keyvalueprovider.Valkey(valkeyRunner,sec,backupKeys),nginxprovider.New(runner),apacheprovider.New(runner),tomcatprovider.New(runner),nodeprovider.New(nodeRunner),pythonOwned,podmanOwned}
 	for _, p := range providers { if err = reg.Register(p); err != nil { return nil, err } }
 	clusterClient := &cluster.Client{Secrets: sec}
 	eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, LVMRunner: lvmRunner, Cluster: clusterClient, LockPath: root + "/state/mutation.lock"}
@@ -131,13 +118,14 @@ func maintenanceRun() error { rt,err:=buildRuntime();if err!=nil{return err};ret
 
 func privilegedHelper() error {
 	if os.Geteuid()!=0{return errors.New("privileged-helper requires root")}
-	runner:=executor.OSRunner{Timeout:5*time.Minute,MaxOutput:1<<20};ctx,cancel:=context.WithCancel(context.Background());defer cancel();errCh:=make(chan error,5)
+	runner:=executor.OSRunner{Timeout:8*time.Minute,MaxOutput:1<<20};ctx,cancel:=context.WithCancel(context.Background());defer cancel();errCh:=make(chan error,6)
 	go func(){errCh<-privileged.Serve(ctx,privileged.DefaultSocket,"layersentry",runner)}()
 	go func(){errCh<-providerexec.Serve(ctx,providerexec.DefaultSocket,"layersentry",runner)}()
 	go func(){errCh<-valkeyexec.Serve(ctx,valkeyexec.DefaultSocket,"layersentry",runner)}()
 	go func(){errCh<-nodeexec.Serve(ctx,nodeexec.DefaultSocket,"layersentry",runner)}()
 	go func(){errCh<-lvmexec.Serve(ctx,lvmexec.DefaultSocket,"layersentry",runner)}()
-	first:=<-errCh;cancel();errs:=[]error{first,<-errCh,<-errCh,<-errCh,<-errCh};for _,err:=range errs{if err!=nil&&!errors.Is(err,context.Canceled){return err}};return nil
+	go func(){errCh<-dbinitexec.Serve(ctx,dbinitexec.DefaultSocket,"layersentry",runner)}()
+	first:=<-errCh;cancel();errs:=[]error{first,<-errCh,<-errCh,<-errCh,<-errCh,<-errCh};for _,err:=range errs{if err!=nil&&!errors.Is(err,context.Canceled){return err}};return nil
 }
 
 func localIPs()[]net.IP{ifs,_:=net.Interfaces();var out []net.IP;for _,i:=range ifs{addrs,_:=i.Addrs();for _,a:=range addrs{ip,_,err:=net.ParseCIDR(a.String());if err==nil&&ip!=nil&&!ip.IsUnspecified(){out=append(out,ip)}}};return out}
