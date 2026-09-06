@@ -13,6 +13,7 @@ import (
 
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/api"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/auth"
+    "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/backupcrypto"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/bootstrap"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/journal"
@@ -28,11 +29,12 @@ import (
 const root = "/var/lib/layersentryd"
 
 type runtimeState struct {
-    runner  executor.Runner
-    reg     *provider.Registry
-    store   *journal.Store
-    secrets *secrets.Store
-    eng     *lifecycle.Engine
+    runner     executor.Runner
+    reg        *provider.Registry
+    store      *journal.Store
+    secrets    *secrets.Store
+    backupKeys *backupcrypto.Keyring
+    eng        *lifecycle.Engine
 }
 
 func main() {
@@ -68,15 +70,19 @@ func buildRuntime() (*runtimeState, error) {
     if err != nil {
         return nil, err
     }
+    backupKeys, err := backupcrypto.Open(root + "/identity/backup.agekeys")
+    if err != nil {
+        return nil, err
+    }
     reg := provider.NewRegistry()
-    if err = reg.Register(pgprovider.New(runner, sec)); err != nil {
+    if err = reg.Register(pgprovider.New(runner, sec, backupKeys)); err != nil {
         return nil, err
     }
     if err = reg.Register(nginxprovider.New(runner)); err != nil {
         return nil, err
     }
     eng := &lifecycle.Engine{Registry: reg, Store: st, Runner: runner, LockPath: root + "/state/mutation.lock"}
-    return &runtimeState{runner: runner, reg: reg, store: st, secrets: sec, eng: eng}, nil
+    return &runtimeState{runner: runner, reg: reg, store: st, secrets: sec, backupKeys: backupKeys, eng: eng}, nil
 }
 
 func serve() error {
