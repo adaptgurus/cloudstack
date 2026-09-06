@@ -1,0 +1,72 @@
+
+{{ if .Values.syncer.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "cloudstack-csi-driver.name" . }}-sc-syncer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloudstack-csi-driver.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  backoffLimit: {{ .Values.syncer.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.syncer.ttlSecondsAfterFinished }}
+  template:
+    spec:
+      securityContext: {{- toYaml .Values.syncer.podSecurityContext | nindent 8 }}
+      serviceAccountName: {{ .Values.syncer.serviceAccount.name }}
+      tolerations:
+        {{- with .Values.syncer.tolerations }}
+          {{- toYaml . | nindent 8 }}
+          {{- end }}
+      {{- with .Values.syncer.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+        kubernetes.io/os: linux
+        {{- with .Values.syncer.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      containers:
+        - image: "{{ .Values.syncer.image.repository }}:{{ .Values.syncer.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.syncer.image.imagePullPolicy }}
+          name: {{ include "cloudstack-csi-driver.name" . }}-sc-syncer
+          args:
+            - "--cloudstackconfig=$(CLOUD_CONFIG)"
+            - "--kubeconfig=-"
+            - "--volumeExpansion=true"
+            {{- if .Values.syncer.extraArgs }}
+            {{- with .Values.syncer.extraArgs }}
+            {{- tpl . $ | trim | nindent 12 }}
+            {{- end }}
+            {{- end }}
+          env:
+            - name: CLOUD_CONFIG
+              value: /etc/config/cloud-config
+          volumeMounts:
+            - name: cloud-config
+              mountPath: /etc/config/
+          {{- with .Values.syncer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.syncer.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        {{- if .Values.secret.enabled }}
+        - name: cloud-config
+          secret:
+            secretName: {{ .Values.secret.name }}
+        {{- else if .Values.secret.hostMount }}
+        - name: cloud-config
+          hostPath:
+            path: /etc/cloudstack-csi-driver
+        {{- end }}
+      restartPolicy: {{ .Values.syncer.restartPolicy }}
+{{- end }}

@@ -1,0 +1,22 @@
+{{- if .Values.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "cloudstack-csi-driver.name" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloudstack-csi-driver.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podMetricsEndpoints:
+  - interval: 30s
+    port: http
+    scheme: http
+  jobLabel: component
+  selector:
+    matchLabels:
+      {{- include "cloudstack-csi-driver.selectorLabels" . | nindent 6 }}
+{{- end }}
