@@ -1,0 +1,48 @@
+name: LayerSentry native CSI offline qualification
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/k8s-csi-native-bundle]
+    paths:
+      - .github/workflows/layersentry-csi-native-qualification.yml
+      - tools/layersentry/k8s/downstream/cloudstack-csi/native/**
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: layersentry-csi-native-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  qualify:
+    if: github.ref == 'refs/heads/codex/k8s-csi-native-bundle'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Install locked parser
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/csi-venv"
+          "$RUNNER_TEMP/csi-venv/bin/pip" install --only-binary=:all: --require-hashes -r tools/layersentry/k8s/downstream/cloudstack-csi/native/requirements-build.txt
+      - name: Qualify exact OCI images and isolated RKE2 imports
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/csi-venv/bin/python" tools/layersentry/k8s/downstream/cloudstack-csi/native/qualify_offline.py --output "$RUNNER_TEMP/csi-native"
+      - name: Retain unsigned image candidates and bounded qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: layersentry-csi-native-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/csi-native/images/
+            ${{ runner.temp }}/csi-native/review/
+            ${{ runner.temp }}/csi-native/qualification.json
+            ${{ runner.temp }}/csi-native/tests.txt
+            ${{ runner.temp }}/csi-native/cleanup.json
+            ${{ runner.temp }}/csi-native/import-*.txt
+            ${{ runner.temp }}/csi-native/containerd.log
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: warn
