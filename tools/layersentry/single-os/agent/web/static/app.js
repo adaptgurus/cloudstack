@@ -8,7 +8,7 @@ const providerMeta={
 'nginx':{name:'Nginx',category:'application',release:'stable',port:8080,network:true,storage:false,backup:false,adminSecret:false,cluster:false},
 'apache-httpd':{name:'Apache HTTPD',category:'application',release:'stable',port:8080,network:true,storage:false,backup:false,adminSecret:false,cluster:false},
 'tomcat':{name:'Tomcat',category:'application',release:'stable',port:8080,network:true,storage:false,backup:false,adminSecret:false,cluster:false},
-'nodejs-runtime':{name:'Node.js runtime',category:'application',release:'22',port:0,network:false,storage:false,backup:false,adminSecret:false,cluster:false},
+'nodejs-runtime':{name:'Node.js runtime',category:'application',release:'20',port:0,network:false,storage:false,backup:false,adminSecret:false,cluster:false},
 'python-runtime':{name:'Python 3.12 runtime',category:'application',release:'3.12',port:0,network:false,storage:false,backup:false,adminSecret:false,cluster:false},
 'podman-runtime':{name:'Podman runtime',category:'application',release:'rocky9',port:0,network:false,storage:false,backup:false,adminSecret:false,cluster:false}
 };
