@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "status": "CI_VERIFIED",
+  "status": "PARTIAL",
   "scope": "unsigned offline Rocky9 amd64 CPU QCOW2 build and integrity evidence",
   "sourceCommit": "f05710874613c3a38c2704c28650a04f7bae2aef",
   "workflowRun": 34050507635,
@@ -32,26 +32,41 @@
     "rockyBaseSignatureVerified": true,
     "rpmSignaturesVerified": true,
     "offlinePackageTransactionPassed": true,
-    "selinuxRelabelCompleted": true,
+    "selinuxRelabelCompleted": false,
     "qemuImageCheckPassed": true,
     "guestRpmInventoryExtracted": true,
-    "exactRke2BinaryVersionExecuted": true
+    "exactRke2BinaryVersionExecuted": true,
+    "selinuxRelabelCommandReturnedSuccess": true
   },
   "independentDownloadedArtifactVerification": {
-    "status": "DELEGATED_NOT_YET_VERIFIED",
+    "status": "LIVE_VERIFIED",
+    "scope": "exact archive/image digest and standalone QCOW2 integrity only",
     "runnerRepository": "adaptgurus/cozystack",
     "workflowRun": 34051209929,
-    "reason": "Runtime owner independently verifies exact ZIP and QCOW2 hashes before boot; duplicate local transfer stopped."
+    "reason": "Runtime owner independently verified exact ZIP and QCOW2 hashes; subsequent virsh creation failed before guest boot."
   },
-  "qualificationStatus": "NOT_TESTED",
+  "qualificationStatus": "BLOCKED",
   "signed": false,
   "runtimeQualified": false,
-  "hostBootTested": false,
-  "qgaChannelTested": false,
+  "hostBootTested": true,
+  "qgaChannelTested": true,
   "sshConnectivityTested": false,
   "joinTested": false,
   "storageTested": false,
   "templateRegistered": false,
   "rke2Started": false,
-  "bootHarnessCommit": "fb2ec21623fa4429f3353f7f194e0057466843bf"
+  "bootHarnessCommit": "fb2ec21623fa4429f3353f7f194e0057466843bf",
+  "runtimeFindings": {
+    "bootRun": 34052299028,
+    "readOnlyPolicyAuditRun": 34053044282,
+    "guestExecAllowed": false,
+    "selinuxCriticalLabelsPresent": false,
+    "bootAcceptancePassed": false,
+    "candidateApprovedForBootstrap": false,
+    "failures": [
+      "Guest-exec rejected by exact Rocky package RPC allowlist",
+      "Updated loader/systemd/Python/QGA lack SELinux xattrs; first-boot autorelabel fallback did not establish completed labeling"
+    ],
+    "ownedGuestCleanupVerified": true
+  }
 }
