@@ -49,6 +49,18 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE — 2026-09-06 E1 pinned provider resources and restricted Kubernetes client
+
+Exact implementation commit:
+
+`7060883e13`
+
+Workstream E added exact resource builders for the pinned mixed contract: CAPI `Cluster`/`MachineDeployment` and CAPRKE2 objects at `v1beta2`, CAPC infrastructure objects at `v1beta3`, and exact CAPI `apiGroup` references. RKE2 uses `v1.36.4+rke2r1`, `registrationMethod: control-plane-endpoint`, CAPC dual-endpoint ownership and CAPC Machine-volume annotations. Builders require resolved project/Site/network/offering/template IDs and include only a Kubernetes credential Secret reference. Flannel was removed from policy/UI because the exact CAPRKE2 v1beta2 CRD does not accept it.
+
+The restricted Kubernetes client accepts only an HTTPS origin with pinned CA/runtime token, disables redirects, allows only the exact E1/Flux kinds, uses server-side apply with `force=false`, bounds responses and treats mutating transport failures as `UNKNOWN`. All 40 Workstream E Python tests passed. Design/source evidence: `docs/layersentry/evidence/k8s/2026-09-06-e1-provider-resource-contract.md`.
+
+No CRD/API/provider runtime was exercised. Tuple reconciliation, actual 6443/9345 rules, automatic join, CNI/CCM/CSI and Flux readiness remain `NOT_TESTED`. Next E1 gate: step executor, condition/status evaluation, CloudStack preflight, create/status/delete/scale and central Flux baseline reconciliation.
+
 ### SOURCE_COMPLETE — 2026-09-06 LayerSentry Kubernetes BFF/controller saga foundation
 
 Exact implementation commit:

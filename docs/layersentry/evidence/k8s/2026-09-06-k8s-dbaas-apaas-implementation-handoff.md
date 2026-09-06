@@ -12,6 +12,10 @@
 
 ## 0. Latest continuation checkpoint
 
+E1 provider resource/source work is at `7060883e13`. It combines CAPI/CAPRKE2 v1beta2 with CAPC v1beta3 exactly as pinned, selects automatic `control-plane-endpoint` joins, carries CAPC endpoint/Machine-volume annotations, requires pre-resolved CloudStack IDs, and adds a restricted pinned-CA Kubernetes client. Unsupported Flannel was removed because the exact CAPRKE2 v1beta2 CRD rejects it. All 40 Workstream E Python tests passed; no provider runtime reconciliation ran.
+
+Resume with the E1 executor, status conditions, CloudStack preflight, create/status/delete/scale, one CCM/CSI path and central Flux. Do not promote any runtime gate or begin stateful DBaaS.
+
 The LayerSentry BFF/controller saga foundation is implemented at `0574697c8a`. It provides a default-deny WSGI request boundary, server-side release policy, exact-project authorization hook, durable SQLite WAL operation/event state, immutable idempotency fingerprints, optimistic concurrency and a separate authoritative-observation path for `UNKNOWN` mutation outcomes. All 32 Workstream E Python tests passed. It has no configured runtime authenticator/provider adapters and has not been deployed, so this is source foundation only.
 
 Resume at E1 exact CAPI/CAPC/CAPRKE2 resource builders and supported Kubernetes/Flux adapters for cluster create/status/delete/scale. One active controller is required while SQLite is used; active/active requires a later tested shared transactional store/claim mechanism.
