@@ -84,6 +84,7 @@ class ReleaseGates:
     endpoint_6443: bool = False
     endpoint_9345: bool = False
     capc_volume_ownership_safe: bool = False
+    node_disk_set_ownership: bool = False
     csi_project_scope: bool = False
     csi_resize_idempotent: bool = False
     airgap_create_scale_repair: bool = False
@@ -137,6 +138,7 @@ class NodePoolRequest:
     role: str = "general"
     storage_profile_ids: Tuple[str, ...] = ()
     direct_node_disks: int = 0
+    node_disk_set_id: Optional[str] = None
     gpu: bool = False
 
 
@@ -287,9 +289,11 @@ def validate_cluster_request(
         _required(pool.service_offering_id, f"node pool {pool.name} service_offering_id")
         _required(pool.image_id, f"node pool {pool.name} image_id")
         if pool.direct_node_disks:
-            raise ValidationError(
-                "direct node disks are not enabled until NodeDiskSet ownership is implemented and certified"
-            )
+            if not gates.node_disk_set_ownership:
+                raise ValidationError(
+                    "direct node disks are not enabled until NodeDiskSet ownership is implemented and certified"
+                )
+            _required(pool.node_disk_set_id, f"node pool {pool.name} node_disk_set_id")
         for profile_id in pool.storage_profile_ids:
             profile = profile_by_id.get(profile_id)
             if profile is None:

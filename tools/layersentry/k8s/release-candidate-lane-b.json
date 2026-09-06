@@ -30,6 +30,7 @@
     "endpoint9345": false,
     "fluxRemoteReconcile": false,
     "capcVolumeOwnershipSafe": false,
+    "nodeDiskSetOwnership": false,
     "csiProjectScope": false,
     "csiResizeIdempotent": false,
     "airgapCreateScaleRepair": false,

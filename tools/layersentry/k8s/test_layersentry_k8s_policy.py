@@ -157,6 +157,27 @@ class ClusterPolicyTest(unittest.TestCase):
         self.assertFalse(plan.executable)
         self.assertIn("NodeDiskSet", plan.blockers[0])
 
+    def test_direct_node_disk_requires_an_explicit_disk_set_id(self):
+        request = base_cluster(node_pools=(
+            NodePoolRequest(
+                name="workers",
+                replicas=3,
+                service_offering_id="worker-offering",
+                image_id="rke2-image",
+                direct_node_disks=1,
+            ),
+        ))
+        gates = ReleaseGates(
+            tuple_reconciliation=True,
+            endpoint_6443=True,
+            endpoint_9345=True,
+            flux_remote_reconcile=True,
+            node_disk_set_ownership=True,
+        )
+        plan = plan_cluster_create(request, gates, [GENERAL, DIRECT])
+        self.assertFalse(plan.executable)
+        self.assertIn("node_disk_set_id", plan.blockers[0])
+
 
 class DatabasePolicyTest(unittest.TestCase):
     def test_dbaas_blocked_until_capc_volume_ownership_safe(self):
