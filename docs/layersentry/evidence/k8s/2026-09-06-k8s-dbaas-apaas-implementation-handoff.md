@@ -12,6 +12,22 @@
 
 ## 0. Latest continuation checkpoint
 
+CloudStack-session BFF authentication and composite authorization are
+implemented at `bc29df96b9405bca263d18cd6deb52c85753f1fb`. The BFF now validates
+the HttpOnly session plus matching session-key cookie/header against
+CloudStack `listApis` and `listProjects`, ignores readable role/user/account
+claims, requires an exact Origin on mutations, and authorizes exact project
+scope plus effective CloudStack capabilities. All 62 Workstream E Python tests
+passed locally. This is source-only: runtime session/RBAC/browser/Rocky tests
+remain `NOT_TESTED`, and the authenticator has not yet been service-wired.
+Design evidence:
+`docs/layersentry/evidence/k8s/2026-09-06-e1-bff-cloudstack-session-auth.md`.
+
+Resume with the immutable E1 CCM/downstream-CSI/Flux component contract and
+controller package/service wiring. Unresolved image/catalog digests must fail
+closed. Do not begin stateful DBaaS mutations while E0/E1 live evidence is
+absent.
+
 The E1 lifecycle executor is implemented at `402cb3f40d`. It provides signed read-only CloudStack ID/health preflight, exact 6443/9345 LB-rule verification, provider resource reconciliation, create/status/scale/delete BFF source paths and commit-pinned central Flux. Scale-down and CAPI Cluster deletion fail closed until CAPC volume ownership is live-verified; delete retains workload volumes and never directly deletes CloudStack VMs. All 52 Workstream E Python tests passed.
 
 This is not runtime E1 proof. Package/service wiring, real authentication/RBAC, CRD admission, provider reconciliation, automatic join, CNI, CCM, CSI, Flux, recovery and Rocky evidence remain `NOT_TESTED`. Do not begin PostgreSQL mutation until those required E0/E1 gates actually pass.

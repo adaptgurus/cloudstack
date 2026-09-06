@@ -49,6 +49,34 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE — 2026-09-06 E1 CloudStack-session BFF authentication/RBAC
+
+Exact implementation commit:
+
+`bc29df96b9405bca263d18cd6deb52c85753f1fb`
+
+Workstream E now validates the existing browser login against the exact
+CloudStack `/client/api` session contract rather than trusting caller-written
+identity or role headers. The BFF requires the HttpOnly `JSESSIONID`, matching
+session-key cookie/header proof and an exact allowlisted Origin for mutations.
+It obtains effective API grants from authenticated `listApis` and active
+project scope from authenticated `listProjects`; create/status/scale/delete
+authorization requires both exact project membership and the corresponding
+CloudStack API capabilities. No CloudStack Java/API/schema/KVM core changed.
+
+All 62 Workstream E Python tests passed locally. They include spoofed readable
+cookie rejection, missing/mismatched/duplicate token handling, cross-Origin
+denial, incomplete inventory denial, custom effective capability checks,
+project tampering and read-only mutation denial. Design/source evidence:
+`docs/layersentry/evidence/k8s/2026-09-06-e1-bff-cloudstack-session-auth.md`.
+
+This authenticator remains opt-in and the unwired BFF remains deny-all. Real
+CloudStack login/logout/expiry/custom-role behavior, reverse proxy, TLS,
+Chrome/Firefox and Rocky Linux 9 remain `NOT_TESTED`. E0/E1 live gates remain
+false and PostgreSQL mutations remain blocked. Next E1 source gate: immutable
+CCM/downstream-CSI/Flux component selection plus controller package/service
+wiring that refuses unresolved digests.
+
 ### SOURCE_COMPLETE — 2026-09-06 E1 create/status/scale/delete lifecycle executor
 
 Exact implementation commit:
