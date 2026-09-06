@@ -23,9 +23,16 @@ type Manager struct{Runner executor.Runner;StateRoot string}
 type ownership struct{ServiceID string `json:"service_id"`;VG string `json:"vg"`;Devices []string `json:"devices"`;CreatedAt time.Time `json:"created_at"`}
 
 func(m Manager)Prepare(ctx context.Context,serviceID string,groups []model.LVMVolumeGroup)error{
-    if len(groups)==0{return nil};if m.Runner==nil{return errors.New("LVM executor unavailable")};if !uuidRE.MatchString(serviceID){return errors.New("invalid service id for LVM ownership")};if m.StateRoot==""{m.StateRoot="/var/lib/layersentryd/state/lvm"};if err:=os.MkdirAll(m.StateRoot,0700);err!=nil{return err}
+    if len(groups)==0{return nil};if err:=m.ready(serviceID);err!=nil{return err}
     for _,g:=range groups{if err:=m.prepareGroup(ctx,serviceID,g);err!=nil{return fmt.Errorf("LVM group %s: %w",g.Name,err)}};return nil
 }
+// EnsureMounted is observation/recovery only. It must never create a PV, VG,
+// LV or filesystem from historical destructive confirmations.
+func(m Manager)EnsureMounted(ctx context.Context,serviceID string,groups []model.LVMVolumeGroup)error{
+    if len(groups)==0{return nil};if err:=m.ready(serviceID);err!=nil{return err}
+    for _,g:=range groups{if err:=m.ensureGroup(ctx,serviceID,g);err!=nil{return fmt.Errorf("LVM group %s recovery: %w",g.Name,err)}};return nil
+}
+func(m Manager)ready(serviceID string)error{if m.Runner==nil{return errors.New("LVM executor unavailable")};if !uuidRE.MatchString(serviceID){return errors.New("invalid service id for LVM ownership")};if m.StateRoot==""{m.StateRoot="/var/lib/layersentryd/state/lvm"};return os.MkdirAll(m.StateRoot,0700)}
 func(m Manager)prepareGroup(ctx context.Context,serviceID string,g model.LVMVolumeGroup)error{
     marker:=filepath.Join(m.StateRoot,g.Name+".json");rec,exists,err:=readOwnership(marker);if err!=nil{return err};vgExists,err:=m.vgExists(ctx,g.Name);if err!=nil{return err}
     if exists{if rec.ServiceID!=serviceID||rec.VG!=g.Name||!sameStrings(rec.Devices,g.Devices){return errors.New("existing LayerSentry LVM ownership does not match requested service/devices")}}
@@ -35,6 +42,9 @@ func(m Manager)prepareGroup(ctx context.Context,serviceID string,g model.LVMVolu
     if !vgExists{args:=append([]string{g.Name},g.Devices...);if _,err=m.Runner.Run(ctx,"/usr/sbin/vgcreate",args...);err!=nil{return err}}else{for _,dev:=range g.Devices{vg,_,err:=m.pvVG(ctx,dev);if err!=nil{return err};if vg==""{if _,err=m.Runner.Run(ctx,"/usr/sbin/vgextend",g.Name,dev);err!=nil{return err}}}}
     for _,lv:=range g.LogicalVolumes{if err=m.prepareLV(ctx,g.Name,lv);err!=nil{return err}}
     return nil
+}
+func(m Manager)ensureGroup(ctx context.Context,serviceID string,g model.LVMVolumeGroup)error{
+    marker:=filepath.Join(m.StateRoot,g.Name+".json");rec,exists,err:=readOwnership(marker);if err!=nil{return err};if !exists||rec.ServiceID!=serviceID||rec.VG!=g.Name||!sameStrings(rec.Devices,g.Devices){return errors.New("cannot prove LayerSentry ownership of existing volume group")};vgExists,err:=m.vgExists(ctx,g.Name);if err!=nil{return err};if !vgExists{return errors.New("owned volume group is missing; destructive recreation is refused during recovery")};for _,dev:=range g.Devices{vg,known,err:=m.pvVG(ctx,dev);if err!=nil{return err};if !known||vg!=g.Name{return fmt.Errorf("PV %s membership in %s cannot be proven",dev,g.Name)}};for _,lv:=range g.LogicalVolumes{dev:=filepath.Join("/dev",g.Name,lv.Name);exists,err:=m.lvExists(ctx,dev);if err!=nil{return err};if !exists{return fmt.Errorf("logical volume %s is missing; recovery will not recreate it",dev)};fs,err:=m.fstype(ctx,dev);if err!=nil{return err};if fs==""{return fmt.Errorf("logical volume %s has no filesystem; recovery will not format it",dev)};if lv.Filesystem!=""&&fs!=lv.Filesystem{return fmt.Errorf("logical volume %s filesystem mismatch: expected %s observed %s",dev,lv.Filesystem,fs)};assignment:=model.StorageAssignment{Device:dev,MountPoint:lv.MountPoint,Purpose:lv.Purpose,Filesystem:fs};if err=(mounts.Manager{Runner:m.Runner}).EnsureMounted(ctx,[]model.StorageAssignment{assignment});err!=nil{return err}};return nil
 }
 func(m Manager)prepareLV(ctx,vg string,lv model.LVMLogicalVolume)error{
     dev:=filepath.Join("/dev",vg,lv.Name);exists,err:=m.lvExists(ctx,dev);if err!=nil{return err};if !exists{var args []string;if lv.Size=="100%FREE"{args=[]string{"-y","-n",lv.Name,"-l","100%FREE",vg}}else{args=[]string{"-y","-n",lv.Name,"-L",lv.Size,vg}};if _,err=m.Runner.Run(ctx,"/usr/sbin/lvcreate",args...);err!=nil{return err}}
