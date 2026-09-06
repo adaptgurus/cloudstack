@@ -9,6 +9,7 @@ import (
     "strings"
     "time"
 
+    "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/cluster"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/journal"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lifecycle"
     "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/model"
@@ -16,11 +17,13 @@ import (
 )
 
 const defaultSecretGracePeriod = 24 * time.Hour
+const enrollmentRecordRetention = 24 * time.Hour
 
 type Runner struct {
     Store             *journal.Store
     Engine            *lifecycle.Engine
     Secrets           *secrets.Store
+    Enrollment        *cluster.Manager
     Now               func() time.Time
     SecretGracePeriod time.Duration
 }
@@ -32,6 +35,11 @@ func (r Runner) Run(ctx context.Context) error {
     }
     if err := r.cleanupTransientSecrets(now); err != nil {
         return err
+    }
+    if r.Enrollment != nil {
+        if _, err := r.Enrollment.Prune(now.Add(-enrollmentRecordRetention)); err != nil {
+            return fmt.Errorf("prune cluster enrollment records: %w", err)
+        }
     }
 
     items, err := r.Store.ListServices()
