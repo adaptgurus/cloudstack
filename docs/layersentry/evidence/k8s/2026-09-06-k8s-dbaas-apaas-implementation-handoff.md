@@ -12,6 +12,21 @@
 
 ## 0. Latest continuation checkpoint
 
+E1 controller runtime wiring is implemented at
+`58e9e2e18e13d91422fe264530828fc6ba538b3d`. It composes the strict
+CloudStack-session BFF, capability RBAC, read-only CloudStack resolver,
+restricted Kubernetes client, E1 executor and restart-safe saga journal from
+secret-file-only configuration. Hardened BFF and single-active reconciler
+systemd examples are present. Cluster requests now require an exact project
+and per-cluster frontend IP; deterministic project namespaces plus pre-apply
+ownership checks prevent foreign object adoption. All 74 Workstream E Python
+tests pass locally. Evidence:
+`docs/layersentry/evidence/k8s/2026-09-06-e1-controller-runtime-wiring.md`.
+
+This is not a deployed service. The immutable component manifest remains
+blocked, and package/Gunicorn/reverse-proxy/SELinux/provider/Rocky evidence is
+`NOT_TESTED`. Do not bypass startup gating or begin PostgreSQL mutations.
+
 The immutable E1 component gate is implemented at
 `20f2336c93ea4ef57d70717261faf9f9ef6c7688`. It pins CloudStack CCM `v1.2.0`
 source commit `4740dbcacc7fc5892354b03b2f0be7ebf5c92584`, records its Kubernetes

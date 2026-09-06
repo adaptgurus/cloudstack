@@ -49,6 +49,32 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE / BLOCKED — 2026-09-06 E1 controller runtime wiring
+
+Exact implementation commit:
+
+`58e9e2e18e13d91422fe264530828fc6ba538b3d`
+
+Workstream E now has strict runtime composition, secret-file-only config,
+fail-closed immutable component loading, hardened BFF/reconciler systemd
+examples, bounded restart-safe work selection and redacted retry persistence.
+The BFF may use concurrent HTTP workers while one timer-driven reconciler owns
+mutations; SQLite is still explicitly not an active/active store.
+
+Every cluster now requires exact project and per-cluster frontend public-IP
+IDs. CloudStack must report the IP Allocated in the selected project/Site.
+Management namespaces are deterministic per project, and authoritative GETs
+prevent adoption of foreign Namespace/CAPI/CAPRKE2/Flux resources before apply
+or after an ambiguous outcome. The shared Flux source must match its exact
+managed label, URL and commit; per-cluster Kustomizations carry project labels.
+
+All 74 Workstream E Python tests and Python compilation passed locally.
+Evidence: `docs/layersentry/evidence/k8s/2026-09-06-e1-controller-runtime-wiring.md`.
+No package/systemd/reverse-proxy/SELinux/provider/Rocky test ran. The current
+component manifest is non-deployable, so startup intentionally remains
+`BLOCKED`. Next gate is Workstream B immutable artifact/catalog publication and
+E0/E1 live qualification; PostgreSQL mutation remains blocked until those pass.
+
 ### SOURCE_COMPLETE / BLOCKED — 2026-09-06 E1 immutable component gate
 
 Exact implementation commit:
