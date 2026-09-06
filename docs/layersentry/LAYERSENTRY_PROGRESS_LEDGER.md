@@ -49,6 +49,18 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE — 2026-09-06 E0 CAPC endpoint and Machine-volume ownership overlay
+
+Exact implementation commit:
+
+`6f38f4a5954729706236e81bacdb2800444a1fe3`
+
+Workstream E added a digest-pinned downstream overlay for exact CAPC `v0.6.1` commit `7521b14a31e6c46f81f16aae3738a27c08ad063f`; no Apache CloudStack Java/API/schema/KVM source changed. For LayerSentry-annotated clusters CAPC remains the one endpoint authority and now owns/reconciles both Kubernetes API TCP `6443` and RKE2 supervisor/join TCP `9345`. The overlay also replaces all-attached-`DATADISK` destruction with an explicit two-factor ownership check: the one deploy-time disk ID must be recorded in `CloudStackMachine.status` and its CloudStack CAPC/Machine-UID tags must match. CSI and otherwise unowned attached volumes are excluded; legacy/unmarked disks fail toward retention.
+
+Source evidence: the overlay materializer verifies the exact upstream commit and patch SHA-256 `6d3fc88ccf986bd025fc6d714ec7b4fa19d0c2afe6f10c50ef02a198286cea74`, applies idempotently and rejects drift. Exact patched CAPC source compiled with verified Go `1.23.2`; the non-integration `pkg/cloud` suite passed 135 selected specs including the new two-rule assignment and owned-versus-CSI volume destruction cases; v1beta1/v1beta2 API tests passed and the v1beta3 test binary compiled. The existing LayerSentry policy suite passed 10 tests and overlay tooling passed 3 tests. This is local source evidence, not GitHub CI or live evidence.
+
+`E0` remains incomplete. Full envtest, actual CAPC/CAPI/CAPRKE2 reconciliation, CloudStack LB creation, destructive PVC survival across delete/rollout/scale-down/remediation and rollback remain `NOT_TESTED`. Next Workstream E gate: implement explicit NodeDiskSet ID/tag/retain/delete/resize/replacement semantics and its failure/destructive test harness, then qualify CloudStack CSI `3.0.2` project lifecycle and idempotent resize.
+
 ### NOT_TESTED — 2026-09-06 provider-neutral DR state/journal/lease source foundation
 
 DR-only source continuation added a provider-neutral, inactive control-plane foundation without changing CloudStack core DB/API contracts, without adding a scheduler/RBAC authority, and without executing any provider/runtime mutation.

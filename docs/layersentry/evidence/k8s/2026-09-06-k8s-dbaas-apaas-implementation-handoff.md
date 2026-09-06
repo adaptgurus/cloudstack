@@ -10,6 +10,25 @@
 **Runtime mutation:** **NONE**  
 **Status:** `SOURCE_COMPLETE` for policy/UI foundation; **E0 NOT COMPLETE**; DBaaS production remains `BLOCKED`
 
+## 0. Latest continuation checkpoint
+
+Implementation continued directly on the integration branch from fetched head `f61c4d8198a7af4d3147ea893f77830d4f8f21f0`.
+
+Exact E0 endpoint/volume source commit:
+
+`6f38f4a5954729706236e81bacdb2800444a1fe3`
+
+Added:
+
+- exact CAPC `v0.6.1` downstream overlay and manifest under `tools/layersentry/k8s/downstream/capc/`;
+- fail-closed/idempotent overlay materializer and tests;
+- CAPC-owned dual `6443`/`9345` rule lifecycle for explicitly marked LayerSentry RKE2 clusters;
+- recorded-ID plus CloudStack-tag ownership for the single CAPC deploy-time data disk;
+- exclusion of CSI/unowned attached disks from Machine destruction;
+- source/design evidence at `docs/layersentry/evidence/k8s/2026-09-06-e0-capc-endpoint-volume-design.md`.
+
+Local source checks passed as recorded in the Progress Ledger. No CI/live/destructive CloudStack test ran, so the two runtime gates remain `NOT_TESTED` and `E0` remains incomplete. Resume with NodeDiskSet ownership and destructive-test harnessing, then CloudStack CSI `3.0.2` project/resize qualification. Do not begin stateful DBaaS yet.
+
 ## 1. Governing instructions read
 
 The implementation was resumed only after reading the current branch copies of:
