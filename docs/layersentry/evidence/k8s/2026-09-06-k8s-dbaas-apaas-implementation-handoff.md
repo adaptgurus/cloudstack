@@ -12,6 +12,10 @@
 
 ## 0. Latest continuation checkpoint
 
+The LayerSentry BFF/controller saga foundation is implemented at `0574697c8a`. It provides a default-deny WSGI request boundary, server-side release policy, exact-project authorization hook, durable SQLite WAL operation/event state, immutable idempotency fingerprints, optimistic concurrency and a separate authoritative-observation path for `UNKNOWN` mutation outcomes. All 32 Workstream E Python tests passed. It has no configured runtime authenticator/provider adapters and has not been deployed, so this is source foundation only.
+
+Resume at E1 exact CAPI/CAPC/CAPRKE2 resource builders and supported Kubernetes/Flux adapters for cluster create/status/delete/scale. One active controller is required while SQLite is used; active/active requires a later tested shared transactional store/claim mechanism.
+
 CloudStack CSI source qualification continued at `d249be7dba`. The exact upstream `cloudstack-csi-3.0.2` commit is pinned with a SHA-verified overlay that makes repeated/already-satisfied expansion convergent and returns observed capacity. The exact patched upstream tree passed `go test ./...`; the overlay applied and reapplied idempotently. Source review confirmed the existing project option flow, but actual CloudStack `4.22.1.1` project isolation and lifecycle remain `NOT_TESTED`.
 
 The new `e0_qualification.py` harness requires project create/isolation, attach/detach, snapshot/restore, expansion/delete replay, CAPC PVC survival and NodeDiskSet destructive evidence on Rocky 9. It has not been populated by a live run, so CSI, CAPC and NodeDiskSet runtime gates remain false. Resume with the LayerSentry BFF/controller and E1 lifecycle; do not enable DBaaS mutations.

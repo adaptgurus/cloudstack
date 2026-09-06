@@ -49,6 +49,18 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE — 2026-09-06 LayerSentry Kubernetes BFF/controller saga foundation
+
+Exact implementation commit:
+
+`0574697c8a`
+
+Workstream E added a framework-neutral WSGI BFF and SQLite-WAL durable saga/event journal outside Apache CloudStack core. Authentication and authorization default to deny-all; mutation requests require canonical subject-bound idempotency fingerprints; server-owned release policy runs before persistence; optimistic versions reject stale writers; provider metadata with secret-bearing fields is not persisted. A mutation timeout enters `UNKNOWN`, normal advance refuses to replay it, and only an explicit authoritative observation path can reconcile it.
+
+Local evidence: all 32 Workstream E Python tests passed, including BFF denial/idempotency, exact-project authorization, durable journal events, idempotency collision, stale-writer rejection, secret-output rejection and ambiguous mutation observation. Design evidence: `docs/layersentry/evidence/k8s/2026-09-06-controller-bff-saga-design.md`.
+
+Provider authentication/RBAC, CAPI/Kubernetes/CloudStack/Flux adapters, controller packaging and Rocky deployment remain `NOT_TESTED`; SQLite is limited to one active reconciler and is not claimed as an active/active distributed store. Next gate: E1 exact CAPI/CAPC/CAPRKE2 resource builders plus supported Kubernetes/Flux API adapters for cluster create/status/delete/scale.
+
 ### SOURCE_COMPLETE — 2026-09-06 CloudStack CSI 3.0.2 source qualification and idempotent expansion
 
 Exact implementation commit:
