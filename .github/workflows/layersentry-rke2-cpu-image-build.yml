@@ -1,0 +1,59 @@
+name: LayerSentry RKE2 CPU image build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/k8s-artifact-completion]
+    paths:
+      - .github/workflows/layersentry-rke2-cpu-image-build.yml
+      - tools/layersentry/k8s/image/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layersentry-rke2-cpu-image-build
+  cancel-in-progress: false
+
+jobs:
+  build-candidate:
+    if: github.repository == 'adaptgurus/cloudstack' && github.ref == 'refs/heads/codex/k8s-artifact-completion'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Validate source and install hosted build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/layersentry/k8s/image -p 'test_*.py' -v
+          bash -n tools/layersentry/k8s/image/customize_guest.sh
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends qemu-utils libguestfs-tools linux-image-generic
+          # The hosted kernel image must be readable by the unprivileged appliance builder.
+          sudo chmod a+r /boot/vmlinuz-*
+          test -c /dev/kvm
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          mkdir build-evidence
+          dpkg-query -W > build-evidence/hosted-builder-packages.tsv
+      - name: Materialize and verify locked inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 1800 python3 tools/layersentry/k8s/image/prepare_inputs.py --output node-inputs
+      - name: Build image offline without starting RKE2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/layersentry/k8s/image/build_cpu_image.py --inputs node-inputs --output build-evidence/cpu-image
+      - name: Retain unsigned image and evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: layersentry-rke2-cpu-image-${{ github.sha }}-${{ github.run_attempt }}
+          path: build-evidence/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
