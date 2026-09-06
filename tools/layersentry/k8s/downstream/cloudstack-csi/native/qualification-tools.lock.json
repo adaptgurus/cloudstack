@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "runtimeImage": "docker.io/rancher/rke2-runtime@sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9",
+  "runtimeTag": "v1.36.4-rke2r1",
+  "expectedContainerdVersion": "2.3.4",
+  "scope": "isolated GitHub-hosted native CSI image import/reimport; no lab, CRI pod or storage certification",
+  "crane": {
+    "version": "v0.20.3",
+    "repository": "google/go-containerregistry",
+    "name": "go-containerregistry_Linux_x86_64.tar.gz",
+    "sha256": "36c67a932f489b3f2724b64af90b599a8ef2aa7b004872597373c0ad694dc059",
+    "binarySha256": "675f3b2f1696c1f6bc55b1ef535163364119776999f3d1471e4558ed35bab548"
+  },
+  "binarySha256": {
+    "containerd": "fcb35183e9181fc2735bc131245d223fdf23f75b17f735290868e1c1a1e8db1d",
+    "containerd-shim-runc-v2": "f2061d1918ec0de7ecfcc3d1312d23c5a16443869aa5868035a550ee18087177",
+    "runc": "d450efc859dff197b3e77ea2635322b285c31458fe90e24d1f010ad11727305f",
+    "ctr": "aee886f9dd324d06db314a9c9545ecde0797309f3887ca671bf52f02d5f2bc08"
+  },
+  "expectedContainerdVersionOutput": "containerd github.com/k3s-io/containerd v2.3.4-k3s1.36 b92ab05c7f4bfac0033a4ce560c5698bfb2b26c9"
+}
