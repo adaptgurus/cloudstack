@@ -19,3 +19,28 @@ The host profile includes cloud-init, QGA/Python/SSH, iSCSI/multipath/NVMe/NFS/L
 Initial bootstrap inputs are deterministic hostname and root SSH public key only. Cloud-init disables passwords; Runner must use the root-specific authorized-key field, because the upstream default user is rocky. QGA supplies the guest SSH host public key through an already trusted KVM transport; Runner must use strict guest known_hosts verification before injecting RKE2 configuration/token. No key, join token, CloudStack credential, kubeconfig or per-cluster address is baked. RKE2 is preinstalled and disabled, with SELinux enabled through its systemd environment and only Canal images staged. Firewalld remains enabled; exact SSH/RKE2/Canal rules belong to the validated bootstrap path.
 
 `candidate-manifest.json` records output digest, source/input/inventory provenance and explicit false runtime qualifications. It is unsigned, has no template ID and is not a trusted live-qualification attestation. The builder is not a replacement for native CloudStack registration or CAPRKE2 tenant lifecycle. License/security review, signing, registry/media retention, Rocky boot/three-server join/storage validation and upgrade/rollback remain release gates.
+
+## Bounded networkless boot and QGA acceptance
+
+`boot_qga_acceptance.py` is executed only through the runtime owner's approved root runner. Host prerequisites are signed Rocky `libvirt-client`, `libvirt-daemon-kvm`, `qemu-img`, `genisoimage` (or `xorriso`), Python 3 and policycoreutils, working local `qemu:///system` sockets, nested KVM and SELinux Enforcing. It does not install packages or alter host services, networks or firewall rules.
+
+Provide the exact downloaded candidate QCOW2 and independently checked candidate manifest SHA-256:
+
+```sh
+python3 tools/layersentry/k8s/image/boot_qga_acceptance.py \
+  --image /approved/artifact/cpu-image/layersentry-rke2-rocky9-amd64.qcow2 \
+  --sha256 "$CANDIDATE_SHA256" --evidence /approved/evidence/unique-boot-run
+```
+
+The harness verifies standalone QCOW2 integrity and copies it into `/var/lib/libvirt/images/layersentry-cpuqc-<full UUID>` (root:qemu 0750). It creates one transient BIOS/q35 domain, 2 vCPU/4 GiB, with a virtio disk, read-only CIDATA seed, virtio QGA channel and serial log. It attaches **no network interface**. The NoCloud seed contains only a fresh instance ID, hostname and disabled password authentication; it adds no SSH key or cluster credential. CloudStack/NoCloud/None are the image's supported datasources; OpenStack is not enabled.
+
+Bounded QGA checks require Rocky 9.8, Enforcing SELinux, cloud-init completion, active QGA/SSH/firewalld, a generated machine ID and Ed25519 public host key, key-only effective SSH configuration, disabled/inactive RKE2, absent cluster config/server state and only the loopback interface. They do not start RKE2, test SSH network connectivity, form a cluster or qualify storage. The result is specifically `LIVE_BOOT_QGA_VERIFIED`; production qualification remains false.
+
+Default behavior shuts down and, after 60 seconds if needed, destroys only the UUID-bound owned transient domain and removes its private runtime copy. `--retain-for-dr-qualification` retains only a passing domain for the runtime owner's bounded capture test. Its root-only `ownership.json` binds the exact UUID, name, disk/seed paths and source SHA. After capture, use:
+
+```sh
+python3 tools/layersentry/k8s/image/boot_qga_acceptance.py \
+  --cleanup-manifest /var/lib/libvirt/images/layersentry-cpuqc-UUID/ownership.json
+```
+
+Cleanup refuses a changed domain disk/network, malformed ownership or failed libvirt connection. The original candidate image remains unchanged. Evidence includes requested/actual XML, guest facts, source image metadata and at most 2 MiB of serial log. A retained runtime copy contains generated guest host keys and must remain private; never upload that mutated disk as the sealed release image. Native CloudStack registration, after separate trusted qualification, represents this SHA-256 checksum as `{SHA-256}<64hex>`; this harness performs no registration.
