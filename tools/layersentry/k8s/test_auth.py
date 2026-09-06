@@ -195,7 +195,7 @@ class CloudStackCapabilityAuthorizerTest(unittest.TestCase):
         read_only = Actor(
             "session", "", "", ("project-1",), (), ("listProjects", "listVirtualMachines"),
         )
-        authorizer.require(read_only, "kubernetes.cluster.status", "project-1")
+        authorizer.require(read_only, "kubernetes.cluster.read", "project-1")
         with self.assertRaises(AuthorizationError):
             authorizer.require(read_only, "kubernetes.cluster.delete", "project-1")
         with self.assertRaises(AuthorizationError):

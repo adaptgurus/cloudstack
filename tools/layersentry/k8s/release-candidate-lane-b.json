@@ -20,7 +20,23 @@
   "cloudstackCsiDownstream": {
     "manifest": "tools/layersentry/k8s/downstream/cloudstack-csi/manifest.json",
     "patchSha256": "64853e92e82f4a6e5e298b9d114a1522aea21d04f84c02e1667079c54d4f9635",
-    "requiredProjectConfig": "global.project-id"
+    "requiredProjectConfig": "global.project-id",
+    "image": null,
+    "projectLifecycleQualified": false,
+    "resizeIdempotencyQualified": false
+  },
+  "cloudstackCcm": {
+    "version": "1.2.0",
+    "upstreamCommit": "4740dbcacc7fc5892354b03b2f0be7ebf5c92584",
+    "kubernetesLibraryVersion": "0.24.17",
+    "candidateKubernetesVersion": "1.36.x",
+    "image": null,
+    "kubernetes136Qualified": false
+  },
+  "fluxCatalog": {
+    "repository": null,
+    "commit": null,
+    "contentDigestVerified": false
   },
   "architecture": {
     "infrastructureOwner": "CloudStack",

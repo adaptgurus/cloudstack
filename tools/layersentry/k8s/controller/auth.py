@@ -44,7 +44,8 @@ _SESSION_KEY = re.compile(r"^[A-Za-z0-9_-]{20,256}$")
 _READ_COMMANDS = frozenset({"listApis", "listProjects"})
 _ACTION_CAPABILITIES = {
     "kubernetes.readiness.read": (),
-    "kubernetes.cluster.status": ("listProjects", "listVirtualMachines"),
+    "kubernetes.cluster.read": ("listProjects", "listVirtualMachines"),
+    "kubernetes.operation.read": ("listProjects",),
     "kubernetes.cluster.create": (
         "listProjects", "deployVirtualMachine", "createLoadBalancerRule", "createVolume",
     ),
