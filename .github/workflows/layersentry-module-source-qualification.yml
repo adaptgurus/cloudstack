@@ -1,0 +1,62 @@
+name: LayerSentry module source qualification on Rocky
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/k8s-service-completion]
+    paths: [.github/workflows/layersentry-module-source-qualification.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layersentry-module-source-qualification
+  cancel-in-progress: false
+
+jobs:
+  source-on-rocky:
+    if: github.repository == 'adaptgurus/cloudstack' && github.ref == 'refs/heads/codex/k8s-service-completion'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: adaptgurus/cozystack
+          ref: c8ad45c4dca0755ba3091a4ee3f445e5ba9b8361
+          path: runner-source
+          persist-credentials: false
+      - name: Execute module source and disk transport tests in exact Rocky userspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir evidence
+          git rev-parse HEAD > evidence/source.txt
+          git -C runner-source rev-parse HEAD > evidence/runner-source.txt
+          docker run --rm --volume "$PWD:/source:ro" --volume "$PWD/evidence:/evidence" \
+            quay.io/rockylinux/rockylinux@sha256:ed654c694190a670bb5c33f68995b862214fc96ffbdca95e07a8935ba0a3717d \
+            bash -euo pipefail -c '
+              dnf -y install python3 qemu-img nginx shadow-utils > /evidence/package-install.log 2>&1
+              rpm -qa --qf "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n" | sort > /evidence/packages.txt
+              cat /etc/os-release > /evidence/os-release.txt
+              qemu-img --version > /evidence/qemu-version.txt
+              useradd --uid 1001 --create-home qualification
+              cd /source
+              runuser -u qualification -- env PYTHONDONTWRITEBYTECODE=1 LAYERSENTRY_TEST_NGINX=/usr/sbin/nginx \
+                python3 -m unittest discover -s tools/layersentry/k8s -p "test_*.py" -v 2>&1 | tee /evidence/k8s-tests.log
+              runuser -u qualification -- env PYTHONDONTWRITEBYTECODE=1 \
+                LAYERSENTRY_TEST_QEMU_IMG=/usr/bin/qemu-img LAYERSENTRY_TEST_QEMU_IO=/usr/bin/qemu-io \
+                LAYERSENTRY_NATIVE_ACCEPTANCE_DIR=/source/runner-source/hack/layersentry \
+                python3 -m unittest discover -s tools/layersentry/tests -p "test_dr*.py" -v 2>&1 | tee /evidence/dr-tests.log
+            '
+          printf '%s\n' 'CI_VERIFIED source tests in Rocky container; not live guest, libvirt capture, GUI, restore, or production certification.' > evidence/scope.txt
+      - name: Retain source qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: layersentry-module-source-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
