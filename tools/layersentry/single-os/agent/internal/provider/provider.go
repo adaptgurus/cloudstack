@@ -20,6 +20,9 @@ type Provider interface {
  Initialize(context.Context,model.Operation,model.Plan) error
  Join(context.Context,model.Operation,model.Plan) error
  Health(context.Context,model.ServiceState)(model.HealthResult,error)
+ Start(context.Context,model.Operation,model.ServiceState) error
+ Stop(context.Context,model.Operation,model.ServiceState) error
+ Restart(context.Context,model.Operation,model.ServiceState) error
  Upgrade(context.Context,model.Operation,model.Plan) error
  Repair(context.Context,model.Operation,model.Plan) error
  Backup(context.Context,model.Operation,model.ServiceState) error
