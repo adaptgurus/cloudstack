@@ -2,7 +2,7 @@ name: LayerSentry management provider bundle qualification
 on:
   workflow_dispatch:
   push:
-    branches: [codex/k8s-management-provider-install]
+    branches: [codex/k8s-central-flux-install]
     paths:
       - .github/workflows/layersentry-management-provider-qualification.yml
       - tools/layersentry/k8s/management/**
@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   qualify:
-    if: github.ref == 'refs/heads/codex/k8s-management-provider-install'
+    if: github.ref == 'refs/heads/codex/k8s-central-flux-install'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:

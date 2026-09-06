@@ -13,7 +13,7 @@ from controller.model import InvalidRequestError
 
 _STATUS = '''import json,subprocess,sys,re
 p=json.load(sys.stdin)
-if set(p)!={'images'} or not isinstance(p['images'],list) or len(p['images'])!=8:raise SystemExit(2)
+if set(p)!={'images'} or not isinstance(p['images'],list) or len(p['images'])!=11:raise SystemExit(2)
 for image in p['images']:
  if not re.fullmatch(r'[a-z0-9][a-z0-9./_-]+@sha256:[a-f0-9]{64}',image):raise SystemExit(2)
 r=subprocess.run(['/var/lib/rancher/rke2/bin/ctr','--address','/run/k3s/containerd/containerd.sock','--namespace','k8s.io','images','list'],capture_output=True,text=True,timeout=30,check=True)

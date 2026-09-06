@@ -13,7 +13,8 @@ import subprocess
 import tarfile
 
 import yaml
-from bundle import sha256, verify_oci
+from management.bundle import sha256, verify_oci
+from management.flux import render_manifest
 
 ROOT = Path(__file__).resolve().parent
 PROVIDERS = [
@@ -134,10 +135,19 @@ def prepare(output, *, downstream_dir):
     (certdir/'cert-manager.yaml').write_text(yaml.safe_dump_all(docs,sort_keys=False))
     # CCM remains available but unactivated; its existing qualification gate is false.
     shutil.copyfile(downstream['cloudstack-ccm'],bundle/'cloud-controller-manager.yaml')
+    flux_archive=assets[('fluxcd/flux2','flux_2.9.5_linux_amd64.tar.gz')]
+    with tarfile.open(flux_archive) as archive:
+        member=archive.getmember('flux')
+        if not member.isfile() or member.size>150*1024**2:raise ValueError('invalid pinned Flux executable')
+        raw=archive.extractfile(member).read()
+    if hashlib.sha256(raw).hexdigest()!=lock['centralFlux']['binarySha256']:raise ValueError('Flux executable checksum mismatch')
+    (bundle/'bin/flux').write_bytes(raw);(bundle/'bin/flux').chmod(0o755)
+    flux=render_manifest(bundle/'bin/flux',lock)
+    (bundle/'central-flux.json').write_text(json.dumps(flux,indent=2)+'\n')
     files={str(path.relative_to(bundle)):{'sha256':sha256(path),'size':path.stat().st_size} for path in sorted(bundle.rglob('*')) if path.is_file() and path.name!='bundle.json'}
     value={'schemaVersion':'1.0','status':'SOURCE_COMPLETE','productionCertified':False,'rke2Version':'v1.36.4+rke2r1',
            'files':files,'images':images,'providers':providers,'deployments':deployments,'crds':crds,'namespaceNames':sorted(set(namespaces)),
-           'sourceLockSha256':sha256(ROOT/'inputs.lock.json')}
+           'sourceLockSha256':sha256(ROOT/'inputs.lock.json'),'centralFlux':{'version':'v2.9.5','namespace':'layersentry-flux-system','file':'central-flux.json'}}
     (bundle/'bundle.json').write_text(json.dumps(value,indent=2)+'\n')
     print(json.dumps({'status':'SOURCE_COMPLETE','bundleManifestSha256':sha256(bundle/'bundle.json'),'productionCertified':False}))
     return bundle

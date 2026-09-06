@@ -67,3 +67,66 @@ https://github.com/kubernetes-sigs/cluster-api/blob/v1.13.5/cmd/clusterctl/clien
 https://github.com/rancher/rke2/issues/5944 ;
 https://github.com/rancher/rke2/discussions/5628 ;
 https://github.com/rancher/rke2/discussions/7645 .
+
+
+## Central Flux 2.9.5 installation design (2026-09-07)
+
+Existing bootstrap imports immutable CAPI/RKE2/provider OCI archives on all three
+management nodes, installs native providers, and closes the temporary SSH transport
+only after API-observed readiness. Central Flux was absent despite remote package
+resources depending on it. Extend that same digest-bound bundle and completion gate;
+do not create a second importer or reopen transport. Native CloudStack VM ownership
+and the CloudStack 4.22.1.1 bootstrap APIs remain unchanged. XaaS does not replace
+Kubernetes controller installation.
+
+Use the pinned Flux 2.9.5 CLI's embedded manifests in offline export mode, with only
+source-controller 1.9.5, kustomize-controller 1.9.5, and helm-controller 1.6.4. Replace
+image tags with immutable OCI index digests and retain the complete graph including
+upstream in-toto attestations. The exact release assets, hashes and image indices are
+in inputs.lock.json. Do not call an online `flux install`, use floating manifests, or
+claim that source-release provenance attests an OCI image.
+
+Controllers reside in layersentry-flux-system and watch project namespaces. Sources,
+reconciliation objects and CAPRKE2 kubeconfig Secrets are colocated per project.
+Set no-cross-namespace-refs on Helm/Kustomize, and no-remote-bases on Kustomize. Remove
+unselected subjects/API groups, unused serviceaccounts/token creation, aggregate
+tenant edit/view ClusterRoles, and the management cluster-admin reconciler binding.
+Keep only native reconciliation, event, leader-election and read-credential rights.
+Do not set default-service-account=default: remote impersonation would require a
+workload project namespace/ServiceAccount before its first package. The central
+internal plane instead uses protected CAPRKE2 remote credentials and denies direct
+tenant Flux mutation. A separate namespace-restricted remote SA bootstrap remains a
+future hardening dependency, not an invented ready prerequisite. Native NetworkPolicy
+allows controller egress; it does not itself prove air-gap or deny Internet access.
+
+Alternatives considered: native online Flux install loses immutable manifest closure;
+installing full optional controllers adds unused images/permissions; per-workload
+platform Flux contradicts the authoritative central remote package owner; using
+cluster-admin locally is unnecessary for remote reconciliation. Official guidance
+permits removing aggregate roles and unused token creation. No upstream core patches
+or new package readiness claims result.
+
+The installer creates only exact approved native resource identities, saves operation
+nonce/bundle binding before POST, observes before retry, rejects foreign or changed
+resources and records native UIDs. It never overwrites an existing object or repairs
+a deleted owned object silently. Exact controller args/images, CRD served schemas,
+RBAC and current-generation readiness gate completion. CAPI readiness alone cannot
+close transport while Flux installation is incomplete. Runtime credentials stay in
+the existing protected kubeconfig path and never enter bundle/journal/artifacts.
+
+Research: https://github.com/fluxcd/flux2/releases/tag/v2.9.5 ;
+https://fluxcd.io/flux/cmd/flux_install/ ;
+https://fluxcd.io/flux/installation/configuration/multitenancy/ ;
+https://fluxcd.io/flux/security/ ;
+https://fluxcd.io/flux/components/helm/helmreleases/#remote-cluster-api-clusters ;
+https://fluxcd.io/flux/components/kustomize/kustomizations/#remote-clusters-cluster-api .
+Exact release CRDs and generated CLI YAML were inspected, including native kubeConfig
+Secret and cross-namespace policy fields. This is an extension of the approved
+architecture, not a new CloudStack lifecycle decision. Relevant native containerd
+import naming failure and recovery are already covered by the provider qualification.
+
+Qualification is source and hosted native import only until actual Rocky RKE2
+controller deployment, restart, namespace-negative, remote package, storage and
+recovery tests pass. No production/signature/live gate is changed. Failed installation
+retains credentials and exact owned transport for resume; incompatible existing
+resources require explicit operator recovery, never automatic delete/upgrade.
