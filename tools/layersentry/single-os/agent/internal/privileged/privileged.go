@@ -1,57 +1,670 @@
 package privileged
 
 import (
- "bufio"
- "context"
- "encoding/json"
- "errors"
- "fmt"
- "io"
- "net"
- "os"
- "os/exec"
- "os/user"
- "path/filepath"
- "regexp"
- "strconv"
- "strings"
- "time"
+    "bufio"
+    "context"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "io"
+    "net"
+    "os"
+    "os/exec"
+    "os/user"
+    "path/filepath"
+    "regexp"
+    "strconv"
+    "strings"
+    "time"
 
- "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
+    "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
 )
 
-const DefaultSocket="/run/layersentryd/privileged.sock"
-const maxMessage=2<<20
-var unitRE=regexp.MustCompile(`^(nginx\.service|postgresql-(16|17)\.service)$`)
-var zoneRE=regexp.MustCompile(`^ls-[0-9a-f]{12}$`)
-var tokenRE=regexp.MustCompile(`^[A-Za-z0-9._+~:-]+$`)
-var pgPathRE=regexp.MustCompile(`^/usr/pgsql-(16|17)/bin/(initdb|psql|pg_isready|pg_dumpall|postgres)$`)
-var backupPathRE=regexp.MustCompile(`^/var/lib/layersentryd/backups/[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36}-pg_dumpall\.sql$`)
-var allowedRepos=map[string]bool{"appstream":true,"pgdg16":true,"pgdg17":true}
-type request struct{Action string `json:"action"`;Args []string `json:"args"`}
-type response struct{Stdout string `json:"stdout,omitempty"`;Stderr string `json:"stderr,omitempty"`;ExitCode int `json:"exit_code"`;Error string `json:"error,omitempty"`}
-type Client struct{Socket string;Timeout time.Duration}
-func NewClient(socket string)Client{if socket==""{socket=DefaultSocket};return Client{Socket:socket,Timeout:3*time.Minute}}
-func(c Client)Run(ctx context.Context,path string,args ...string)(executor.Result,error){action,err:=actionFor(path,args);if err!=nil{return executor.Result{},err};if c.Timeout<=0{c.Timeout=3*time.Minute};cctx,cancel:=context.WithTimeout(ctx,c.Timeout);defer cancel();conn,err:=(&net.Dialer{Timeout:5*time.Second}).DialContext(cctx,"unix",c.Socket);if err!=nil{return executor.Result{},fmt.Errorf("privileged helper unavailable: %w",err)};defer conn.Close();if deadline,ok:=cctx.Deadline();ok{_ = conn.SetDeadline(deadline)};if err=json.NewEncoder(conn).Encode(request{Action:action,Args:args});err!=nil{return executor.Result{},err};var resp response;if err=json.NewDecoder(io.LimitReader(conn,maxMessage)).Decode(&resp);err!=nil{return executor.Result{},err};res:=executor.Result{Stdout:resp.Stdout,Stderr:resp.Stderr,ExitCode:resp.ExitCode};if resp.Error!=""{return res,errors.New(resp.Error)};return res,nil}
-func actionFor(path string,args []string)(string,error){var action string;switch path{case "/usr/bin/dnf":action="dnf";case "/usr/bin/systemctl":action="systemctl";case "/usr/bin/firewall-cmd":action="firewall";case "/usr/sbin/mkfs.xfs":action="mkfs-xfs";case "/usr/sbin/mkfs.ext4":action="mkfs-ext4";case "/usr/bin/mount":action="mount";case "/usr/bin/findmnt":action="findmnt";case "/usr/sbin/blkid":action="blkid";case "/usr/bin/lsblk":action="lsblk";case "/usr/sbin/getenforce":action="getenforce";case "/usr/sbin/ss":action="ss";case "/usr/bin/rpm":action="rpm";case "/usr/sbin/nginx":action="nginx";case "/usr/sbin/runuser":action="runuser-postgres";default:if pgPathRE.MatchString(path){action="postgres-bin:"+path}else{return "",fmt.Errorf("privileged executable is not allowlisted: %s",path)}};if err:=validateAction(action,args);err!=nil{return "",err};return action,nil}
-func Serve(ctx context.Context,socketPath,groupName string,runner executor.Runner)error{if socketPath==""{socketPath=DefaultSocket};if groupName==""{groupName="layersentry"};if runner==nil{return errors.New("privileged helper runner is nil")};dir:=filepath.Dir(socketPath);fi,err:=os.Lstat(dir);if err!=nil{return err};if !fi.IsDir()||fi.Mode()&os.ModeSymlink!=0{return errors.New("unsafe privileged socket directory")};if fi.Mode().Perm()&01000==0{return errors.New("privileged socket directory must be sticky")};if old,err:=os.Lstat(socketPath);err==nil{if old.Mode()&os.ModeSocket==0{return errors.New("refusing to replace non-socket privileged path")};if err=os.Remove(socketPath);err!=nil{return err}}else if !errors.Is(err,os.ErrNotExist){return err};addr,err:=net.ResolveUnixAddr("unix",socketPath);if err!=nil{return err};ln,err:=net.ListenUnix("unix",addr);if err!=nil{return err};defer ln.Close();defer os.Remove(socketPath);g,err:=user.LookupGroup(groupName);if err!=nil{return err};gid,err:=strconv.Atoi(g.Gid);if err!=nil{return err};if err=os.Chown(socketPath,0,gid);err!=nil{return err};if err=os.Chmod(socketPath,0660);err!=nil{return err};sem:=make(chan struct{},4);for{_ = ln.SetDeadline(time.Now().Add(time.Second));conn,err:=ln.AcceptUnix();if err!=nil{if ne,ok:=err.(net.Error);ok&&ne.Timeout(){select{case<-ctx.Done():return ctx.Err();default:continue}};return err};select{case sem<-struct{}{}:go func(c *net.UnixConn){defer func(){<-sem;_ = c.Close()}();handle(c,runner)}(conn);default:_ = json.NewEncoder(conn).Encode(response{ExitCode:-1,Error:"privileged helper busy"});_ = conn.Close()}}}
-func handle(conn *net.UnixConn,runner executor.Runner){_ = conn.SetDeadline(time.Now().Add(5*time.Minute));dec:=json.NewDecoder(io.LimitReader(bufio.NewReader(conn),maxMessage));dec.DisallowUnknownFields();var req request;if err:=dec.Decode(&req);err!=nil{_ = json.NewEncoder(conn).Encode(response{ExitCode:-1,Error:"invalid privileged request"});return};exe,err:=executableFor(req.Action);if err==nil{err=validateAction(req.Action,req.Args)};if err!=nil{_ = json.NewEncoder(conn).Encode(response{ExitCode:-1,Error:err.Error()});return};res,runErr:=runner.Run(context.Background(),exe,req.Args...);out:=response{Stdout:res.Stdout,Stderr:res.Stderr,ExitCode:res.ExitCode};if runErr!=nil{out.Error=runErr.Error()};_ = json.NewEncoder(conn).Encode(out)}
-func executableFor(action string)(string,error){fixed:=map[string]string{"dnf":"/usr/bin/dnf","systemctl":"/usr/bin/systemctl","firewall":"/usr/bin/firewall-cmd","mkfs-xfs":"/usr/sbin/mkfs.xfs","mkfs-ext4":"/usr/sbin/mkfs.ext4","mount":"/usr/bin/mount","findmnt":"/usr/bin/findmnt","blkid":"/usr/sbin/blkid","lsblk":"/usr/bin/lsblk","getenforce":"/usr/sbin/getenforce","ss":"/usr/sbin/ss","rpm":"/usr/bin/rpm","nginx":"/usr/sbin/nginx","runuser-postgres":"/usr/sbin/runuser"};if p,ok:=fixed[action];ok{return p,nil};if strings.HasPrefix(action,"postgres-bin:"){p:=strings.TrimPrefix(action,"postgres-bin:");if pgPathRE.MatchString(p){return p,nil}};return "",errors.New("unknown privileged action")}
-func validateAction(action string,args []string)error{if err:=validateBasic(args);err!=nil{return err};switch{case action=="dnf":return validateDNF(args);case action=="systemctl":return validateSystemctl(args);case action=="firewall":return validateFirewall(args);case action=="mkfs-xfs":return validateMkfs(args,"-f");case action=="mkfs-ext4":return validateMkfs(args,"-F");case action=="mount":return validateMount(args);case action=="findmnt"||action=="blkid"||action=="lsblk"||action=="ss":return nil;case action=="getenforce":if len(args)!=0{return errors.New("getenforce accepts no arguments")};return nil;case action=="rpm":return validateRPM(args);case action=="nginx":return validateNginx(args);case action=="runuser-postgres":return validateRunuserPostgres(args);case strings.HasPrefix(action,"postgres-bin:"):return validatePostgresArgs(strings.TrimPrefix(action,"postgres-bin:"),args);default:return errors.New("unknown privileged action")}}
-func validateBasic(args []string)error{if len(args)>64{return errors.New("too many privileged arguments")};for _,a:=range args{if len(a)>4096||strings.ContainsAny(a,"\x00\r\n"){return errors.New("unsafe privileged argument")}};return nil}
-func validateDNF(args []string)error{if len(args)==4&&args[0]=="-q"&&args[1]=="config-manager"&&args[2]=="--dump"&&allowedRepos[args[3]]{return nil};if len(args)>=8&&args[0]=="-q"&&args[1]=="repoquery"&&args[2]=="--latest-limit"&&args[3]=="1"&&args[4]=="--qf"{pkg:=args[len(args)-1];if !allowedPackage(pkg){return errors.New("repoquery package rejected")};repoCount:=0;for _,a:=range args[6:len(args)-1]{if !strings.HasPrefix(a,"--repoid="){return errors.New("repoquery argument rejected")};repo:=strings.TrimPrefix(a,"--repoid=");if !repoMatchesPackage(repo,pkg){return errors.New("repoquery repository rejected")};repoCount++};if repoCount<1{return errors.New("repoquery requires an approved repository")};return nil};if len(args)>=6&&args[0]=="-y"&&args[1]=="--setopt=install_weak_deps=False"&&args[2]=="--disablerepo=*"{i:=3;repos:=[]string{};for i<len(args)&&strings.HasPrefix(args[i],"--enablerepo="){repo:=strings.TrimPrefix(args[i],"--enablerepo=");if !allowedRepos[repo]{return errors.New("install repository rejected")};repos=append(repos,repo);i++};if len(repos)==0{return errors.New("install requires an approved repository")};if i>=len(args)||args[i]!="install"{return errors.New("dnf install grammar rejected")};i++;if i>=len(args){return errors.New("no install package")};for _,nevra:=range args[i:]{pkg:=packageForNEVRA(nevra);if pkg==""{return errors.New("install NEVRA rejected")};matched:=false;for _,repo:=range repos{if repoMatchesPackage(repo,pkg){matched=true}};if !matched{return errors.New("package/repository mismatch")}};return nil};if len(args)>=3&&args[0]=="-y"&&args[1]=="remove"{for _,pkg:=range args[2:]{if !allowedPackage(pkg){return errors.New("remove package rejected")}};return nil};if len(args)==2&&args[0]=="clean"&&args[1]=="packages"{return nil};return errors.New("dnf action is not allowlisted")}
-func allowedPackage(pkg string)bool{return pkg=="nginx"||pkg=="postgresql16-server"||pkg=="postgresql17-server"}
-func packageForNEVRA(v string)string{if !tokenRE.MatchString(v){return ""};for _,pkg:=range []string{"postgresql16-server","postgresql17-server","nginx"}{if strings.HasPrefix(v,pkg+"-"){return pkg}};return ""}
-func repoMatchesPackage(repo,pkg string)bool{switch pkg{case "nginx":return repo=="appstream";case "postgresql16-server":return repo=="pgdg16";case "postgresql17-server":return repo=="pgdg17"};return false}
-func validateSystemctl(args []string)error{if len(args)<2{return errors.New("systemctl action/unit required")};allowed:=map[string]bool{"start":true,"stop":true,"restart":true,"enable":true,"disable":true,"is-active":true,"is-enabled":true};if !allowed[args[0]]{return errors.New("systemctl action rejected")};for _,a:=range args[1:]{if a=="--now"||a=="--quiet"{continue};if !unitRE.MatchString(a){return errors.New("systemctl unit outside provider allowlist")}};return nil}
-func validateFirewall(args []string)error{for _,a:=range args{switch{case a=="--permanent"||a=="--reload":case strings.HasPrefix(a,"--new-zone=")||strings.HasPrefix(a,"--delete-zone=")||strings.HasPrefix(a,"--zone="):z:=a[strings.IndexByte(a,'=')+1:];if !zoneRE.MatchString(z){return errors.New("firewall zone rejected")};case a=="--set-target=DROP":case strings.HasPrefix(a,"--add-source="):if _,_,err:=net.ParseCIDR(strings.TrimPrefix(a,"--add-source="));err!=nil{return errors.New("firewall CIDR rejected")};case strings.HasPrefix(a,"--add-port="):raw:=strings.TrimPrefix(a,"--add-port=");if !strings.HasSuffix(raw,"/tcp"){return errors.New("firewall protocol rejected")};p,err:=strconv.Atoi(strings.TrimSuffix(raw,"/tcp"));if err!=nil||p<1||p>65535{return errors.New("firewall port rejected")};default:return errors.New("firewall argument rejected")}};return nil}
-func validateMkfs(args []string,flag string)error{if len(args)!=2||args[0]!=flag||!strings.HasPrefix(args[1],"/dev/disk/by-"){return errors.New("mkfs request rejected")};protected,err:=rootProtected(args[1]);if err!=nil{return fmt.Errorf("cannot prove formatting safety: %w",err)};if protected{return errors.New("refusing root/root-parent device")};return nil}
-func rootProtected(candidate string)(bool,error){real,err:=filepath.EvalSymlinks(candidate);if err!=nil{return false,err};rootRaw,err:=exec.Command("/usr/bin/findmnt","-nro","SOURCE","/").Output();if err!=nil{return false,err};root:=strings.TrimSpace(string(rootRaw));if root==""{return false,errors.New("root source is empty")};chainRaw,err:=exec.Command("/usr/bin/lsblk","-s","-nrpo","PATH",root).Output();if err!=nil{return false,err};for _,line:=range strings.Fields(string(chainRaw)){p,_:=filepath.EvalSymlinks(line);if p==""{p=line};if p==real{return true,nil}};return false,nil}
-func validateMount(args []string)error{if len(args)!=1||!safeMountPoint(args[0]){return errors.New("mount target rejected")};return nil}
-func safeMountPoint(p string)bool{if !filepath.IsAbs(p)||filepath.Clean(p)!=p{return false};for _,root:=range []string{"/var/lib/pgsql","/var/lib/mysql","/var/lib/redis","/var/lib/valkey","/srv","/data","/opt/layersentry-data","/var/log/layersentry-services"}{if p==root||strings.HasPrefix(p,root+"/"){return true}};return false}
-func validateRPM(args []string)error{if len(args)==2&&args[0]=="-q"&&allowedPackage(args[1]){return nil};return errors.New("rpm action rejected")}
-func validateNginx(args []string)error{if len(args)==1&&(args[0]=="-t"||args[0]=="-v"){return nil};return errors.New("nginx action rejected")}
-func validateRunuserPostgres(args []string)error{if len(args)<4||args[0]!="-u"||args[1]!="postgres"||args[2]!="--"{return errors.New("runuser request rejected")};if !pgPathRE.MatchString(args[3]){return errors.New("runuser PostgreSQL executable rejected")};return validatePostgresArgs(args[3],args[4:])}
-func validatePostgresArgs(path string,args []string)error{if !pgPathRE.MatchString(path){return errors.New("PostgreSQL executable rejected")};switch filepath.Base(path){case "postgres":if len(args)==1&&args[0]=="--version"{return nil};case "pg_isready":if len(args)==3&&args[0]=="-q"&&args[1]=="-p"&&validPort(args[2]){return nil};if len(args)==5&&args[0]=="-q"&&args[1]=="-p"&&validPort(args[2])&&args[3]=="-h"&&net.ParseIP(args[4])!=nil{return nil};case "psql":if len(args)==7&&args[0]=="-XAtq"&&args[1]=="-p"&&validPort(args[2])&&args[3]=="-d"&&args[4]=="postgres"&&args[5]=="-c"&&args[6]=="SELECT current_setting('server_version')"{return nil};if len(args)==8&&args[0]=="-X"&&args[1]=="-v"&&args[2]=="ON_ERROR_STOP=1"&&args[3]=="-p"&&validPort(args[4])&&args[5]=="-d"&&args[6]=="postgres"&&strings.HasPrefix(args[7],"--file="){p:=strings.TrimPrefix(args[7],"--file=");if backupPathRE.MatchString(p)&&filepath.Clean(p)==p{return nil}};case "pg_dumpall":if len(args)==3&&args[0]=="--clean"&&args[1]=="--if-exists"&&strings.HasPrefix(args[2],"--file="){p:=strings.TrimPrefix(args[2],"--file=");if backupPathRE.MatchString(p)&&filepath.Clean(p)==p{return nil}};case "initdb":return validateInitDB(args)};return errors.New("PostgreSQL helper arguments rejected")}
-func validateInitDB(args []string)error{if len(args)<7{return errors.New("initdb arguments incomplete")};dataOK,pwOK:=false,false;for i:=0;i<len(args);i++{a:=args[i];switch{case a=="-D":if i+1>=len(args)||!safeMountPoint(args[i+1]){return errors.New("unsafe PostgreSQL data directory")};dataOK=true;i++;case a=="--username=postgres",a=="--auth-local=peer",a=="--auth-host=scram-sha-256",a=="--encoding=UTF8":case strings.HasPrefix(a,"--pwfile="):p:=strings.TrimPrefix(a,"--pwfile=");if filepath.Dir(p)!="/run/layersentryd"||filepath.Clean(p)!=p||!strings.HasPrefix(filepath.Base(p),"pgpw-"){return errors.New("unsafe PostgreSQL password file")};pwOK=true;case strings.HasPrefix(a,"--waldir="):if !safeMountPoint(strings.TrimPrefix(a,"--waldir=")){return errors.New("unsafe PostgreSQL WAL directory")};default:return errors.New("initdb argument rejected")}};if !dataOK||!pwOK{return errors.New("initdb requires safe data directory and password file")};return nil}
-func validPort(v string)bool{p,err:=strconv.Atoi(v);return err==nil&&p>=1&&p<=65535}
+const DefaultSocket = "/run/layersentryd/privileged.sock"
+const maxMessage = 2 << 20
+
+var unitRE = regexp.MustCompile(`^(nginx\.service|postgresql-(16|17)\.service)$`)
+var zoneRE = regexp.MustCompile(`^ls-[0-9a-f]{12}$`)
+var tokenRE = regexp.MustCompile(`^[A-Za-z0-9._+~:-]+$`)
+var pgPathRE = regexp.MustCompile(`^/usr/pgsql-(16|17)/bin/(initdb|psql|pg_isready|pg_dumpall|postgres)$`)
+var pgBackupStagePathRE = regexp.MustCompile(`^/run/layersentryd/backup-staging/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}-(pg_dumpall|restore)\.sql$`)
+var allowedRepos = map[string]bool{"appstream": true, "pgdg16": true, "pgdg17": true}
+
+type request struct {
+    Action string   `json:"action"`
+    Args   []string `json:"args"`
+}
+
+type response struct {
+    Stdout   string `json:"stdout,omitempty"`
+    Stderr   string `json:"stderr,omitempty"`
+    ExitCode int    `json:"exit_code"`
+    Error    string `json:"error,omitempty"`
+}
+
+type Client struct {
+    Socket  string
+    Timeout time.Duration
+}
+
+func NewClient(socket string) Client {
+    if socket == "" {
+        socket = DefaultSocket
+    }
+    return Client{Socket: socket, Timeout: 3 * time.Minute}
+}
+
+func (c Client) Run(ctx context.Context, path string, args ...string) (executor.Result, error) {
+    action, err := actionFor(path, args)
+    if err != nil {
+        return executor.Result{}, err
+    }
+    if c.Timeout <= 0 {
+        c.Timeout = 3 * time.Minute
+    }
+    cctx, cancel := context.WithTimeout(ctx, c.Timeout)
+    defer cancel()
+    conn, err := (&net.Dialer{Timeout: 5 * time.Second}).DialContext(cctx, "unix", c.Socket)
+    if err != nil {
+        return executor.Result{}, fmt.Errorf("privileged helper unavailable: %w", err)
+    }
+    defer conn.Close()
+    if deadline, ok := cctx.Deadline(); ok {
+        _ = conn.SetDeadline(deadline)
+    }
+    if err = json.NewEncoder(conn).Encode(request{Action: action, Args: args}); err != nil {
+        return executor.Result{}, err
+    }
+    var resp response
+    if err = json.NewDecoder(io.LimitReader(conn, maxMessage)).Decode(&resp); err != nil {
+        return executor.Result{}, err
+    }
+    res := executor.Result{Stdout: resp.Stdout, Stderr: resp.Stderr, ExitCode: resp.ExitCode}
+    if resp.Error != "" {
+        return res, errors.New(resp.Error)
+    }
+    return res, nil
+}
+
+func actionFor(path string, args []string) (string, error) {
+    var action string
+    switch path {
+    case "/usr/bin/dnf":
+        action = "dnf"
+    case "/usr/bin/systemctl":
+        action = "systemctl"
+    case "/usr/bin/firewall-cmd":
+        action = "firewall"
+    case "/usr/sbin/mkfs.xfs":
+        action = "mkfs-xfs"
+    case "/usr/sbin/mkfs.ext4":
+        action = "mkfs-ext4"
+    case "/usr/bin/mount":
+        action = "mount"
+    case "/usr/bin/findmnt":
+        action = "findmnt"
+    case "/usr/sbin/blkid":
+        action = "blkid"
+    case "/usr/bin/lsblk":
+        action = "lsblk"
+    case "/usr/sbin/getenforce":
+        action = "getenforce"
+    case "/usr/sbin/ss":
+        action = "ss"
+    case "/usr/bin/rpm":
+        action = "rpm"
+    case "/usr/sbin/nginx":
+        action = "nginx"
+    case "/usr/sbin/runuser":
+        action = "runuser-postgres"
+    default:
+        if pgPathRE.MatchString(path) {
+            action = "postgres-bin:" + path
+        } else {
+            return "", fmt.Errorf("privileged executable is not allowlisted: %s", path)
+        }
+    }
+    if err := validateAction(action, args); err != nil {
+        return "", err
+    }
+    return action, nil
+}
+
+func Serve(ctx context.Context, socketPath, groupName string, runner executor.Runner) error {
+    if socketPath == "" {
+        socketPath = DefaultSocket
+    }
+    if groupName == "" {
+        groupName = "layersentry"
+    }
+    if runner == nil {
+        return errors.New("privileged helper runner is nil")
+    }
+    dir := filepath.Dir(socketPath)
+    fi, err := os.Lstat(dir)
+    if err != nil {
+        return err
+    }
+    if !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
+        return errors.New("unsafe privileged socket directory")
+    }
+    if fi.Mode().Perm()&01000 == 0 {
+        return errors.New("privileged socket directory must be sticky")
+    }
+    if old, err := os.Lstat(socketPath); err == nil {
+        if old.Mode()&os.ModeSocket == 0 {
+            return errors.New("refusing to replace non-socket privileged path")
+        }
+        if err = os.Remove(socketPath); err != nil {
+            return err
+        }
+    } else if !errors.Is(err, os.ErrNotExist) {
+        return err
+    }
+    addr, err := net.ResolveUnixAddr("unix", socketPath)
+    if err != nil {
+        return err
+    }
+    ln, err := net.ListenUnix("unix", addr)
+    if err != nil {
+        return err
+    }
+    defer ln.Close()
+    defer os.Remove(socketPath)
+    g, err := user.LookupGroup(groupName)
+    if err != nil {
+        return err
+    }
+    gid, err := strconv.Atoi(g.Gid)
+    if err != nil {
+        return err
+    }
+    if err = os.Chown(socketPath, 0, gid); err != nil {
+        return err
+    }
+    if err = os.Chmod(socketPath, 0660); err != nil {
+        return err
+    }
+    sem := make(chan struct{}, 4)
+    for {
+        _ = ln.SetDeadline(time.Now().Add(time.Second))
+        conn, err := ln.AcceptUnix()
+        if err != nil {
+            if ne, ok := err.(net.Error); ok && ne.Timeout() {
+                select {
+                case <-ctx.Done():
+                    return ctx.Err()
+                default:
+                    continue
+                }
+            }
+            return err
+        }
+        select {
+        case sem <- struct{}{}:
+            go func(c *net.UnixConn) {
+                defer func() { <-sem; _ = c.Close() }()
+                handle(c, runner)
+            }(conn)
+        default:
+            _ = json.NewEncoder(conn).Encode(response{ExitCode: -1, Error: "privileged helper busy"})
+            _ = conn.Close()
+        }
+    }
+}
+
+func handle(conn *net.UnixConn, runner executor.Runner) {
+    _ = conn.SetDeadline(time.Now().Add(5 * time.Minute))
+    dec := json.NewDecoder(io.LimitReader(bufio.NewReader(conn), maxMessage))
+    dec.DisallowUnknownFields()
+    var req request
+    if err := dec.Decode(&req); err != nil {
+        _ = json.NewEncoder(conn).Encode(response{ExitCode: -1, Error: "invalid privileged request"})
+        return
+    }
+    exe, err := executableFor(req.Action)
+    if err == nil {
+        err = validateAction(req.Action, req.Args)
+    }
+    if err != nil {
+        _ = json.NewEncoder(conn).Encode(response{ExitCode: -1, Error: err.Error()})
+        return
+    }
+    res, runErr := runner.Run(context.Background(), exe, req.Args...)
+    out := response{Stdout: res.Stdout, Stderr: res.Stderr, ExitCode: res.ExitCode}
+    if runErr != nil {
+        out.Error = runErr.Error()
+    }
+    _ = json.NewEncoder(conn).Encode(out)
+}
+
+func executableFor(action string) (string, error) {
+    fixed := map[string]string{
+        "dnf": "/usr/bin/dnf", "systemctl": "/usr/bin/systemctl", "firewall": "/usr/bin/firewall-cmd",
+        "mkfs-xfs": "/usr/sbin/mkfs.xfs", "mkfs-ext4": "/usr/sbin/mkfs.ext4", "mount": "/usr/bin/mount",
+        "findmnt": "/usr/bin/findmnt", "blkid": "/usr/sbin/blkid", "lsblk": "/usr/bin/lsblk",
+        "getenforce": "/usr/sbin/getenforce", "ss": "/usr/sbin/ss", "rpm": "/usr/bin/rpm",
+        "nginx": "/usr/sbin/nginx", "runuser-postgres": "/usr/sbin/runuser",
+    }
+    if p, ok := fixed[action]; ok {
+        return p, nil
+    }
+    if strings.HasPrefix(action, "postgres-bin:") {
+        p := strings.TrimPrefix(action, "postgres-bin:")
+        if pgPathRE.MatchString(p) {
+            return p, nil
+        }
+    }
+    return "", errors.New("unknown privileged action")
+}
+
+func validateAction(action string, args []string) error {
+    if err := validateBasic(args); err != nil {
+        return err
+    }
+    switch {
+    case action == "dnf":
+        return validateDNF(args)
+    case action == "systemctl":
+        return validateSystemctl(args)
+    case action == "firewall":
+        return validateFirewall(args)
+    case action == "mkfs-xfs":
+        return validateMkfs(args, "-f")
+    case action == "mkfs-ext4":
+        return validateMkfs(args, "-F")
+    case action == "mount":
+        return validateMount(args)
+    case action == "findmnt" || action == "blkid" || action == "lsblk" || action == "ss":
+        return nil
+    case action == "getenforce":
+        if len(args) != 0 {
+            return errors.New("getenforce accepts no arguments")
+        }
+        return nil
+    case action == "rpm":
+        return validateRPM(args)
+    case action == "nginx":
+        return validateNginx(args)
+    case action == "runuser-postgres":
+        return validateRunuserPostgres(args)
+    case strings.HasPrefix(action, "postgres-bin:"):
+        return validatePostgresArgs(strings.TrimPrefix(action, "postgres-bin:"), args)
+    default:
+        return errors.New("unknown privileged action")
+    }
+}
+
+func validateBasic(args []string) error {
+    if len(args) > 64 {
+        return errors.New("too many privileged arguments")
+    }
+    for _, a := range args {
+        if len(a) > 4096 || strings.ContainsAny(a, "\x00\r\n") {
+            return errors.New("unsafe privileged argument")
+        }
+    }
+    return nil
+}
+
+func validateDNF(args []string) error {
+    if len(args) == 4 && args[0] == "-q" && args[1] == "config-manager" && args[2] == "--dump" && allowedRepos[args[3]] {
+        return nil
+    }
+    if len(args) >= 8 && args[0] == "-q" && args[1] == "repoquery" && args[2] == "--latest-limit" && args[3] == "1" && args[4] == "--qf" {
+        pkg := args[len(args)-1]
+        if !allowedPackage(pkg) {
+            return errors.New("repoquery package rejected")
+        }
+        repoCount := 0
+        for _, a := range args[6 : len(args)-1] {
+            if !strings.HasPrefix(a, "--repoid=") {
+                return errors.New("repoquery argument rejected")
+            }
+            repo := strings.TrimPrefix(a, "--repoid=")
+            if !repoMatchesPackage(repo, pkg) {
+                return errors.New("repoquery repository rejected")
+            }
+            repoCount++
+        }
+        if repoCount < 1 {
+            return errors.New("repoquery requires an approved repository")
+        }
+        return nil
+    }
+    if len(args) >= 6 && args[0] == "-y" && args[1] == "--setopt=install_weak_deps=False" && args[2] == "--disablerepo=*" {
+        i := 3
+        repos := []string{}
+        for i < len(args) && strings.HasPrefix(args[i], "--enablerepo=") {
+            repo := strings.TrimPrefix(args[i], "--enablerepo=")
+            if !allowedRepos[repo] {
+                return errors.New("install repository rejected")
+            }
+            repos = append(repos, repo)
+            i++
+        }
+        if len(repos) == 0 {
+            return errors.New("install requires an approved repository")
+        }
+        if i >= len(args) || args[i] != "install" {
+            return errors.New("dnf install grammar rejected")
+        }
+        i++
+        if i >= len(args) {
+            return errors.New("no install package")
+        }
+        for _, nevra := range args[i:] {
+            pkg := packageForNEVRA(nevra)
+            if pkg == "" {
+                return errors.New("install NEVRA rejected")
+            }
+            matched := false
+            for _, repo := range repos {
+                if repoMatchesPackage(repo, pkg) {
+                    matched = true
+                }
+            }
+            if !matched {
+                return errors.New("package/repository mismatch")
+            }
+        }
+        return nil
+    }
+    if len(args) >= 3 && args[0] == "-y" && args[1] == "remove" {
+        for _, pkg := range args[2:] {
+            if !allowedPackage(pkg) {
+                return errors.New("remove package rejected")
+            }
+        }
+        return nil
+    }
+    if len(args) == 2 && args[0] == "clean" && args[1] == "packages" {
+        return nil
+    }
+    return errors.New("dnf action is not allowlisted")
+}
+
+func allowedPackage(pkg string) bool {
+    return pkg == "nginx" || pkg == "postgresql16-server" || pkg == "postgresql17-server"
+}
+
+func packageForNEVRA(v string) string {
+    if !tokenRE.MatchString(v) {
+        return ""
+    }
+    for _, pkg := range []string{"postgresql16-server", "postgresql17-server", "nginx"} {
+        if strings.HasPrefix(v, pkg+"-") {
+            return pkg
+        }
+    }
+    return ""
+}
+
+func repoMatchesPackage(repo, pkg string) bool {
+    switch pkg {
+    case "nginx":
+        return repo == "appstream"
+    case "postgresql16-server":
+        return repo == "pgdg16"
+    case "postgresql17-server":
+        return repo == "pgdg17"
+    }
+    return false
+}
+
+func validateSystemctl(args []string) error {
+    if len(args) < 2 {
+        return errors.New("systemctl action/unit required")
+    }
+    allowed := map[string]bool{"start": true, "stop": true, "restart": true, "enable": true, "disable": true, "is-active": true, "is-enabled": true}
+    if !allowed[args[0]] {
+        return errors.New("systemctl action rejected")
+    }
+    for _, a := range args[1:] {
+        if a == "--now" || a == "--quiet" {
+            continue
+        }
+        if !unitRE.MatchString(a) {
+            return errors.New("systemctl unit outside provider allowlist")
+        }
+    }
+    return nil
+}
+
+func validateFirewall(args []string) error {
+    for _, a := range args {
+        switch {
+        case a == "--permanent" || a == "--reload":
+        case strings.HasPrefix(a, "--new-zone=") || strings.HasPrefix(a, "--delete-zone=") || strings.HasPrefix(a, "--zone="):
+            z := a[strings.IndexByte(a, '=')+1:]
+            if !zoneRE.MatchString(z) {
+                return errors.New("firewall zone rejected")
+            }
+        case a == "--set-target=DROP":
+        case strings.HasPrefix(a, "--add-source="):
+            if _, _, err := net.ParseCIDR(strings.TrimPrefix(a, "--add-source=")); err != nil {
+                return errors.New("firewall CIDR rejected")
+            }
+        case strings.HasPrefix(a, "--add-port="):
+            raw := strings.TrimPrefix(a, "--add-port=")
+            if !strings.HasSuffix(raw, "/tcp") {
+                return errors.New("firewall protocol rejected")
+            }
+            p, err := strconv.Atoi(strings.TrimSuffix(raw, "/tcp"))
+            if err != nil || p < 1 || p > 65535 {
+                return errors.New("firewall port rejected")
+            }
+        default:
+            return errors.New("firewall argument rejected")
+        }
+    }
+    return nil
+}
+
+func validateMkfs(args []string, flag string) error {
+    if len(args) != 2 || args[0] != flag || !strings.HasPrefix(args[1], "/dev/disk/by-") {
+        return errors.New("mkfs request rejected")
+    }
+    protected, err := rootProtected(args[1])
+    if err != nil {
+        return fmt.Errorf("cannot prove formatting safety: %w", err)
+    }
+    if protected {
+        return errors.New("refusing root/root-parent device")
+    }
+    return nil
+}
+
+func rootProtected(candidate string) (bool, error) {
+    real, err := filepath.EvalSymlinks(candidate)
+    if err != nil {
+        return false, err
+    }
+    rootRaw, err := exec.Command("/usr/bin/findmnt", "-nro", "SOURCE", "/").Output()
+    if err != nil {
+        return false, err
+    }
+    root := strings.TrimSpace(string(rootRaw))
+    if root == "" {
+        return false, errors.New("root source is empty")
+    }
+    chainRaw, err := exec.Command("/usr/bin/lsblk", "-s", "-nrpo", "PATH", root).Output()
+    if err != nil {
+        return false, err
+    }
+    for _, line := range strings.Fields(string(chainRaw)) {
+        p, _ := filepath.EvalSymlinks(line)
+        if p == "" {
+            p = line
+        }
+        if p == real {
+            return true, nil
+        }
+    }
+    return false, nil
+}
+
+func validateMount(args []string) error {
+    if len(args) != 1 || !safeMountPoint(args[0]) {
+        return errors.New("mount target rejected")
+    }
+    return nil
+}
+
+func safeMountPoint(p string) bool {
+    if !filepath.IsAbs(p) || filepath.Clean(p) != p {
+        return false
+    }
+    for _, root := range []string{"/var/lib/pgsql", "/var/lib/mysql", "/var/lib/redis", "/var/lib/valkey", "/srv", "/data", "/opt/layersentry-data", "/var/log/layersentry-services"} {
+        if p == root || strings.HasPrefix(p, root+"/") {
+            return true
+        }
+    }
+    return false
+}
+
+func validateRPM(args []string) error {
+    if len(args) == 2 && args[0] == "-q" && allowedPackage(args[1]) {
+        return nil
+    }
+    return errors.New("rpm action rejected")
+}
+
+func validateNginx(args []string) error {
+    if len(args) == 1 && (args[0] == "-t" || args[0] == "-v") {
+        return nil
+    }
+    return errors.New("nginx action rejected")
+}
+
+func validateRunuserPostgres(args []string) error {
+    if len(args) < 4 || args[0] != "-u" || args[1] != "postgres" || args[2] != "--" {
+        return errors.New("runuser request rejected")
+    }
+    if !pgPathRE.MatchString(args[3]) {
+        return errors.New("runuser PostgreSQL executable rejected")
+    }
+    return validatePostgresArgs(args[3], args[4:])
+}
+
+func validatePostgresArgs(path string, args []string) error {
+    if !pgPathRE.MatchString(path) {
+        return errors.New("PostgreSQL executable rejected")
+    }
+    switch filepath.Base(path) {
+    case "postgres":
+        if len(args) == 1 && args[0] == "--version" {
+            return nil
+        }
+    case "pg_isready":
+        if len(args) == 3 && args[0] == "-q" && args[1] == "-p" && validPort(args[2]) {
+            return nil
+        }
+        if len(args) == 5 && args[0] == "-q" && args[1] == "-p" && validPort(args[2]) && args[3] == "-h" && net.ParseIP(args[4]) != nil {
+            return nil
+        }
+    case "psql":
+        if len(args) == 7 && args[0] == "-XAtq" && args[1] == "-p" && validPort(args[2]) && args[3] == "-d" && args[4] == "postgres" && args[5] == "-c" && args[6] == "SELECT current_setting('server_version')" {
+            return nil
+        }
+        if len(args) == 8 && args[0] == "-X" && args[1] == "-v" && args[2] == "ON_ERROR_STOP=1" && args[3] == "-p" && validPort(args[4]) && args[5] == "-d" && args[6] == "postgres" && strings.HasPrefix(args[7], "--file=") {
+            p := strings.TrimPrefix(args[7], "--file=")
+            if err := validateExistingStagingFile(p, "restore"); err == nil {
+                return nil
+            }
+        }
+    case "pg_dumpall":
+        if len(args) == 3 && args[0] == "--clean" && args[1] == "--if-exists" && strings.HasPrefix(args[2], "--file=") {
+            p := strings.TrimPrefix(args[2], "--file=")
+            if err := validateNewStagingFile(p, "pg_dumpall"); err == nil {
+                return nil
+            }
+        }
+    case "initdb":
+        return validateInitDB(args)
+    }
+    return errors.New("PostgreSQL helper arguments rejected")
+}
+
+func validateNewStagingFile(path, suffix string) error {
+    if filepath.Clean(path) != path || !pgBackupStagePathRE.MatchString(path) || !strings.HasSuffix(path, "-"+suffix+".sql") {
+        return errors.New("PostgreSQL backup staging path rejected")
+    }
+    if err := validateStagingParent(filepath.Dir(path)); err != nil {
+        return err
+    }
+    if _, err := os.Lstat(path); err == nil {
+        return errors.New("PostgreSQL backup staging destination already exists")
+    } else if !errors.Is(err, os.ErrNotExist) {
+        return err
+    }
+    return nil
+}
+
+func validateExistingStagingFile(path, suffix string) error {
+    if filepath.Clean(path) != path || !pgBackupStagePathRE.MatchString(path) || !strings.HasSuffix(path, "-"+suffix+".sql") {
+        return errors.New("PostgreSQL restore staging path rejected")
+    }
+    if err := validateStagingParent(filepath.Dir(path)); err != nil {
+        return err
+    }
+    fi, err := os.Lstat(path)
+    if err != nil {
+        return err
+    }
+    if fi.Mode()&os.ModeSymlink != 0 || !fi.Mode().IsRegular() {
+        return errors.New("PostgreSQL restore staging file is unsafe")
+    }
+    return nil
+}
+
+func validateStagingParent(path string) error {
+    fi, err := os.Lstat(path)
+    if err != nil {
+        return err
+    }
+    if fi.Mode()&os.ModeSymlink != 0 || !fi.IsDir() || fi.Mode().Perm()&0002 != 0 {
+        return errors.New("PostgreSQL staging directory is unsafe")
+    }
+    return nil
+}
+
+func validateInitDB(args []string) error {
+    if len(args) < 7 {
+        return errors.New("initdb arguments incomplete")
+    }
+    dataOK, pwOK := false, false
+    for i := 0; i < len(args); i++ {
+        a := args[i]
+        switch {
+        case a == "-D":
+            if i+1 >= len(args) || !safeMountPoint(args[i+1]) {
+                return errors.New("unsafe PostgreSQL data directory")
+            }
+            dataOK = true
+            i++
+        case a == "--username=postgres", a == "--auth-local=peer", a == "--auth-host=scram-sha-256", a == "--encoding=UTF8":
+        case strings.HasPrefix(a, "--pwfile="):
+            p := strings.TrimPrefix(a, "--pwfile=")
+            if filepath.Dir(p) != "/run/layersentryd" || filepath.Clean(p) != p || !strings.HasPrefix(filepath.Base(p), "pgpw-") {
+                return errors.New("unsafe PostgreSQL password file")
+            }
+            pwOK = true
+        case strings.HasPrefix(a, "--waldir="):
+            if !safeMountPoint(strings.TrimPrefix(a, "--waldir=")) {
+                return errors.New("unsafe PostgreSQL WAL directory")
+            }
+        default:
+            return errors.New("initdb argument rejected")
+        }
+    }
+    if !dataOK || !pwOK {
+        return errors.New("initdb requires safe data directory and password file")
+    }
+    return nil
+}
+
+func validPort(v string) bool {
+    p, err := strconv.Atoi(v)
+    return err == nil && p >= 1 && p <= 65535
+}
