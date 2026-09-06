@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "1.0",
+  "scope": "hosted source, native provider generation and exact RKE2 containerd import/reimport only",
+  "status": "CI_VERIFIED",
+  "liveVerified": false,
+  "productionCertified": false,
+  "signed": false,
+  "sourceCommit": "87cc2c84ef7126dc47cb44630c388c3bc02c838c",
+  "workflowRunId": "34052983062",
+  "bundleManifestSha256": "9b9c3e0f2aeb81b42866e06e58bb9315ea5c269ddbc4a8d38ab52167fcb81fe5",
+  "bundleArchiveSha256": "76b82041182f53a14113e0a799be78ae6cdff969b256cfd0044d368a538cfb84",
+  "inputLockSha256": "8acbde8adf3b9abfcdc8a6064f9790a365a43a683af6a98bd4ab64f8e38535c6",
+  "generatedProviders": [
+    {
+      "provider": "cluster-api",
+      "sha256": "03b5c5c390b1b6fb6364dd1130fb8744cf7717038893f379783dbef390475665",
+      "size": 1158073
+    },
+    {
+      "provider": "bootstrap-rke2",
+      "sha256": "bd05056ee5e9913be4a65c9b775058cac80527fe37cdad595d9f62af6356169b",
+      "size": 157988
+    },
+    {
+      "provider": "control-plane-rke2",
+      "sha256": "3d22d31f3c52fafd4952a887a62043c2c7b1999bba7aa3d8ea5e95ba46c65eda",
+      "size": 394728
+    },
+    {
+      "provider": "infrastructure-cloudstack",
+      "sha256": "db648465c8649ca25a89695f297dc396bb5e61e144d09785accc9cd0ad719ea9",
+      "size": 142091
+    }
+  ],
+  "nativeImport": {
+    "runtimeImage": "docker.io/rancher/rke2-runtime@sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9",
+    "containerdVersion": "containerd github.com/k3s-io/containerd v2.3.4-k3s1.36 b92ab05c7f4bfac0033a4ce560c5698bfb2b26c9",
+    "binarySha256": {
+      "containerd": "fcb35183e9181fc2735bc131245d223fdf23f75b17f735290868e1c1a1e8db1d",
+      "containerd-shim-runc-v2": "f2061d1918ec0de7ecfcc3d1312d23c5a16443869aa5868035a550ee18087177",
+      "runc": "d450efc859dff197b3e77ea2635322b285c31458fe90e24d1f010ad11727305f",
+      "ctr": "aee886f9dd324d06db314a9c9545ecde0797309f3887ca671bf52f02d5f2bc08"
+    },
+    "transferApiProbe": {
+      "missingExactNames": [
+        "layersentry.local/capc@sha256:68cd841cda9d4a8160e9564f11a687b1e36515d8f78383428fca1428734558b5",
+        "layersentry.local/cloudstack-ccm@sha256:edc1f8164c7b958c215d70e2b19aa8e4a248d1c531d83134dc542bb29b0f55be"
+      ],
+      "observedImages": {
+        "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:ad19774d04fae3d06497fc264a3da04aaf162fbdf9b939728eaa115623b1eb99": "sha256:ad19774d04fae3d06497fc264a3da04aaf162fbdf9b939728eaa115623b1eb99",
+        "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa": "sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa",
+        "ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5": "sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5",
+        "ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:af7c9c09795639072de9a272a227d2ca4be0bb7acbab483aa9e4ef36d12a0541": "sha256:af7c9c09795639072de9a272a227d2ca4be0bb7acbab483aa9e4ef36d12a0541",
+        "layersentry.local/capc:qualification": "sha256:68cd841cda9d4a8160e9564f11a687b1e36515d8f78383428fca1428734558b5",
+        "layersentry.local/capc@sha256:7af138f10efd576376eec9c4e397d5b787916d0b90fa8c73d25c340dd4874cbd": "sha256:7af138f10efd576376eec9c4e397d5b787916d0b90fa8c73d25c340dd4874cbd",
+        "layersentry.local/cloudstack-ccm:qualification": "sha256:edc1f8164c7b958c215d70e2b19aa8e4a248d1c531d83134dc542bb29b0f55be",
+        "layersentry.local/cloudstack-ccm@sha256:e5501cb157e4cd2be8cb8a2693c54eaf72fd9d6feec8945107087a2431986fd5": "sha256:e5501cb157e4cd2be8cb8a2693c54eaf72fd9d6feec8945107087a2431986fd5",
+        "quay.io/jetstack/cert-manager-cainjector@sha256:0dc9484fa0edf2cea4daac74e4a723a2bec4a346cae5eeb56f68ab6816cb5fc8": "sha256:0dc9484fa0edf2cea4daac74e4a723a2bec4a346cae5eeb56f68ab6816cb5fc8",
+        "quay.io/jetstack/cert-manager-cainjector@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98": "sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98",
+        "quay.io/jetstack/cert-manager-controller@sha256:18d095e45d4fa76ec6cb6520f8b202cbf4cd99bdb4e02b61633f37bef3e5b42c": "sha256:18d095e45d4fa76ec6cb6520f8b202cbf4cd99bdb4e02b61633f37bef3e5b42c",
+        "quay.io/jetstack/cert-manager-controller@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a": "sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a",
+        "quay.io/jetstack/cert-manager-webhook@sha256:31cb83550b17026c947116331a99a1a50c2bcede8bab20382de43f6607800552": "sha256:31cb83550b17026c947116331a99a1a50c2bcede8bab20382de43f6607800552",
+        "quay.io/jetstack/cert-manager-webhook@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42": "sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42",
+        "registry.k8s.io/cluster-api/cluster-api-controller@sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e": "sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e",
+        "registry.k8s.io/cluster-api/cluster-api-controller@sha256:b8a4a843edf5491e7799379ee88ba7d088878aee2f168864d0402706b5c9b61b": "sha256:b8a4a843edf5491e7799379ee88ba7d088878aee2f168864d0402706b5c9b61b"
+      }
+    },
+    "imports": [
+      {
+        "attempt": 1,
+        "mode": "native-local",
+        "exactImages": {
+          "registry.k8s.io/cluster-api/cluster-api-controller@sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e": "sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e",
+          "ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5": "sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5",
+          "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa": "sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa",
+          "quay.io/jetstack/cert-manager-cainjector@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98": "sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98",
+          "quay.io/jetstack/cert-manager-controller@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a": "sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a",
+          "quay.io/jetstack/cert-manager-webhook@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42": "sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42",
+          "layersentry.local/capc@sha256:68cd841cda9d4a8160e9564f11a687b1e36515d8f78383428fca1428734558b5": "sha256:68cd841cda9d4a8160e9564f11a687b1e36515d8f78383428fca1428734558b5",
+          "layersentry.local/cloudstack-ccm@sha256:edc1f8164c7b958c215d70e2b19aa8e4a248d1c531d83134dc542bb29b0f55be": "sha256:edc1f8164c7b958c215d70e2b19aa8e4a248d1c531d83134dc542bb29b0f55be"
+        }
+      },
+      {
+        "attempt": 2,
+        "mode": "native-local",
+        "exactImages": {
+          "registry.k8s.io/cluster-api/cluster-api-controller@sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e": "sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e",
+          "ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5": "sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5",
+          "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa": "sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa",
+          "quay.io/jetstack/cert-manager-cainjector@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98": "sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98",
+          "quay.io/jetstack/cert-manager-controller@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a": "sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a",
+          "quay.io/jetstack/cert-manager-webhook@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42": "sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42",
+          "layersentry.local/capc@sha256:68cd841cda9d4a8160e9564f11a687b1e36515d8f78383428fca1428734558b5": "sha256:68cd841cda9d4a8160e9564f11a687b1e36515d8f78383428fca1428734558b5",
+          "layersentry.local/cloudstack-ccm@sha256:edc1f8164c7b958c215d70e2b19aa8e4a248d1c531d83134dc542bb29b0f55be": "sha256:edc1f8164c7b958c215d70e2b19aa8e4a248d1c531d83134dc542bb29b0f55be"
+        }
+      }
+    ]
+  },
+  "workflowRunUrl": "https://github.com/adaptgurus/cloudstack/actions/runs/34052983062",
+  "artifactId": 9995125313,
+  "artifactZipSha256": "4da85c8fc529aea69aa35f203560be519962dd28154f67130af13aa8300f9f3d",
+  "artifactExpiresAt": "2026-09-20T18:51:26Z",
+  "localDownloadVerification": {
+    "zipDigest": true,
+    "tarDigest": true,
+    "manifestDigest": true,
+    "allFileAndOciDigests": true,
+    "clusterctlExecutable": true
+  },
+  "tests": {
+    "hostedCount": 142,
+    "hostedSkipped": 0,
+    "localCount": 142,
+    "localSkipped": 1
+  }
+}
