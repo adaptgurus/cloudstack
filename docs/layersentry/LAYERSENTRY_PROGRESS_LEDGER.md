@@ -49,6 +49,49 @@ Before changing anything:
 
 ## Current checkpoint
 
+### NOT_TESTED — 2026-09-06 provider-neutral DR state/journal/lease source foundation
+
+DR-only source continuation added a provider-neutral, inactive control-plane foundation without changing CloudStack core DB/API contracts, without adding a scheduler/RBAC authority, and without executing any provider/runtime mutation.
+
+Exact source implementation commit:
+
+`8304bab4c3e8c209de9929c9f718053e32210724`
+
+Exact source handoff/evidence commit:
+
+`eeb71859e45924cb6a72439e8137874c87ecb300`
+
+Handoff path:
+
+`docs/layersentry/evidence/dr/2026-09-06-dr-logic-source-handoff.md`
+
+Implemented in `tools/layersentry/dr_state_machine.py`:
+
+- provider-neutral contracts for Site Pair, Protection Plan, Recovery Point, Recovery Group, network mapping and IP mapping;
+- explicit operation types for Test Recovery, selected-recovery-point Recovery, Planned Failover, Failback and Auto Failover;
+- durable operation state and append-only mutation journal primitives;
+- idempotency-key binding to an immutable request fingerprint;
+- resource-scoped exclusive lease with expiry/renew/release and live-token enforcement for post-lease transitions;
+- explicit recovery-point requirements for Test Recovery, Recovery and Failback; no silent latest-point selection;
+- isolated-Test-Recovery request invariant;
+- provider capability contracts for CloudStack native, LINSTOR/DRBD, Ceph RBD, SAN array and libvirt backup paths, without embedding those provider implementations;
+- capability gates for Planned Failover and Failback;
+- dedicated fail-closed Auto Failover transition path that cannot be advanced through the generic state transition API and requires plan opt-in, provider identity/capability match, witness/quorum, source fencing, no-dual-writer proof, provider-safe promotion, destination/application validation and traffic-switch readiness at the required stages;
+- ambiguous non-auto provider mutations transition to `RECONCILIATION_REQUIRED` with `FAIL_CLOSED_NO_AUTOMATIC_REPLAY` instead of blind mutation replay.
+
+Scope/status limits:
+
+- this source does **not** replace or duplicate the established native CloudStack `createVMFromBackup` recovery adapter;
+- actual native adapter binding behind `RecoveryProvider` is the next DR-only source integration task;
+- SQLite is only the current LayerSentry-owned durable source primitive and is **not** certified as the final distributed production coordination backend;
+- LINSTOR/DRBD, Ceph RBD, SAN-array and libvirt provider-side replication/promotion implementations remain unimplemented/capability-gated unless an existing adapter is subsequently located and bound;
+- no witness service, fencing executor, traffic-switch executor, provider promotion, failback mutation or automatic-failover runtime path was enabled;
+- no test, build, lint, CI, deployment, live DR validation, recovery drill, failover drill, fencing validation or failback validation was run for this continuation.
+
+Therefore this checkpoint is strictly `NOT_TESTED`. It is not `CODE_VERIFIED`, `CI_VERIFIED` or `LIVE_VERIFIED`, and it does not promote native recovery or advanced DR runtime readiness.
+
+Next DR-only source action: bind the established native CloudStack recovery adapter behind the new `RecoveryProvider` contract while preserving its Advanced-Zone guard, caller-selected recovery-point UUID, intent-before-mutation journal behavior and fail-closed async-job reconciliation; keep provider-side Planned Failover/Failback/Auto Failover disabled until their real provider/fencing/witness implementations exist.
+
 ### PARTIAL — 2026-09-06 native DR baseline and acceptance tooling
 
 The dedicated DR session owns DC/DR lab runtime operations; the other session acknowledged a source-only reservation. Fresh authenticated DC and Hyper-V inventories supersede the historical single-VM/API-secret blockers below. Both Rocky lab VMs now exist, but native recovery has not passed. See the [runner evidence and readiness matrix](https://github.com/adaptgurus/cozystack/blob/ops/layersentry-hyperv-inventory/hack/layersentry/evidence/dr-native-baseline-20260906.md).
@@ -104,7 +147,7 @@ Exact Apache CloudStack documentation tag `4.22.1.1` contains conflicting databa
 | Native NAS B&R/two-Zone recovery | `BLOCKED` | current live inventory has one VM on one Hyper-V host; no B&R evidence | authenticated inventory plus approved second Rocky Linux 9/KVM target and disposable workload |
 | DB HA/version selection | `PENDING` / `NOT_TESTED` | exact 4.22.1.1 documentation conflict recorded; no DB topology deployed | compare/test 8.0 and 8.4 candidates, routing, failover, quorum, backup/PITR, restore and upgrade |
 | 3 Management / 3 DB / 2 LB HA | `NOT_TESTED` | no matching live topology exists in current evidence | provision independent failure domains and execute the complete failure/recovery matrix |
-| Advanced DR/failover/failback/fencing | `NOT_TESTED` | architecture remains `DESIGN_DEFINED`; no provider implementation/runtime proof | complete native recovery first, then provider/Test Recovery/planned failover/failback before automatic failover |
+| Advanced DR/failover/failback/fencing | `NOT_TESTED` | provider-neutral state/journal/lease source foundation is committed at `8304bab4c3e8c209de9929c9f718053e32210724`; provider/runtime implementations remain unproven | bind native recovery to the provider contract, then provider/Test Recovery/planned failover/failback before automatic failover |
 | Production certification | `PENDING` | mandatory Rocky Linux 9 release gates are incomplete | all release-specific functional, security, HA, DR, upgrade, recovery, performance and soak gates |
 
 Combined source verification for this checkpoint is recorded in the final integration commit and command evidence. Runtime-affecting claims remain below `LIVE_VERIFIED` until exact artifacts are exercised on Rocky Linux 9.
@@ -375,17 +418,17 @@ This historical run has been superseded for the DBaaS/APaaS-removal scope by run
 - DR source-record retention/purge negative test;
 - two-zone cross-zone DR proof;
 - RPO/RTO measurement;
-- DR Site pairing/inventory sync;
-- provider capability model;
-- Protection Plan + Recovery Point Catalog;
+- DR Site Pair binding/inventory sync runtime integration;
+- provider capability adapters/runtime integration and certification;
+- Protection Plan + Recovery Point Catalog service integration/runtime validation;
 - LINSTOR/DRBD provider certification;
 - NAS/libvirt incremental provider certification;
 - first enterprise SAN provider certification;
 - automated DR network/IP mapping;
-- old-checkpoint recovery;
-- Test Recovery;
-- planned failover/failback;
-- witness/fencing/emergency automatic failover;
+- old-checkpoint recovery runtime validation;
+- Test Recovery provider binding/runtime validation;
+- Planned Failover/Failback provider-side implementation and runtime validation;
+- witness/fencing/emergency automatic-failover implementation and runtime validation;
 - 3-Management/2-LB/3-DB HA deployment/certification;
 - physical OOBM/fencing certification on supported hardware;
 - rolling upgrade certification;
@@ -397,7 +440,7 @@ This historical run has been superseded for the DBaaS/APaaS-removal scope by run
 1. Before runtime implementation, run fresh read-only discovery of the intended Rocky Linux 9/CloudStack target through the approved runner path and establish a secure non-mutating API/SSH credential injection method; do not reintroduce guest `authorized_keys` mutation for R0 discovery.
 2. Establish/obtain a second independent Rocky Linux 9/KVM DR failure domain with sufficient compute/storage/network capacity; a same-host nested lab can prove function only, not production site independence.
 3. Prove native CloudStack 4.22.1.1 NAS B&R two-Zone recovery first: backup, selected old backup, cross-Zone VM create, network mapping, data validation, source-record retention negative case and measured timings.
-4. Implement Site Pairing/capability sync and provider-neutral Protection Plan/Recovery Point Catalog outside CloudStack core.
+4. Bind the established native recovery adapter behind the provider-neutral `RecoveryProvider` contract, then implement Site Pairing/capability sync and the Protection Plan/Recovery Point Catalog service layer outside CloudStack core.
 5. Certify the first real production storage path. Prefer LINSTOR/DRBD if building the LayerSentry HCI profile; otherwise certify the actual NAS/SAN backend required by the target deployment first.
 6. Implement/verify older-point recovery and isolated Test Recovery before failover automation.
 7. Implement and repeatedly test Planned Failover + reverse replication + Failback.
