@@ -23,12 +23,23 @@ import (
 const DefaultSocket = "/run/layersentryd/privileged.sock"
 const maxMessage = 2 << 20
 
-var unitRE = regexp.MustCompile(`^(nginx\.service|postgresql-(16|17)\.service)$`)
+var unitRE = regexp.MustCompile(`^(nginx\.service|httpd\.service|tomcat\.service|mariadb\.service|mysqld\.service|redis\.service|postgresql-(16|17)\.service)$`)
 var zoneRE = regexp.MustCompile(`^ls-[0-9a-f]{12}$`)
 var tokenRE = regexp.MustCompile(`^[A-Za-z0-9._+~:-]+$`)
 var pgPathRE = regexp.MustCompile(`^/usr/pgsql-(16|17)/bin/(initdb|psql|pg_isready|pg_dumpall|postgres)$`)
 var pgBackupStagePathRE = regexp.MustCompile(`^/run/layersentryd/backup-staging/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}-(pg_dumpall|restore)\.sql$`)
 var allowedRepos = map[string]bool{"appstream": true, "pgdg16": true, "pgdg17": true}
+var appstreamPackages = map[string]bool{
+    "nginx": true,
+    "httpd": true,
+    "tomcat": true,
+    "nodejs": true,
+    "python3.12": true,
+    "podman": true,
+    "mariadb-server": true,
+    "mysql-server": true,
+    "redis": true,
+}
 
 type request struct {
     Action string   `json:"action"`
@@ -385,14 +396,14 @@ func validateDNF(args []string) error {
 }
 
 func allowedPackage(pkg string) bool {
-    return pkg == "nginx" || pkg == "postgresql16-server" || pkg == "postgresql17-server"
+    return appstreamPackages[pkg] || pkg == "postgresql16-server" || pkg == "postgresql17-server"
 }
 
 func packageForNEVRA(v string) string {
     if !tokenRE.MatchString(v) {
         return ""
     }
-    for _, pkg := range []string{"postgresql16-server", "postgresql17-server", "nginx"} {
+    for _, pkg := range []string{"postgresql16-server", "postgresql17-server", "mariadb-server", "mysql-server", "python3.12", "nodejs", "podman", "tomcat", "httpd", "redis", "nginx"} {
         if strings.HasPrefix(v, pkg+"-") {
             return pkg
         }
@@ -401,9 +412,10 @@ func packageForNEVRA(v string) string {
 }
 
 func repoMatchesPackage(repo, pkg string) bool {
-    switch pkg {
-    case "nginx":
+    if appstreamPackages[pkg] {
         return repo == "appstream"
+    }
+    switch pkg {
     case "postgresql16-server":
         return repo == "pgdg16"
     case "postgresql17-server":
