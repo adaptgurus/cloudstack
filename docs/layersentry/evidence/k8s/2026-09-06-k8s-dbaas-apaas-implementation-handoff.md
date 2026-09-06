@@ -12,6 +12,10 @@
 
 ## 0. Latest continuation checkpoint
 
+The E1 lifecycle executor is implemented at `402cb3f40d`. It provides signed read-only CloudStack ID/health preflight, exact 6443/9345 LB-rule verification, provider resource reconciliation, create/status/scale/delete BFF source paths and commit-pinned central Flux. Scale-down and CAPI Cluster deletion fail closed until CAPC volume ownership is live-verified; delete retains workload volumes and never directly deletes CloudStack VMs. All 52 Workstream E Python tests passed.
+
+This is not runtime E1 proof. Package/service wiring, real authentication/RBAC, CRD admission, provider reconciliation, automatic join, CNI, CCM, CSI, Flux, recovery and Rocky evidence remain `NOT_TESTED`. Do not begin PostgreSQL mutation until those required E0/E1 gates actually pass.
+
 E1 provider resource/source work is at `7060883e13`. It combines CAPI/CAPRKE2 v1beta2 with CAPC v1beta3 exactly as pinned, selects automatic `control-plane-endpoint` joins, carries CAPC endpoint/Machine-volume annotations, requires pre-resolved CloudStack IDs, and adds a restricted pinned-CA Kubernetes client. Unsupported Flannel was removed because the exact CAPRKE2 v1beta2 CRD rejects it. All 40 Workstream E Python tests passed; no provider runtime reconciliation ran.
 
 Resume with the E1 executor, status conditions, CloudStack preflight, create/status/delete/scale, one CCM/CSI path and central Flux. Do not promote any runtime gate or begin stateful DBaaS.

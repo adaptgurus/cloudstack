@@ -49,6 +49,18 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE — 2026-09-06 E1 create/status/scale/delete lifecycle executor
+
+Exact implementation commit:
+
+`402cb3f40d`
+
+Workstream E added the E1 step executor and read-only CloudStack preflight without modifying CloudStack core. CloudStack Signature V3 POST calls resolve exact authorized project/Site/network/service-offering/KVM-image/endpoint IP inputs before CAPI apply. Provider resources are reconciled through the restricted Kubernetes client; both exact Active 6443 and 9345 LB rules must resolve before the endpoint step advances. Central Flux is pinned to a full Git commit with per-cluster prune/wait reconciliation.
+
+The BFF source now covers create/status/scale/delete. Status, scale and delete verify LayerSentry/project ownership. Scale-up converges on available replicas; scale-down remains blocked while CAPC volume ownership lacks live evidence. Delete requires exact cluster confirmation, retained workload volumes and the live CAPC gate, deletes only the CAPI Cluster, and waits for absence so CAPI/CAPC remain VM authority. Mutating timeouts still enter `UNKNOWN` and require authoritative observation.
+
+All 52 Workstream E Python tests passed. Source evidence: `docs/layersentry/evidence/k8s/2026-09-06-e1-lifecycle-executor.md`. No live CloudStack/Kubernetes/CAPI/RKE2/CCM/CSI/Flux request ran; E1 remains `NOT_TESTED` at runtime. Remaining E1 work includes package/service wiring, authenticated CloudStack-backed RBAC, real provider admission/reconciliation, one CCM/CSI path, restart/rollback/failure and Rocky evidence. PostgreSQL remains blocked until E0/E1 live evidence passes.
+
 ### SOURCE_COMPLETE — 2026-09-06 E1 pinned provider resources and restricted Kubernetes client
 
 Exact implementation commit:
