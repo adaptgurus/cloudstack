@@ -24,6 +24,7 @@ func(e *Engine)Plan(ctx context.Context,req model.ServiceRequest)(model.Plan,mod
  if err:=config.Validate(req);err!=nil{return model.Plan{},model.Operation{},err}
  p,ok:=e.Registry.Get(req.Provider);if !ok{return model.Plan{},model.Operation{},fmt.Errorf("unknown provider %q",req.Provider)}
  if p.Category()!=req.Category{return model.Plan{},model.Operation{},errors.New("provider category mismatch")}
+ if err:=provider.ValidateIntentCapabilities(p.ID(),req);err!=nil{return model.Plan{},model.Operation{},err}
  if err:=p.Validate(ctx,req);err!=nil{return model.Plan{},model.Operation{},err}
  if _,err:=preflight.System(ctx,req,e.Runner);err!=nil{return model.Plan{},model.Operation{},err}
  requestDigest,err:=config.CanonicalDigest(req);if err!=nil{return model.Plan{},model.Operation{},err}
