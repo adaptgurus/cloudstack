@@ -99,6 +99,16 @@ for (const host of targets) {
         const entry = { route: name, status: 'FAILED' }
         record.pages.push(entry)
         if (!page.url().includes(`#/${name}`)) throw new Error('ROUTE_REDIRECTED')
+        if (name === 'kubernetes-data-services') {
+          record.moduleTabs = []
+          for (const tab of ['Kubernetes', 'DBaaS', 'APaaS']) {
+            await page.getByRole('tab', { name: tab, exact: true }).click()
+            const blocked = await page.getByText('Release qualification is still blocked', { exact: true }).isVisible()
+            await page.screenshot({ path: path.join(output, `${host}-${browserName}-${tab}.png`), fullPage: true })
+            record.moduleTabs.push({ module: tab, status: blocked ? 'BLOCKED' : 'NOT_VERIFIED' })
+          }
+          throw new Error('MODULE_LIFECYCLE_NOT_VERIFIED')
+        }
         if (await page.locator('.ant-alert-error:visible').count()) throw new Error('VISIBLE_PAGE_ERROR')
         if (pageErrors.length > errorsBefore || record.failedReads.length > readsBefore) throw new Error('PAGE_READ_FAILED')
         const main = page.locator('main, [role="main"], .layout-content').first()
