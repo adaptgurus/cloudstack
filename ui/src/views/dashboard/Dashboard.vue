@@ -20,8 +20,14 @@
     <div v-if="showOnboarding">
       <onboarding-dashboard />
     </div>
+    <div v-else-if="layersentryProfile && $store.getters.userInfo.roletype === 'Admin' && !project">
+      <layer-sentry-platform-dashboard />
+    </div>
+    <div v-else-if="layersentryProfile">
+      <layer-sentry-self-service-dashboard />
+    </div>
     <div v-else-if="$store.getters.userInfo.roletype === 'Admin' && !project">
-      <capacity-dashboard/>
+      <capacity-dashboard />
     </div>
     <div v-else>
       <usage-dashboard :resource="$store.getters.project" :showProject="project" />
@@ -32,7 +38,10 @@
 <script>
 import { getAPI } from '@/api'
 import store from '@/store'
+import { isLayersentryKvmProfile } from '@/config/productProfile'
 import CapacityDashboard from './CapacityDashboard'
+import LayerSentryPlatformDashboard from './LayerSentryPlatformDashboard'
+import LayerSentrySelfServiceDashboard from './LayerSentrySelfServiceDashboard'
 import UsageDashboard from './UsageDashboard'
 import OnboardingDashboard from './OnboardingDashboard'
 import VerifyTwoFa from './VerifyTwoFa'
@@ -42,6 +51,8 @@ export default {
   name: 'Dashboard',
   components: {
     CapacityDashboard,
+    LayerSentryPlatformDashboard,
+    LayerSentrySelfServiceDashboard,
     UsageDashboard,
     OnboardingDashboard,
     VerifyTwoFa,
@@ -57,6 +68,11 @@ export default {
       showCapacityDashboard: false,
       project: false,
       showOnboarding: false
+    }
+  },
+  computed: {
+    layersentryProfile () {
+      return isLayersentryKvmProfile(this.$config)
     }
   },
   created () {

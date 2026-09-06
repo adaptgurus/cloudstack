@@ -22,7 +22,10 @@ import IFramePlugin from '@/views/plugins/IFramePlugin.vue'
 import ApiDocsPlugin from '@/views/plugins/ApiDocsPlugin.vue'
 
 import { shallowRef } from 'vue'
+import store from '@/store'
 import { vueProps } from '@/vue-app'
+import { isLayersentryKvmProfile } from '@/config/productProfile'
+import { applyLayersentryNavigation, withLayersentryKvmParams } from '@/config/layersentryNavigation'
 
 import compute from '@/config/section/compute'
 import storage from '@/config/section/storage'
@@ -79,7 +82,7 @@ function generateRouterMap (section) {
           permission: child.permission,
           resourceType: child.resourceType,
           filters: child.filters,
-          params: child.params ? child.params : {},
+          params: withLayersentryKvmParams(child.name, child.params ? child.params : {}),
           columns: child.columns,
           details: child.details,
           searchFilters: child.searchFilters,
@@ -101,7 +104,7 @@ function generateRouterMap (section) {
               docHelp: vueProps.$applyDocHelpMappings(child.docHelp),
               permission: child.permission,
               resourceType: child.resourceType,
-              params: child.params ? child.params : {},
+              params: withLayersentryKvmParams(child.name, child.params ? child.params : {}),
               details: child.details,
               searchFilters: child.searchFilters,
               related: child.related,
@@ -145,6 +148,7 @@ function generateRouterMap (section) {
     map.meta.filters = section.filters
     map.meta.treeView = section.treeView ? section.treeView : false
     map.meta.tabs = section.tabs
+    map.meta.params = withLayersentryKvmParams(section.name, section.params ? section.params : {})
 
     map.children = [{
       path: '/' + section.name + '/:id(.*)',
@@ -157,7 +161,7 @@ function generateRouterMap (section) {
         hidden: section.hidden,
         permission: section.permission,
         resourceType: section.resourceType,
-        params: section.params ? section.params : {},
+        params: withLayersentryKvmParams(section.name, section.params ? section.params : {}),
         details: section.details,
         related: section.related,
         searchFilters: section.searchFilters,
@@ -185,81 +189,104 @@ function generateRouterMap (section) {
   }
 
   if (section.params) {
-    map.meta.params = section.params
+    map.meta.params = withLayersentryKvmParams(section.name, section.params)
   }
 
   return map
 }
 
 export function asyncRouterMap () {
+  const primaryChildren = [
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      meta: {
+        title: 'label.dashboard',
+        icon: 'DashboardOutlined'
+      },
+      component: () => import('@/views/dashboard/Dashboard')
+    },
+    {
+      path: '/quick-provision',
+      name: 'quickProvision',
+      hidden: !isLayersentryKvmProfile() || vueProps.$config?.layersentry?.features?.quickProvision?.enabled === false,
+      meta: {
+        title: 'label.layersentry.quick.provision',
+        icon: 'RocketOutlined',
+        permission: ['deployVirtualMachine']
+      },
+      component: () => import('@/views/layersentry/QuickProvision.vue')
+    },
+    {
+      path: '/kubernetes-data-services',
+      name: 'kubernetesDataServices',
+      hidden: !isLayersentryKvmProfile() || vueProps.$config?.layersentry?.features?.kubernetesDataServices?.enabled === false,
+      meta: {
+        title: 'Kubernetes & Data Services',
+        icon: 'ClusterOutlined'
+      },
+      component: () => import('@/views/layersentry/KubernetesDataServices.vue')
+    },
+
+    generateRouterMap(compute),
+    generateRouterMap(storage),
+    generateRouterMap(network),
+    generateRouterMap(image),
+    generateRouterMap(event),
+    generateRouterMap(project),
+    generateRouterMap(user),
+    generateRouterMap(role),
+    generateRouterMap(account),
+    generateRouterMap(domain),
+    generateRouterMap(infra),
+    generateRouterMap(zone),
+    generateRouterMap(offering),
+    generateRouterMap(config),
+    generateRouterMap(extension),
+    generateRouterMap(customaction),
+    generateRouterMap(tools),
+    generateRouterMap(quota),
+    generateRouterMap(cloudian),
+    {
+      path: '/exception',
+      name: 'exception',
+      component: shallowRef(RouteView),
+      hidden: true,
+      redirect: '/exception/404',
+      meta: { title: 'Exception', icon: 'warning' },
+      children: [
+        {
+          path: '/exception/403',
+          name: '403',
+          hidden: true,
+          component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/403'),
+          meta: { title: '403' }
+        },
+        {
+          path: '/exception/404',
+          name: '404',
+          hidden: true,
+          component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/404'),
+          meta: { title: '404' }
+        },
+        {
+          path: '/exception/500',
+          name: '500',
+          hidden: true,
+          component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/500'),
+          meta: { title: '500' }
+        }
+      ]
+    }
+  ]
+
   const routerMap = [{
     path: '/',
     name: 'index',
     component: shallowRef(BasicLayout),
     meta: { icon: 'HomeOutlined' },
     redirect: '/dashboard',
-    children: [
-      {
-        path: '/dashboard',
-        name: 'dashboard',
-        meta: {
-          title: 'label.dashboard',
-          icon: 'DashboardOutlined'
-        },
-        component: () => import('@/views/dashboard/Dashboard')
-      },
-
-      generateRouterMap(compute),
-      generateRouterMap(storage),
-      generateRouterMap(network),
-      generateRouterMap(image),
-      generateRouterMap(event),
-      generateRouterMap(project),
-      generateRouterMap(user),
-      generateRouterMap(role),
-      generateRouterMap(account),
-      generateRouterMap(domain),
-      generateRouterMap(infra),
-      generateRouterMap(zone),
-      generateRouterMap(offering),
-      generateRouterMap(config),
-      generateRouterMap(extension),
-      generateRouterMap(customaction),
-      generateRouterMap(tools),
-      generateRouterMap(quota),
-      generateRouterMap(cloudian),
-      {
-        path: '/exception',
-        name: 'exception',
-        component: shallowRef(RouteView),
-        hidden: true,
-        redirect: '/exception/404',
-        meta: { title: 'Exception', icon: 'warning' },
-        children: [
-          {
-            path: '/exception/403',
-            name: '403',
-            hidden: true,
-            component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/403'),
-            meta: { title: '403' }
-          },
-          {
-            path: '/exception/404',
-            name: '404',
-            hidden: true,
-            component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/404'),
-            meta: { title: '404' }
-          },
-          {
-            path: '/exception/500',
-            name: '500',
-            hidden: true,
-            component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/500'),
-            meta: { title: '500' }
-          }
-        ]
-      }
-    ]
+    children: applyLayersentryNavigation(primaryChildren, store.getters.userInfo, vueProps.$config, store.getters.apis)
   },
   {
     path: '/:catchAll(.*)', redirect: '/exception/404', hidden: true

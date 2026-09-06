@@ -16,7 +16,7 @@
 // under the License.
 
 export default {
-  primaryColor: '#39A7DE', // primary color of ant design
+  primaryColor: '#0f766e', // LayerSentry interaction color
   navTheme: 'light', // theme for nav menu
   layout: 'sidemenu', // nav menu position: sidemenu or topmenu
   contentWidth: 'Fixed', // layout of content: Fluid or Fixed, only works when layout is topmenu

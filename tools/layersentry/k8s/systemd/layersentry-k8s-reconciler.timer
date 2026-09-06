@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the LayerSentry Kubernetes reconciler
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Persistent=true
+Unit=layersentry-k8s-reconciler.service
+
+[Install]
+WantedBy=timers.target

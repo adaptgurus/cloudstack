@@ -22,6 +22,7 @@ const packageJson = fs.readFileSync('./package.json')
 const version = JSON.parse(packageJson).version || 'main'
 const createThemeColorReplacerPlugin = require('./theme.config')
 const UglifyJsPlugin = require('uglifyjs-webpack-plugin')
+const supportBuild = process.env.LAYERSENTRY_SUPPORT_BUILD === '1'
 
 function resolve (dir) {
   return path.join(__dirname, dir)
@@ -30,6 +31,10 @@ function resolve (dir) {
 // vue.config.js
 const vueConfig = {
   publicPath: './',
+  // Customer release artifacts must not expose source maps. A controlled
+  // support build may opt in explicitly and must not be promoted as a
+  // production artifact.
+  productionSourceMap: supportBuild,
   /*
     Vue-cli3:
     Crashed when using Webpack `import()` #2463
@@ -65,7 +70,7 @@ const vueConfig = {
             ecma: 6,
             mangle: true
           },
-          sourceMap: true
+          sourceMap: supportBuild
         })
       ],
       splitChunks: {

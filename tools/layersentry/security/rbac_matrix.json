@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "suite_id": "layersentry-rbac-v1",
+  "roles": [
+    "platform_admin",
+    "department_admin",
+    "department_user",
+    "read_only"
+  ],
+  "tests": [
+    {
+      "id": "platform-admin-dashboard-control",
+      "kind": "direct_url",
+      "role": "platform_admin",
+      "path": "/ui/#/dashboard",
+      "expect": "allowed"
+    },
+    {
+      "id": "platform-admin-capabilities-control",
+      "kind": "api",
+      "role": "platform_admin",
+      "command": "listCapabilities",
+      "params": {},
+      "expect": "api_allowed"
+    },
+    {
+      "id": "department-admin-platform-route",
+      "kind": "direct_url",
+      "role": "department_admin",
+      "path": "/ui/#/infrastructure/zones",
+      "expect": "denied_or_redirected"
+    },
+    {
+      "id": "department-user-platform-route",
+      "kind": "direct_url",
+      "role": "department_user",
+      "path": "/ui/#/infrastructure/hosts",
+      "expect": "denied_or_redirected"
+    },
+    {
+      "id": "read-only-platform-route",
+      "kind": "direct_url",
+      "role": "read_only",
+      "path": "/ui/#/infrastructure/clusters",
+      "expect": "denied_or_redirected"
+    },
+    {
+      "id": "department-admin-list-hosts",
+      "kind": "api",
+      "role": "department_admin",
+      "command": "listHosts",
+      "params": {},
+      "expect": "api_denied"
+    },
+    {
+      "id": "department-user-list-users",
+      "kind": "api",
+      "role": "department_user",
+      "command": "listUsers",
+      "params": {},
+      "expect": "api_denied"
+    },
+    {
+      "id": "read-only-list-hosts",
+      "kind": "api",
+      "role": "read_only",
+      "command": "listHosts",
+      "params": {},
+      "expect": "api_denied"
+    },
+    {
+      "id": "department-admin-foreign-vm",
+      "kind": "api_object",
+      "role": "department_admin",
+      "command": "listVirtualMachines",
+      "params": {"id": "${fixtures.foreign_vm_id}"},
+      "expect": "api_denied_or_empty"
+    },
+    {
+      "id": "department-user-foreign-volume",
+      "kind": "api_object",
+      "role": "department_user",
+      "command": "listVolumes",
+      "params": {"id": "${fixtures.foreign_volume_id}"},
+      "expect": "api_denied_or_empty"
+    },
+    {
+      "id": "read-only-foreign-network",
+      "kind": "api_object",
+      "role": "read_only",
+      "command": "listNetworks",
+      "params": {"id": "${fixtures.foreign_network_id}"},
+      "expect": "api_denied_or_empty"
+    }
+  ]
+}

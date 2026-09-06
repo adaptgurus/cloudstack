@@ -16,7 +16,22 @@
 // under the License.
 
 <template>
-  <a-row class="capacity-dashboard" :gutter="[12,12]">
+  <div>
+    <div class="self-service-header">
+      <div class="self-service-header__identity">
+        <h2>{{ $t('label.dashboard') }}</h2>
+        <a-tag color="blue">{{ $t(dashboardRoleLabel) }}</a-tag>
+      </div>
+      <div class="self-service-header__actions">
+        <router-link
+          v-for="action in dashboardQuickActions"
+          :key="action.key"
+          :to="{ path: action.path }">
+          <a-button type="primary">{{ $t(action.label) }}</a-button>
+        </router-link>
+      </div>
+    </div>
+    <a-row class="capacity-dashboard" :gutter="[12,12]">
     <a-col :xs="{ span: 24 }" :lg="{ span: 12 }" :xl="{ span: 8 }" :xxl="{ span: 8 }">
       <chart-card :loading="loading" class="dashboard-card">
         <template #title>
@@ -363,6 +378,7 @@
       </chart-card>
     </a-col>
   </a-row>
+  </div>
 </template>
 
 <script>
@@ -373,6 +389,7 @@ import ChartCard from '@/components/widgets/ChartCard'
 import UsageDashboardChart from '@/views/dashboard/UsageDashboardChart'
 import ResourceLabel from '@/components/widgets/ResourceLabel'
 import Status from '@/components/widgets/Status'
+import { getDashboardQuickActions, getDashboardRole } from '@/views/dashboard/dashboardRole'
 
 export default {
   name: 'UsageDashboard',
@@ -419,6 +436,15 @@ export default {
     }
   },
   computed: {
+    dashboardRole () {
+      return getDashboardRole(this.$store.getters.userInfo, this.$store.getters.apis, this.showProject)
+    },
+    dashboardRoleLabel () {
+      return `label.layersentry.${this.dashboardRole}`
+    },
+    dashboardQuickActions () {
+      return getDashboardQuickActions(this.$store.getters.apis)
+    },
     entity: function () {
       if (this.showProject) {
         return this.project
@@ -664,6 +690,34 @@ export default {
 </script>
 
 <style lang="less" scoped>
+  .self-service-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    background: #fff;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+
+    &__identity {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      h2 {
+        margin: 0;
+      }
+    }
+
+    &__actions {
+      display: flex;
+      gap: 8px;
+    }
+  }
+
   :deep(.usage-dashboard) {
 
     &-chart-tile {

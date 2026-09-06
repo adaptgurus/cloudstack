@@ -1,0 +1,33 @@
+[Unit]
+Description=LayerSentry Single-OS lifecycle agent
+After=network-online.target firewalld.service layersentry-firstboot.service layersentry-privileged.service
+Wants=network-online.target
+Requires=layersentry-firstboot.service layersentry-privileged.service
+
+[Service]
+Type=simple
+User=layersentry
+Group=layersentry
+ExecStart=/usr/bin/layersentryd serve
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/layersentryd /run/layersentryd /etc/fstab /etc/nginx /var/lib/pgsql /var/log/nginx /etc/httpd /var/www/html /etc/tomcat /etc/my.cnf.d /var/lib/mysql /etc/redis /var/lib/redis /etc/valkey /var/lib/valkey /var/log/valkey /srv /data /opt/layersentry-data /var/log/layersentry-services
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
+AmbientCapabilities=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
+
+[Install]
+WantedBy=multi-user.target

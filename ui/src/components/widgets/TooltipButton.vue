@@ -24,6 +24,7 @@
       <a-button
         v-if="copyResource"
         :shape="shape"
+        :aria-label="ariaLabel || tooltip"
         :size="size"
         :type="type"
         :danger="danger"
@@ -40,6 +41,7 @@
       <a-button
         v-else
         :shape="shape"
+        :aria-label="ariaLabel || tooltip"
         :size="size"
         :type="type"
         :danger="danger"
@@ -61,6 +63,10 @@
 export default {
   name: 'TooltipButton',
   props: {
+    ariaLabel: {
+      type: String,
+      default: null
+    },
     tooltip: {
       type: String,
       default: null

@@ -1,57 +1,42 @@
 // Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
+// or more contributor license agreements. See the NOTICE file
 // distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
+// regarding copyright ownership. The ASF licenses this file
 // to you under the Apache License, Version 2.0 (the
 // "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
+// with the License. You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing,
 // software distributed under the License is distributed on an
 // "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
+// KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations
 // under the License.
 
 <template>
-  <div class="exception">
-    <div class="img" v-if="type == '403'">
+  <main class="exception" :aria-labelledby="`layersentry-error-${type}`">
+    <div class="exception__image" v-if="$config.error[type]">
       <img
-        v-if="$config.error['403']"
-        :src="$config.error['403']"
+        :src="$config.error[type]"
+        alt=""
+        role="presentation"
         :style="{
           width: $config.theme['@error-width'],
           height: $config.theme['@error-height']
-        }"/>
+        }" />
     </div>
-    <div class="img" v-if="type == '404'">
-      <img
-        v-if="$config.error['404']"
-        :src="$config.error['404']"
-        :style="{
-          width: $config.theme['@error-width'],
-          height: $config.theme['@error-height']
-        }"/>
-    </div>
-    <div class="img" v-if="type == '500'">
-      <img
-        v-if="$config.error['500']"
-        :src="$config.error['500']"
-        :style="{
-          width: $config.theme['@error-width'],
-          height: $config.theme['@error-height']
-        }"/>
-    </div>
-    <div class="content">
-      <h1>{{ config[type].title }}</h1>
-      <div class="desc">{{ config[type].desc }}</div>
-      <div class="action">
-        <a-button type="primary" @click="handleToHome">{{ $t('label.go.back') }}</a-button>
+    <section class="exception__content">
+      <div class="exception__brand">LAYERSENTRY · {{ config[type].code }}</div>
+      <h1 :id="`layersentry-error-${type}`">{{ config[type].title }}</h1>
+      <p class="exception__desc">{{ config[type].desc }}</p>
+      <div class="exception__actions">
+        <a-button v-if="canGoBack" @click="handleBack">{{ $t('label.go.back') }}</a-button>
+        <a-button type="primary" @click="handleToHome">{{ $t('label.dashboard') }}</a-button>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 </template>
 
 <script>
@@ -62,7 +47,8 @@ export default {
   props: {
     type: {
       type: String,
-      default: '404'
+      default: '404',
+      validator: value => Object.prototype.hasOwnProperty.call(types, value)
     }
   },
   data () {
@@ -70,7 +56,15 @@ export default {
       config: types
     }
   },
+  computed: {
+    canGoBack () {
+      return typeof window !== 'undefined' && window.history.length > 1
+    }
+  },
   methods: {
+    handleBack () {
+      this.$router.back()
+    },
     handleToHome () {
       this.$router.push({ name: 'dashboard' })
     }
@@ -79,46 +73,72 @@ export default {
 </script>
 
 <style lang="less" scoped>
+.exception {
+  min-height: 65vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 24px;
+
+  &__image {
+    flex: 0 1 auto;
+
+    img {
+      max-width: min(320px, 38vw);
+      height: auto !important;
+      object-fit: contain;
+    }
+  }
+
+  &__content {
+    max-width: 560px;
+    text-align: left;
+  }
+
+  &__brand {
+    margin-bottom: 8px;
+    color: #0f766e;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .12em;
+  }
+
+  h1 {
+    margin: 0 0 12px;
+    color: #101828;
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 650;
+    line-height: 1.1;
+  }
+
+  &__desc {
+    margin: 0;
+    color: #667085;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 760px) {
   .exception {
-    min-height: 500px;
-    height: 80%;
-    align-items: center;
+    flex-direction: column;
+    gap: 24px;
+    padding-top: 28px;
     text-align: center;
-    margin-top: 150px;
-    .img {
-      display: inline-block;
-      padding-right: 52px;
-      zoom: 1;
-    }
-    .content {
-      display: inline-block;
-      flex: auto;
-      h1 {
-        color: #434e59;
-        font-size: 72px;
-        font-weight: 600;
-        line-height: 72px;
-        margin-bottom: 24px;
-      }
-      .desc {
-        color: rgba(0, 0, 0, .45);
-        font-size: 20px;
-        line-height: 28px;
-        margin-bottom: 16px;
-      }
-    }
-  }
 
-  .mobile {
-    .exception {
-      margin-top: 30px;
-      .img {
-        padding-right: unset;
-
-        img {
-          max-width: 80%;
-        }
-      }
-    }
+    &__content { text-align: center; }
+    &__actions { justify-content: center; }
+    &__image img { max-width: 210px; }
   }
+}
 </style>

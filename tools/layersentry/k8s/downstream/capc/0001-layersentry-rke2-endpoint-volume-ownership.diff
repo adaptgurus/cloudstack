@@ -1,0 +1,620 @@
+diff --git a/api/v1beta1/cloudstackisolatednetwork_types.go b/api/v1beta1/cloudstackisolatednetwork_types.go
+index 83698fed5c2d7aebf6c83a22b893a24e33c5fdf3..4ec23d82b50a24628896040be407b4b9cf5ae784 100644
+--- a/api/v1beta1/cloudstackisolatednetwork_types.go
++++ b/api/v1beta1/cloudstackisolatednetwork_types.go
+@@ -48,6 +48,10 @@ type CloudStackIsolatedNetworkStatus struct {
+ 	// The ID of the lb rule used to assign VMs to the lb.
+ 	LBRuleID string `json:"loadBalancerRuleID,omitempty"`
+ 
++	// RKE2SupervisorLBRuleID is the CAPC-owned TCP 9345 rule.
++	// +optional
++	RKE2SupervisorLBRuleID string `json:"rke2SupervisorLoadBalancerRuleID,omitempty"`
++
+ 	// Ready indicates the readiness of this provider resource.
+ 	Ready bool `json:"ready"`
+ }
+diff --git a/api/v1beta1/cloudstackmachine_types.go b/api/v1beta1/cloudstackmachine_types.go
+index 1329c9f046966363b278c064f42b1332e927a931..1b6ef91d90d8d656fca72f0c4933707f9111ea11 100644
+--- a/api/v1beta1/cloudstackmachine_types.go
++++ b/api/v1beta1/cloudstackmachine_types.go
+@@ -141,6 +141,10 @@ type CloudStackMachineStatus struct {
+ 
+ 	// Ready indicates the readiness of the provider resource.
+ 	Ready bool `json:"ready"`
++
++	// OwnedDataDiskID is the explicitly recorded CAPC deploy-time data disk.
++	// +optional
++	OwnedDataDiskID string `json:"ownedDataDiskID,omitempty"`
+ }
+ 
+ // TimeSinceLastStateChange returns the amount of time that's elapsed since the state was last updated.  If the state
+diff --git a/api/v1beta1/zz_generated.conversion.go b/api/v1beta1/zz_generated.conversion.go
+index 229c534b183eef4cd670506a32ee8a970f564f67..611a90ee95b65fb05f2dc4499fa9ae11c17be19a 100644
+--- a/api/v1beta1/zz_generated.conversion.go
++++ b/api/v1beta1/zz_generated.conversion.go
+@@ -516,6 +516,7 @@ func autoConvert_v1beta3_CloudStackIsolatedNetworkSpec_To_v1beta1_CloudStackIsol
+ func autoConvert_v1beta1_CloudStackIsolatedNetworkStatus_To_v1beta3_CloudStackIsolatedNetworkStatus(in *CloudStackIsolatedNetworkStatus, out *v1beta3.CloudStackIsolatedNetworkStatus, s conversion.Scope) error {
+ 	out.PublicIPID = in.PublicIPID
+ 	out.LBRuleID = in.LBRuleID
++	out.RKE2SupervisorLBRuleID = in.RKE2SupervisorLBRuleID
+ 	out.Ready = in.Ready
+ 	return nil
+ }
+@@ -528,6 +529,7 @@ func Convert_v1beta1_CloudStackIsolatedNetworkStatus_To_v1beta3_CloudStackIsolat
+ func autoConvert_v1beta3_CloudStackIsolatedNetworkStatus_To_v1beta1_CloudStackIsolatedNetworkStatus(in *v1beta3.CloudStackIsolatedNetworkStatus, out *CloudStackIsolatedNetworkStatus, s conversion.Scope) error {
+ 	out.PublicIPID = in.PublicIPID
+ 	out.LBRuleID = in.LBRuleID
++	out.RKE2SupervisorLBRuleID = in.RKE2SupervisorLBRuleID
+ 	// WARNING: in.RoutingMode requires manual conversion: does not exist in peer-type
+ 	out.Ready = in.Ready
+ 	return nil
+@@ -762,6 +764,7 @@ func autoConvert_v1beta1_CloudStackMachineStatus_To_v1beta3_CloudStackMachineSta
+ 	out.InstanceState = string(in.InstanceState)
+ 	out.InstanceStateLastUpdated = in.InstanceStateLastUpdated
+ 	out.Ready = in.Ready
++	out.OwnedDataDiskID = in.OwnedDataDiskID
+ 	return nil
+ }
+ 
+@@ -775,6 +778,7 @@ func autoConvert_v1beta3_CloudStackMachineStatus_To_v1beta1_CloudStackMachineSta
+ 	out.InstanceState = InstanceState(in.InstanceState)
+ 	out.InstanceStateLastUpdated = in.InstanceStateLastUpdated
+ 	out.Ready = in.Ready
++	out.OwnedDataDiskID = in.OwnedDataDiskID
+ 	// WARNING: in.Status requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Reason requires manual conversion: does not exist in peer-type
+ 	return nil
+diff --git a/api/v1beta2/cloudstackisolatednetwork_types.go b/api/v1beta2/cloudstackisolatednetwork_types.go
+index 903994894a237de84ca8cedd6ffa21b6df795c4c..2e8b616ba2bdda387a53ca231c54afe0e40e7141 100644
+--- a/api/v1beta2/cloudstackisolatednetwork_types.go
++++ b/api/v1beta2/cloudstackisolatednetwork_types.go
+@@ -49,6 +49,10 @@ type CloudStackIsolatedNetworkStatus struct {
+ 	// The ID of the lb rule used to assign VMs to the lb.
+ 	LBRuleID string `json:"loadBalancerRuleID,omitempty"`
+ 
++	// RKE2SupervisorLBRuleID is the CAPC-owned TCP 9345 rule.
++	// +optional
++	RKE2SupervisorLBRuleID string `json:"rke2SupervisorLoadBalancerRuleID,omitempty"`
++
+ 	// Ready indicates the readiness of this provider resource.
+ 	Ready bool `json:"ready"`
+ }
+diff --git a/api/v1beta2/cloudstackmachine_types.go b/api/v1beta2/cloudstackmachine_types.go
+index efc5d7027d19f4f7bf5c918c550e8ebc6ba78ea6..39bae83911ac3e4e7a7fe5d2b7aa771f8923409d 100644
+--- a/api/v1beta2/cloudstackmachine_types.go
++++ b/api/v1beta2/cloudstackmachine_types.go
+@@ -143,6 +143,10 @@ type CloudStackMachineStatus struct {
+ 	// Reason indicates the reason of status failure
+ 	// +optional
+ 	Reason *string `json:"reason,omitempty"`
++
++	// OwnedDataDiskID is the explicitly recorded CAPC deploy-time data disk.
++	// +optional
++	OwnedDataDiskID string `json:"ownedDataDiskID,omitempty"`
+ }
+ 
+ // TimeSinceLastStateChange returns the amount of time that's elapsed since the state was last updated.  If the state
+diff --git a/api/v1beta2/zz_generated.conversion.go b/api/v1beta2/zz_generated.conversion.go
+index 137ef317af28a30bcf0528d457acbc919b13dfa9..bba0c7e16fb70f5677575e8323603164dd16d5b1 100644
+--- a/api/v1beta2/zz_generated.conversion.go
++++ b/api/v1beta2/zz_generated.conversion.go
+@@ -825,6 +825,7 @@ func autoConvert_v1beta3_CloudStackIsolatedNetworkSpec_To_v1beta2_CloudStackIsol
+ func autoConvert_v1beta2_CloudStackIsolatedNetworkStatus_To_v1beta3_CloudStackIsolatedNetworkStatus(in *CloudStackIsolatedNetworkStatus, out *v1beta3.CloudStackIsolatedNetworkStatus, s conversion.Scope) error {
+ 	out.PublicIPID = in.PublicIPID
+ 	out.LBRuleID = in.LBRuleID
++	out.RKE2SupervisorLBRuleID = in.RKE2SupervisorLBRuleID
+ 	out.Ready = in.Ready
+ 	return nil
+ }
+@@ -837,6 +838,7 @@ func Convert_v1beta2_CloudStackIsolatedNetworkStatus_To_v1beta3_CloudStackIsolat
+ func autoConvert_v1beta3_CloudStackIsolatedNetworkStatus_To_v1beta2_CloudStackIsolatedNetworkStatus(in *v1beta3.CloudStackIsolatedNetworkStatus, out *CloudStackIsolatedNetworkStatus, s conversion.Scope) error {
+ 	out.PublicIPID = in.PublicIPID
+ 	out.LBRuleID = in.LBRuleID
++	out.RKE2SupervisorLBRuleID = in.RKE2SupervisorLBRuleID
+ 	// WARNING: in.RoutingMode requires manual conversion: does not exist in peer-type
+ 	out.Ready = in.Ready
+ 	return nil
+@@ -1071,6 +1073,7 @@ func autoConvert_v1beta2_CloudStackMachineStatus_To_v1beta3_CloudStackMachineSta
+ 	out.Ready = in.Ready
+ 	out.Status = (*string)(unsafe.Pointer(in.Status))
+ 	out.Reason = (*string)(unsafe.Pointer(in.Reason))
++	out.OwnedDataDiskID = in.OwnedDataDiskID
+ 	return nil
+ }
+ 
+@@ -1086,6 +1089,7 @@ func autoConvert_v1beta3_CloudStackMachineStatus_To_v1beta2_CloudStackMachineSta
+ 	out.Ready = in.Ready
+ 	out.Status = (*string)(unsafe.Pointer(in.Status))
+ 	out.Reason = (*string)(unsafe.Pointer(in.Reason))
++	out.OwnedDataDiskID = in.OwnedDataDiskID
+ 	return nil
+ }
+ 
+diff --git a/api/v1beta3/cloudstackisolatednetwork_types.go b/api/v1beta3/cloudstackisolatednetwork_types.go
+index fc868f1dfae3d373c829b60eda14619bb862ab55..e123b437eb70398e6af025a37fa2bd505f506ace 100644
+--- a/api/v1beta3/cloudstackisolatednetwork_types.go
++++ b/api/v1beta3/cloudstackisolatednetwork_types.go
+@@ -68,6 +68,10 @@ type CloudStackIsolatedNetworkStatus struct {
+ 	// The ID of the lb rule used to assign VMs to the lb.
+ 	LBRuleID string `json:"loadBalancerRuleID,omitempty"`
+ 
++	// RKE2SupervisorLBRuleID is the CAPC-owned TCP 9345 rule.
++	// +optional
++	RKE2SupervisorLBRuleID string `json:"rke2SupervisorLoadBalancerRuleID,omitempty"`
++
+ 	// Routing mode of the network.
+ 	// Routing mode can be Dynamic, or Static.
+ 	// Empty value means the network mode is NATTED, not ROUTED.
+diff --git a/api/v1beta3/cloudstackmachine_types.go b/api/v1beta3/cloudstackmachine_types.go
+index 34946f26a5037c75e99cec710450d1faf9fd8880..4553ef1ae6eadf39c1a6bcde549994586b10acc7 100644
+--- a/api/v1beta3/cloudstackmachine_types.go
++++ b/api/v1beta3/cloudstackmachine_types.go
+@@ -159,6 +159,10 @@ type CloudStackMachineStatus struct {
+ 	// Reason indicates the reason of status failure
+ 	// +optional
+ 	Reason *string `json:"reason,omitempty"`
++
++	// OwnedDataDiskID is the explicitly recorded CAPC deploy-time data disk.
++	// +optional
++	OwnedDataDiskID string `json:"ownedDataDiskID,omitempty"`
+ }
+ 
+ // TimeSinceLastStateChange returns the amount of time that's elapsed since the state was last updated.  If the state
+diff --git a/config/crd/bases/infrastructure.cluster.x-k8s.io_cloudstackisolatednetworks.yaml b/config/crd/bases/infrastructure.cluster.x-k8s.io_cloudstackisolatednetworks.yaml
+index b12fa680d68f6aad106d47a6f0791972c01476e0..d4c33a404bb755e53e9f8b65b114dde986e3a8af 100644
+--- a/config/crd/bases/infrastructure.cluster.x-k8s.io_cloudstackisolatednetworks.yaml
++++ b/config/crd/bases/infrastructure.cluster.x-k8s.io_cloudstackisolatednetworks.yaml
+@@ -71,6 +71,9 @@ spec:
+               loadBalancerRuleID:
+                 description: The ID of the lb rule used to assign VMs to the lb.
+                 type: string
++              rke2SupervisorLoadBalancerRuleID:
++                description: RKE2SupervisorLBRuleID is the CAPC-owned TCP 9345 rule.
++                type: string
+               publicIPID:
+                 description: The CS public IP ID to use for the k8s endpoint.
+                 type: string
+@@ -147,6 +150,9 @@ spec:
+               loadBalancerRuleID:
+                 description: The ID of the lb rule used to assign VMs to the lb.
+                 type: string
++              rke2SupervisorLoadBalancerRuleID:
++                description: RKE2SupervisorLBRuleID is the CAPC-owned TCP 9345 rule.
++                type: string
+               publicIPID:
+                 description: The CS public IP ID to use for the k8s endpoint.
+                 type: string
+@@ -254,6 +260,9 @@ spec:
+               loadBalancerRuleID:
+                 description: The ID of the lb rule used to assign VMs to the lb.
+                 type: string
++              rke2SupervisorLoadBalancerRuleID:
++                description: RKE2SupervisorLBRuleID is the CAPC-owned TCP 9345 rule.
++                type: string
+               publicIPID:
+                 description: The CS public IP ID to use for the k8s endpoint.
+                 type: string
+diff --git a/config/crd/bases/infrastructure.cluster.x-k8s.io_cloudstackmachines.yaml b/config/crd/bases/infrastructure.cluster.x-k8s.io_cloudstackmachines.yaml
+index 3c957df4c7f757ac3180290367b44ae9157fd408..4b8176626d9c1097af7279d787c60cfe3ba7b145 100644
+--- a/config/crd/bases/infrastructure.cluster.x-k8s.io_cloudstackmachines.yaml
++++ b/config/crd/bases/infrastructure.cluster.x-k8s.io_cloudstackmachines.yaml
+@@ -252,6 +252,9 @@ spec:
+                   was last updated.
+                 format: date-time
+                 type: string
++              ownedDataDiskID:
++                description: OwnedDataDiskID is the explicitly recorded CAPC deploy-time data disk.
++                type: string
+               ready:
+                 description: Ready indicates the readiness of the provider resource.
+                 type: boolean
+@@ -487,6 +490,9 @@ spec:
+                   was last updated.
+                 format: date-time
+                 type: string
++              ownedDataDiskID:
++                description: OwnedDataDiskID is the explicitly recorded CAPC deploy-time data disk.
++                type: string
+               ready:
+                 description: Ready indicates the readiness of the provider resource.
+                 type: boolean
+@@ -743,6 +749,9 @@ spec:
+                   was last updated.
+                 format: date-time
+                 type: string
++              ownedDataDiskID:
++                description: OwnedDataDiskID is the explicitly recorded CAPC deploy-time data disk.
++                type: string
+               ready:
+                 description: Ready indicates the readiness of the provider resource.
+                 type: boolean
+diff --git a/pkg/cloud/instance.go b/pkg/cloud/instance.go
+index ad6a7cdc16d05c62e8c9d2117843009acb2bf20f..1f5b3fbbfe39db0c86381b9d3864619a2fcf948f 100644
+--- a/pkg/cloud/instance.go
++++ b/pkg/cloud/instance.go
+@@ -534,7 +534,40 @@ func (c *client) DeployVM(
+ 
+ 	csMachine.Spec.InstanceID = ptr.To(deployVMResp.Id)
+ 	csMachine.Status.Status = ptr.To(metav1.StatusSuccess)
++	return c.recordDeployTimeDataDisk(csMachine)
++}
+ 
++// recordDeployTimeDataDisk records the one DATADISK that CAPC requested as
++// part of VM deployment. The persisted status ID and CloudStack ownership tags
++// must both match before deletion can include the volume. This deliberately
++// fails closed if the result is ambiguous.
++func (c *client) recordDeployTimeDataDisk(csMachine *infrav1.CloudStackMachine) error {
++	if csMachine.Annotations[LayerSentryVolumeOwnershipAnnotation] != "true" {
++		return nil
++	}
++	if csMachine.Spec.DiskOffering.ID == "" && csMachine.Spec.DiskOffering.Name == "" {
++		return nil
++	}
++	p := c.cs.Volume.NewListVolumesParams()
++	p.SetVirtualmachineid(*csMachine.Spec.InstanceID)
++	p.SetType("DATADISK")
++	setIfNotEmpty(c.user.Project.ID, p.SetProjectid)
++	response, err := c.cs.Volume.ListVolumes(p)
++	if err != nil {
++		return errors.Wrap(err, "listing deploy-time data disk")
++	}
++	if response.Count != 1 {
++		return errors.Errorf("expected exactly one deploy-time data disk, found %d", response.Count)
++	}
++	volumeID := response.Volumes[0].Id
++	tags := map[string]string{
++		CreatedByCAPCTagName:              "1",
++		generateMachineTagName(csMachine): "1",
++	}
++	if err := c.AddTags(ResourceTypeVolume, volumeID, tags); err != nil {
++		return errors.Wrapf(err, "tagging deploy-time data disk %s", volumeID)
++	}
++	csMachine.Status.OwnedDataDiskID = volumeID
+ 	return nil
+ }
+ 
+@@ -611,7 +644,7 @@ func (c *client) DestroyVMInstance(csMachine *infrav1.CloudStackMachine) error {
+ 
+ 	// Attempt deletion regardless of machine state.
+ 	p2 := c.csAsync.VirtualMachine.NewDestroyVirtualMachineParams(*csMachine.Spec.InstanceID)
+-	volIDs, err := c.listVMInstanceDatadiskVolumeIDs(*csMachine.Spec.InstanceID)
++	volIDs, err := c.listVMInstanceOwnedDatadiskVolumeIDs(csMachine)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -641,9 +674,9 @@ func (c *client) DestroyVMInstance(csMachine *infrav1.CloudStackMachine) error {
+ 	return errors.New("VM deletion in progress")
+ }
+ 
+-func (c *client) listVMInstanceDatadiskVolumeIDs(instanceID string) ([]string, error) {
++func (c *client) listVMInstanceOwnedDatadiskVolumeIDs(csMachine *infrav1.CloudStackMachine) ([]string, error) {
+ 	p := c.cs.Volume.NewListVolumesParams()
+-	p.SetVirtualmachineid(instanceID)
++	p.SetVirtualmachineid(*csMachine.Spec.InstanceID)
+ 	// VM root volumes are destroyed automatically, no need to explicitly include
+ 	p.SetType("DATADISK")
+ 	setIfNotEmpty(c.user.Project.ID, p.SetProjectid)
+@@ -653,10 +686,24 @@ func (c *client) listVMInstanceDatadiskVolumeIDs(instanceID string) ([]string, e
+ 		c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
+ 		return nil, err
+ 	}
++	if csMachine.Annotations[LayerSentryVolumeOwnershipAnnotation] != "true" {
++		// Never pass attached DATADISK IDs through VM destruction without the
++		// explicit ownership contract. Older/unmanaged disks are retained.
++		return nil, nil
++	}
+ 
+ 	var ret []string
+ 	for _, vol := range listVOLResp.Volumes {
+-		ret = append(ret, vol.Id)
++		if vol.Id != csMachine.Status.OwnedDataDiskID {
++			continue
++		}
++		tags, err := c.GetTags(ResourceTypeVolume, vol.Id)
++		if err != nil {
++			return nil, errors.Wrapf(err, "checking ownership of data disk %s", vol.Id)
++		}
++		if tags[CreatedByCAPCTagName] == "1" && tags[generateMachineTagName(csMachine)] == "1" {
++			ret = append(ret, vol.Id)
++		}
+ 	}
+ 
+ 	return ret, nil
+diff --git a/pkg/cloud/instance_test.go b/pkg/cloud/instance_test.go
+index 52d42b85b3979fa13a1f4f79405a6461710989d8..b7dc213c724ba6baa0056676b46a2861146332d8 100644
+--- a/pkg/cloud/instance_test.go
++++ b/pkg/cloud/instance_test.go
+@@ -909,6 +909,41 @@ var _ = ginkgo.Describe("Instance", func() {
+ 				Should(gomega.Succeed())
+ 		})
+ 
++		ginkgo.It("destroys only the recorded and tagged deploy-time disk", func() {
++			dummies.CSMachine1.UID = "machine-uid"
++			dummies.CSMachine1.Annotations = map[string]string{
++				cloud.LayerSentryVolumeOwnershipAnnotation: "true",
++			}
++			dummies.CSMachine1.Status.OwnedDataDiskID = "owned-volume"
++			listVolumesParams.SetVirtualmachineid(*dummies.CSMachine1.Spec.InstanceID)
++			listVolumesParams.SetType("DATADISK")
++			listVolumesResponse.Volumes = []*cloudstack.Volume{
++				{Id: "owned-volume"},
++				{Id: "csi-workload-volume"},
++			}
++			listVolumesResponse.Count = 2
++
++			vms.EXPECT().NewDestroyVirtualMachineParams(*dummies.CSMachine1.Spec.InstanceID).
++				Return(expungeDestroyParams)
++			vs.EXPECT().NewListVolumesParams().Return(listVolumesParams)
++			vs.EXPECT().ListVolumes(listVolumesParams).Return(listVolumesResponse, nil)
++			rtags := mockClient.Resourcetags.(*cloudstack.MockResourcetagsServiceIface)
++			rtags.EXPECT().NewListTagsParams().Return(&cloudstack.ListTagsParams{})
++			rtags.EXPECT().ListTags(gomock.Any()).Return(&cloudstack.ListTagsResponse{Tags: []*cloudstack.Tag{
++				{Key: cloud.CreatedByCAPCTagName, Value: "1"},
++				{Key: cloud.MachineTagNamePrefix + "machine-uid", Value: "1"},
++			}}, nil)
++			vms.EXPECT().DestroyVirtualMachine(expungeDestroyParams).DoAndReturn(
++				func(params *cloudstack.DestroyVirtualMachineParams) (*cloudstack.DestroyVirtualMachineResponse, error) {
++					volumeIDs, present := params.GetVolumeids()
++					gomega.Ω(present).Should(gomega.BeTrue())
++					gomega.Ω(volumeIDs).Should(gomega.Equal([]string{"owned-volume"}))
++					return nil, fmt.Errorf("unable to find uuid for id")
++				})
++
++			gomega.Ω(client.DestroyVMInstance(dummies.CSMachine1)).Should(gomega.Succeed())
++		})
++
+ 		ginkgo.It("calls destroy and returns unexpected error", func() {
+ 			listVolumesParams.SetVirtualmachineid(*dummies.CSMachine1.Spec.InstanceID)
+ 			listVolumesParams.SetType("DATADISK")
+diff --git a/pkg/cloud/isolated_network.go b/pkg/cloud/isolated_network.go
+index b761a7c71a7daf710b26aeb90a5da6639daf5fdf..5be1f103501e425de1a73d1d4b11782b546c445a 100644
+--- a/pkg/cloud/isolated_network.go
++++ b/pkg/cloud/isolated_network.go
+@@ -39,6 +39,8 @@ type IsoNetworkIface interface {
+ 	DisposeIsoNetResources(*infrav1.CloudStackIsolatedNetwork, *infrav1.CloudStackCluster) error
+ }
+ 
++const LayerSentryRKE2EndpointAnnotation = "infrastructure.cluster.x-k8s.io/layersentry-rke2-endpoint"
++
+ // getOfferingID fetches an offering id.
+ func (c *client) getOfferingID(offeringName string) (string, error) {
+ 	offeringID, count, retErr := c.cs.NetworkOffering.GetNetworkOfferingID(offeringName)
+@@ -256,6 +258,46 @@ func (c *client) ResolveLoadBalancerRuleDetails(
+ 	return errors.New("no load balancer rule found")
+ }
+ 
++func (c *client) resolveRKE2SupervisorLoadBalancerRule(isoNet *infrav1.CloudStackIsolatedNetwork) error {
++	p := c.cs.LoadBalancer.NewListLoadBalancerRulesParams()
++	p.SetPublicipid(isoNet.Status.PublicIPID)
++	setIfNotEmpty(c.user.Project.ID, p.SetProjectid)
++	rules, err := c.cs.LoadBalancer.ListLoadBalancerRules(p)
++	if err != nil {
++		c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
++		return errors.Wrap(err, "listing RKE2 supervisor load balancer rules")
++	}
++	for _, rule := range rules.LoadBalancerRules {
++		if rule.Publicport == strconv.Itoa(RKE2SupervisorPort) {
++			isoNet.Status.RKE2SupervisorLBRuleID = rule.Id
++			return nil
++		}
++	}
++	return errors.New("no RKE2 supervisor load balancer rule found")
++}
++
++func (c *client) getOrCreateRKE2SupervisorLoadBalancerRule(isoNet *infrav1.CloudStackIsolatedNetwork) error {
++	if err := c.resolveRKE2SupervisorLoadBalancerRule(isoNet); err == nil {
++		return nil
++	} else if !strings.Contains(strings.ToLower(err.Error()), "no rke2 supervisor load balancer rule found") {
++		return errors.Wrap(err, "resolving RKE2 supervisor load balancer rule")
++	}
++
++	p := c.cs.LoadBalancer.NewCreateLoadBalancerRuleParams(
++		"roundrobin", "RKE2_Supervisor", RKE2SupervisorPort, RKE2SupervisorPort)
++	p.SetPublicport(RKE2SupervisorPort)
++	p.SetNetworkid(isoNet.Spec.ID)
++	p.SetPublicipid(isoNet.Status.PublicIPID)
++	p.SetProtocol(NetworkProtocolTCP)
++	resp, err := c.cs.LoadBalancer.CreateLoadBalancerRule(p)
++	if err != nil {
++		c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
++		return errors.Wrap(err, "creating RKE2 supervisor load balancer rule")
++	}
++	isoNet.Status.RKE2SupervisorLBRuleID = resp.Id
++	return nil
++}
++
+ // GetOrCreateLoadBalancerRule Create a load balancer rule that can be assigned to instances.
+ func (c *client) GetOrCreateLoadBalancerRule(
+ 	isoNet *infrav1.CloudStackIsolatedNetwork,
+@@ -272,9 +314,14 @@ func (c *client) GetOrCreateLoadBalancerRule(
+ 		isoNet.Spec.ControlPlaneEndpoint.Port = 6443
+ 	}
+ 
+-	// Check if rule exists.
+-	if err := c.ResolveLoadBalancerRuleDetails(isoNet); err == nil ||
+-		!strings.Contains(strings.ToLower(err.Error()), "no load balancer rule found") {
++	// Check if the Kubernetes API rule exists. A LayerSentry RKE2 cluster owns
++	// the supervisor rule in the same CAPC reconciliation lifecycle.
++	if err := c.ResolveLoadBalancerRuleDetails(isoNet); err == nil {
++		if csCluster.Annotations[LayerSentryRKE2EndpointAnnotation] == "true" {
++			return c.getOrCreateRKE2SupervisorLoadBalancerRule(isoNet)
++		}
++		return nil
++	} else if !strings.Contains(strings.ToLower(err.Error()), "no load balancer rule found") {
+ 		return errors.Wrap(err, "resolving load balancer rule details")
+ 	}
+ 
+@@ -291,6 +338,10 @@ func (c *client) GetOrCreateLoadBalancerRule(
+ 		return err
+ 	}
+ 	isoNet.Status.LBRuleID = resp.Id
++
++	if csCluster.Annotations[LayerSentryRKE2EndpointAnnotation] == "true" {
++		return c.getOrCreateRKE2SupervisorLoadBalancerRule(isoNet)
++	}
+ 	return nil
+ }
+ 
+@@ -348,26 +399,35 @@ func (c *client) GetOrCreateIsolatedNetwork(
+ 
+ // AssignVMToLoadBalancerRule assigns a VM instance to a load balancing rule (specifying lb membership).
+ func (c *client) AssignVMToLoadBalancerRule(isoNet *infrav1.CloudStackIsolatedNetwork, instanceID string) (retErr error) {
++	for _, ruleID := range []string{isoNet.Status.LBRuleID, isoNet.Status.RKE2SupervisorLBRuleID} {
++		if ruleID == "" {
++			continue
++		}
++		lbRuleInstances, err := c.cs.LoadBalancer.ListLoadBalancerRuleInstances(
++			c.cs.LoadBalancer.NewListLoadBalancerRuleInstancesParams(ruleID))
++		if err != nil {
++			c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
++			return err
++		}
++		alreadyAssigned := false
++		for _, instance := range lbRuleInstances.LoadBalancerRuleInstances {
++			if instance.Id == instanceID {
++				alreadyAssigned = true
++				break
++			}
++		}
++		if alreadyAssigned {
++			continue
++		}
+ 
+-	// Check that the instance isn't already in LB rotation.
+-	lbRuleInstances, retErr := c.cs.LoadBalancer.ListLoadBalancerRuleInstances(
+-		c.cs.LoadBalancer.NewListLoadBalancerRuleInstancesParams(isoNet.Status.LBRuleID))
+-	if retErr != nil {
+-		c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(retErr)
+-		return retErr
+-	}
+-	for _, instance := range lbRuleInstances.LoadBalancerRuleInstances {
+-		if instance.Id == instanceID { // Already assigned to load balancer..
+-			return nil
++		p := c.cs.LoadBalancer.NewAssignToLoadBalancerRuleParams(ruleID)
++		p.SetVirtualmachineids([]string{instanceID})
++		if _, err := c.cs.LoadBalancer.AssignToLoadBalancerRule(p); err != nil {
++			c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
++			return err
+ 		}
+ 	}
+-
+-	// Assign to Load Balancer.
+-	p := c.cs.LoadBalancer.NewAssignToLoadBalancerRuleParams(isoNet.Status.LBRuleID)
+-	p.SetVirtualmachineids([]string{instanceID})
+-	_, retErr = c.cs.LoadBalancer.AssignToLoadBalancerRule(p)
+-	c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(retErr)
+-	return retErr
++	return nil
+ }
+ 
+ // DeleteNetwork deletes an isolated network.
+@@ -382,6 +442,14 @@ func (c *client) DisposeIsoNetResources(
+ 	isoNet *infrav1.CloudStackIsolatedNetwork,
+ 	csCluster *infrav1.CloudStackCluster,
+ ) (retError error) {
++	if isoNet.Status.RKE2SupervisorLBRuleID != "" {
++		p := c.cs.LoadBalancer.NewDeleteLoadBalancerRuleParams(isoNet.Status.RKE2SupervisorLBRuleID)
++		if _, err := c.cs.LoadBalancer.DeleteLoadBalancerRule(p); err != nil &&
++			!strings.Contains(strings.ToLower(err.Error()), "no match found") {
++			return errors.Wrap(err, "deleting RKE2 supervisor load balancer rule")
++		}
++		isoNet.Status.RKE2SupervisorLBRuleID = ""
++	}
+ 	if isoNet.Status.PublicIPID != "" {
+ 		if err := c.DeleteClusterTag(ResourceTypeIPAddress, isoNet.Status.PublicIPID, csCluster); err != nil {
+ 			return err
+diff --git a/pkg/cloud/isolated_network_test.go b/pkg/cloud/isolated_network_test.go
+index 8db967d79829d150e074c3e99e2c5c65cf4d79fd..77cbceb9ef7f9473b34ce45c72986349bee2a31c 100644
+--- a/pkg/cloud/isolated_network_test.go
++++ b/pkg/cloud/isolated_network_test.go
+@@ -368,6 +368,46 @@ var _ = ginkgo.Describe("Network", func() {
+ 		})
+ 	})
+ 
++	ginkgo.Context("LayerSentry RKE2 endpoint ownership", func() {
++		ginkgo.It("resolves both 6443 and 9345 rules under CAPC ownership", func() {
++			dummies.CSCluster.Annotations = map[string]string{cloud.LayerSentryRKE2EndpointAnnotation: "true"}
++			dummies.CSISONet1.Status.LBRuleID = ""
++			dummies.CSISONet1.Status.RKE2SupervisorLBRuleID = ""
++
++			lbs.EXPECT().NewListLoadBalancerRulesParams().Return(&csapi.ListLoadBalancerRulesParams{}).Times(2)
++			lbs.EXPECT().ListLoadBalancerRules(gomock.Any()).Return(
++				&csapi.ListLoadBalancerRulesResponse{LoadBalancerRules: []*csapi.LoadBalancerRule{{
++					Publicport: strconv.Itoa(int(dummies.EndPointPort)), Id: "api-rule",
++				}}}, nil)
++			lbs.EXPECT().ListLoadBalancerRules(gomock.Any()).Return(
++				&csapi.ListLoadBalancerRulesResponse{LoadBalancerRules: []*csapi.LoadBalancerRule{{
++					Publicport: strconv.Itoa(cloud.RKE2SupervisorPort), Id: "supervisor-rule",
++				}}}, nil)
++
++			gomega.Ω(client.GetOrCreateLoadBalancerRule(dummies.CSISONet1, dummies.CSCluster)).Should(gomega.Succeed())
++			gomega.Ω(dummies.CSISONet1.Status.LBRuleID).Should(gomega.Equal("api-rule"))
++			gomega.Ω(dummies.CSISONet1.Status.RKE2SupervisorLBRuleID).Should(gomega.Equal("supervisor-rule"))
++		})
++
++		ginkgo.It("assigns every control-plane VM to both owned rules", func() {
++			dummies.CSISONet1.Status.LBRuleID = "api-rule"
++			dummies.CSISONet1.Status.RKE2SupervisorLBRuleID = "supervisor-rule"
++			for _, ruleID := range []string{"api-rule", "supervisor-rule"} {
++				listParams := &csapi.ListLoadBalancerRuleInstancesParams{}
++				assignParams := &csapi.AssignToLoadBalancerRuleParams{}
++				lbs.EXPECT().NewListLoadBalancerRuleInstancesParams(ruleID).Return(listParams)
++				lbs.EXPECT().ListLoadBalancerRuleInstances(listParams).
++					Return(&csapi.ListLoadBalancerRuleInstancesResponse{}, nil)
++				lbs.EXPECT().NewAssignToLoadBalancerRuleParams(ruleID).Return(assignParams)
++				lbs.EXPECT().AssignToLoadBalancerRule(assignParams).
++					Return(&csapi.AssignToLoadBalancerRuleResponse{}, nil)
++			}
++
++			gomega.Ω(client.AssignVMToLoadBalancerRule(
++				dummies.CSISONet1, *dummies.CSMachine1.Spec.InstanceID)).Should(gomega.Succeed())
++		})
++	})
++
+ 	ginkgo.Context("load balancer rule does not exist", func() {
+ 		ginkgo.It("calls cloudstack to create a new load balancer rule.", func() {
+ 			lbs.EXPECT().NewListLoadBalancerRulesParams().Return(&csapi.ListLoadBalancerRulesParams{})
+diff --git a/pkg/cloud/network.go b/pkg/cloud/network.go
+index 7adce7da0a78ed1ab3da683515fe85356c84c60b..8a8c44ddea360f05619dd80b96204ebaf757172f 100644
+--- a/pkg/cloud/network.go
++++ b/pkg/cloud/network.go
+@@ -32,6 +32,7 @@ const (
+ 	NetOffering         = "DefaultIsolatedNetworkOfferingWithSourceNatService"
+ 	NetVPCOffering      = "DefaultIsolatedNetworkOfferingForVpcNetworks"
+ 	K8sDefaultAPIPort   = 6443
++	RKE2SupervisorPort  = 9345
+ 	NetworkTypeIsolated = "Isolated"
+ 	NetworkTypeShared   = "Shared"
+ 	NetworkProtocolTCP  = "tcp"
+diff --git a/pkg/cloud/tags.go b/pkg/cloud/tags.go
+index 28dc79073f5b6819fca773e6d2b3fe6a1f97b7a1..9ce773b27500631da56ce4f808ccfe08b51fcfe4 100644
+--- a/pkg/cloud/tags.go
++++ b/pkg/cloud/tags.go
+@@ -39,10 +39,13 @@ type TagIface interface {
+ type ResourceType string
+ 
+ const (
+-	ClusterTagNamePrefix               = "CAPC_cluster_"
+-	CreatedByCAPCTagName               = "created_by_CAPC"
+-	ResourceTypeNetwork   ResourceType = "Network"
+-	ResourceTypeIPAddress ResourceType = "PublicIpAddress"
++	ClusterTagNamePrefix                              = "CAPC_cluster_"
++	MachineTagNamePrefix                              = "CAPC_machine_"
++	CreatedByCAPCTagName                              = "created_by_CAPC"
++	LayerSentryVolumeOwnershipAnnotation              = "infrastructure.cluster.x-k8s.io/layersentry-volume-ownership"
++	ResourceTypeNetwork                  ResourceType = "Network"
++	ResourceTypeIPAddress                ResourceType = "PublicIpAddress"
++	ResourceTypeVolume                   ResourceType = "Volume"
+ )
+ 
+ // ignoreAlreadyPresentErrors returns nil if the error is an already present tag error.
+@@ -166,3 +169,7 @@ func (c *client) DeleteTags(resourceType ResourceType, resourceID string, tagsTo
+ func generateClusterTagName(csCluster *infrav1.CloudStackCluster) string {
+ 	return ClusterTagNamePrefix + string(csCluster.UID)
+ }
++
++func generateMachineTagName(csMachine *infrav1.CloudStackMachine) string {
++	return MachineTagNamePrefix + string(csMachine.UID)
++}
+
+

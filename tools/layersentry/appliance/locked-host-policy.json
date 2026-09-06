@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "profile": "layersentry-rocky9-kvm-v1",
+  "os": {"id": "rocky", "major": 9},
+  "allowed_repositories": ["baseos", "appstream", "crb", "epel", "cloudstack", "layersentry"],
+  "required_repo_controls": {"gpgcheck": true, "repo_gpgcheck": true, "sslverify": true},
+  "package_allowlist": [
+    "aide", "audit", "cloudstack-agent", "cloudstack-management", "device-mapper-multipath",
+    "dnf-automatic", "dnf-plugin-versionlock", "fapolicyd", "firewalld", "iscsi-initiator-utils",
+    "kernel", "kernel-core", "kernel-modules", "libvirt", "lvm2", "openssh-server",
+    "policycoreutils", "python3", "qemu-kvm", "rocky-gpg-keys", "selinux-policy-targeted"
+  ],
+  "mutable_exceptions": [
+    "/etc/cloudstack/agent", "/etc/iscsi", "/etc/multipath", "/etc/multipath.conf",
+    "/var/lib/cloudstack", "/var/lib/iscsi", "/var/lib/libvirt", "/var/log"
+  ],
+  "required_services": ["auditd", "fapolicyd", "firewalld"],
+  "root_ssh_login": "no",
+  "ebpf_mode": "observe-only"
+}

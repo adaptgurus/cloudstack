@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly PROGRAM="${0##*/}"
+readonly POLICY_DEFAULT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/locked-host-policy.json"
+
+usage() {
+  echo "usage: $PROGRAM {preflight|stage|apply|verify|rollback|verify-package-lock} [--policy FILE] [--stage DIR] [--evidence FILE] [--lock FILE] [--execute]" >&2
+}
+
+die() { echo "$PROGRAM: $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
+
+policy="$POLICY_DEFAULT"; stage="/var/lib/layersentry/locked-host/staged"; evidence=""; lock=""; execute=false
+[[ $# -gt 0 ]] || { usage; exit 2; }; action="$1"; shift
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --policy) [[ $# -ge 2 ]] || die "--policy requires a value"; policy="$2"; shift 2 ;;
+    --stage) [[ $# -ge 2 ]] || die "--stage requires a value"; stage="$2"; shift 2 ;;
+    --evidence) [[ $# -ge 2 ]] || die "--evidence requires a value"; evidence="$2"; shift 2 ;;
+    --lock) [[ $# -ge 2 ]] || die "--lock requires a value"; lock="$2"; shift 2 ;;
+    --execute) execute=true; shift ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+need python3
+[[ -f "$policy" && ! -L "$policy" ]] || die "policy must be a regular non-symlink file"
+
+json() { python3 - "$policy" "$1" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    value=json.load(stream)
+for item in sys.argv[2].split('.'):
+    value=value[item]
+if isinstance(value, list): print("\n".join(value))
+elif isinstance(value, bool): print(str(value).lower())
+else: print(value)
+PY
+}
+
+preflight() {
+  [[ -r /etc/os-release ]] || die "cannot identify host OS"
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  [[ "${ID:-}" == "$(json os.id)" && "${VERSION_ID%%.*}" == "$(json os.major)" ]] ||
+    die "profile requires Rocky Linux 9"
+  need dnf; need rpm; need systemctl; need firewall-cmd; need getenforce
+  [[ "$(getenforce)" == Enforcing ]] || die "SELinux must already be Enforcing"
+  echo "PREFLIGHT_OK profile=$(json profile) mutation=false"
+}
+
+stage_profile() {
+  preflight
+  [[ "$stage" == /* && "$stage" != / ]] || die "stage must be a non-root absolute path"
+  install -d -m 0700 "$stage"
+  python3 - /etc/dnf/dnf.conf "$stage/dnf.conf" <<'PY'
+import configparser, os, sys
+source, target = sys.argv[1:]
+config = configparser.RawConfigParser(strict=False)
+config.read(source)
+if not config.has_section("main"): config.add_section("main")
+for key, value in (("gpgcheck", "True"), ("repo_gpgcheck", "True"),
+                   ("sslverify", "True"), ("best", "True"),
+                   ("installonly_limit", "3")):
+    config.set("main", key, value)
+with open(target, "w", encoding="utf-8") as stream: config.write(stream)
+PY
+  cat >"$stage/99-layersentry-root-login.conf" <<EOF
+PermitRootLogin $(json root_ssh_login)
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+EOF
+  cat >"$stage/README" <<EOF
+Generated profile: $(json profile)
+eBPF is detection-only; auditd remains authoritative audit evidence.
+Mutable storage/agent exceptions are declared in the policy and require separate validation.
+EOF
+  chmod 0600 "$stage"/*
+  echo "STAGE_OK path=$stage mutation=staging-only"
+}
+
+validate_access_evidence() {
+  [[ -n "$evidence" && -f "$evidence" && ! -L "$evidence" ]] ||
+    die "root SSH restriction requires --evidence regular file"
+  python3 - "$evidence" <<'PY'
+import json, os, stat, sys
+p=sys.argv[1]; st=os.stat(p)
+if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH): raise SystemExit("evidence is group/world writable")
+with open(p, encoding="utf-8") as f: e=json.load(f)
+required=("admin_user", "ssh_key_login_tested", "sudo_tested", "oob_break_glass_tested", "tested_at")
+if not all(e.get(k) for k in required): raise SystemExit("access evidence is incomplete")
+if e["admin_user"] == "root": raise SystemExit("admin_user must be non-root")
+PY
+}
+
+apply_profile() {
+  [[ "$execute" == true ]] || die "apply is dry by default; rerun with --execute after reviewing the stage"
+  [[ $EUID -eq 0 ]] || die "apply requires root"
+  validate_access_evidence
+  [[ -f "$stage/dnf.conf" && -f "$stage/99-layersentry-root-login.conf" ]] || die "stage is incomplete"
+  need sshd; sshd -t -f /etc/ssh/sshd_config
+  local state="/var/lib/layersentry/locked-host" backup="$state/backups/$(date -u +%Y%m%dT%H%M%SZ)"
+  install -d -m 0700 "$backup"
+  for target in /etc/dnf/dnf.conf /etc/ssh/sshd_config.d/99-layersentry-root-login.conf; do
+    [[ ! -e "$target" ]] || cp -a -- "$target" "$backup/"
+  done
+  install -d -m 0755 /etc/ssh/sshd_config.d
+  install -m 0644 "$stage/dnf.conf" /etc/dnf/dnf.conf
+  install -m 0644 "$stage/99-layersentry-root-login.conf" /etc/ssh/sshd_config.d/99-layersentry-root-login.conf
+  sshd -t || { cp -a -- "$backup"/* /etc/ssh/sshd_config.d/ 2>/dev/null || true; die "sshd validation failed; attempted rollback"; }
+  printf '%s\n' "$backup" >"$state/last-backup"
+  echo "APPLY_OK backup=$backup restart_required=sshd package_changes=false"
+}
+
+verify_profile() {
+  preflight
+  need dnf; local failures=0 id enabled allowed=false
+  while IFS= read -r enabled; do
+    [[ -z "$enabled" ]] && continue; allowed=false
+    while IFS= read -r id; do [[ "$enabled" == "$id" ]] && allowed=true; done < <(json allowed_repositories)
+    [[ "$allowed" == true ]] || { echo "FAIL enabled repository is not allowlisted: $enabled"; failures=1; }
+  done < <(dnf -q repolist --enabled 2>/dev/null | awk 'NR>1 {print $1}')
+  while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    if dnf -q repolist --enabled 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$id"; then
+      for key in gpgcheck repo_gpgcheck sslverify; do
+        dnf -q config-manager --dump "$id" 2>/dev/null | grep -Eq "^${key}[[:space:]]*=[[:space:]]*(1|True)$" || { echo "FAIL repo=$id control=$key"; failures=1; }
+      done
+    fi
+  done < <(json allowed_repositories)
+  [[ -f /etc/ssh/sshd_config.d/99-layersentry-root-login.conf ]] || { echo "FAIL root-login drop-in absent"; failures=1; }
+  for service in $(json required_services); do systemctl is-enabled --quiet "$service" || { echo "FAIL service=$service not-enabled"; failures=1; }; done
+  [[ $failures -eq 0 ]] || die "verification failed"
+  echo "VERIFY_OK profile=$(json profile)"
+}
+
+rollback_profile() {
+  [[ "$execute" == true && $EUID -eq 0 ]] || die "rollback requires root and --execute"
+  local state=/var/lib/layersentry/locked-host backup
+  [[ -r "$state/last-backup" ]] || die "no rollback checkpoint"
+  backup=$(<"$state/last-backup"); [[ "$backup" == "$state"/backups/* && -d "$backup" ]] || die "invalid rollback checkpoint"
+  rm -f /etc/ssh/sshd_config.d/99-layersentry-root-login.conf
+  for saved in "$backup"/*; do [[ -e "$saved" ]] || continue; case "${saved##*/}" in dnf.conf) install -m 0644 "$saved" /etc/dnf/dnf.conf ;; 99-layersentry-root-login.conf) install -m 0644 "$saved" /etc/ssh/sshd_config.d/ ;; esac; done
+  sshd -t || die "rollback restored an invalid SSH configuration; use OOB recovery"
+  echo "ROLLBACK_OK restart_required=sshd"
+}
+
+verify_package_lock() {
+  [[ -n "$lock" && -f "$lock" && ! -L "$lock" ]] || die "--lock must name a regular non-symlink JSON file"
+  need rpm
+  python3 - "$lock" <<'PY'
+import json, subprocess, sys
+with open(sys.argv[1], encoding="utf-8") as stream: expected=json.load(stream)
+if expected.get("schema_version") != 1 or not isinstance(expected.get("nevra"), list):
+    raise SystemExit("invalid package-lock schema")
+if len(expected["nevra"]) != len(set(expected["nevra"])):
+    raise SystemExit("duplicate package-lock entry")
+actual=subprocess.check_output(
+    ["rpm", "-qa", "--qf", "%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n"], text=True
+).splitlines()
+missing=sorted(set(expected["nevra"])-set(actual)); extra=sorted(set(actual)-set(expected["nevra"]))
+if missing or extra:
+    print(json.dumps({"missing": missing, "extra": extra}, sort_keys=True))
+    raise SystemExit("installed package set differs from exact lock")
+print("PACKAGE_LOCK_OK packages=%d" % len(actual))
+PY
+}
+
+case "$action" in preflight) preflight ;; stage) stage_profile ;; apply) apply_profile ;; verify) verify_profile ;; rollback) rollback_profile ;; verify-package-lock) verify_package_lock ;; *) usage; exit 2 ;; esac
