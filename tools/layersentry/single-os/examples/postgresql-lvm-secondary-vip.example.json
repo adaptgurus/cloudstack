@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "request_id": "11111111-1111-4111-8111-111111111111",
+  "service_id": "22222222-2222-4222-8222-222222222222",
+  "operation_id": "33333333-3333-4333-8333-333333333333",
+  "idempotency_key": "customer-change-0001",
+  "category": "database",
+  "provider": "postgresql",
+  "release_line": "17",
+  "topology": "standalone",
+  "lvm": [
+    {
+      "name": "ls_pgvg",
+      "devices": [
+        "/dev/disk/by-id/scsi-REPLACE-DATA-DISK-1",
+        "/dev/disk/by-id/scsi-REPLACE-DATA-DISK-2"
+      ],
+      "initialize_pvs": true,
+      "confirm_pv_initialize": true,
+      "logical_volumes": [
+        {
+          "name": "ls_pgdata",
+          "size": "80G",
+          "mount_point": "/data/postgresql",
+          "purpose": "database-data",
+          "filesystem": "xfs",
+          "format": true,
+          "confirm_format": true
+        },
+        {
+          "name": "ls_pgwal",
+          "size": "30G",
+          "mount_point": "/data/postgresql-wal",
+          "purpose": "database-wal",
+          "filesystem": "xfs",
+          "format": true,
+          "confirm_format": true
+        },
+        {
+          "name": "ls_pglogs",
+          "size": "100%FREE",
+          "mount_point": "/data/postgresql-logs",
+          "purpose": "database-logs",
+          "filesystem": "xfs",
+          "format": true,
+          "confirm_format": true
+        }
+      ]
+    }
+  ],
+  "network": {
+    "listen_address": "10.10.10.50",
+    "port": 5432,
+    "allowed_cidrs": ["10.10.20.0/24"],
+    "vip": {
+      "mode": "secondary",
+      "address": "10.10.10.50",
+      "prefix_length": 24,
+      "interface": "eth0"
+    }
+  },
+  "maintenance": {
+    "mode": "weekly",
+    "day": "Sunday",
+    "window": "02:00-04:00",
+    "auto_patch": true,
+    "release_line_locked": true
+  },
+  "backup": {
+    "enabled": true,
+    "schedule": "daily",
+    "retention": 7
+  },
+  "secret_refs": {
+    "admin_password": "secret://0123456789abcdef0123456789abcdef"
+  }
+}

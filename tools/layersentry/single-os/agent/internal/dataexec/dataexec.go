@@ -19,7 +19,7 @@ import (
 
 const DefaultSocket="/run/layersentryd/data-exec.sock"
 const maxMessage=2<<20
-var labelSources=map[string]bool{"/var/lib/redis":true,"/var/lib/valkey":true,"/var/www":true,"/var/lib/tomcat":true,"/var/lib/layersentryd/apps":true}
+var labelSources=map[string]bool{"/var/lib/pgsql":true,"/var/lib/redis":true,"/var/lib/valkey":true,"/var/www":true,"/var/lib/tomcat":true,"/var/lib/layersentryd/apps":true}
 type request struct{Path string `json:"path"`;Args []string `json:"args"`}
 type response struct{Stdout string `json:"stdout,omitempty"`;Stderr string `json:"stderr,omitempty"`;ExitCode int `json:"exit_code"`;Error string `json:"error,omitempty"`}
 type Client struct{Socket string;Timeout time.Duration}
