@@ -128,7 +128,8 @@ class FluxInstaller:
                 if saved and saved.get('uid'):raise InvalidRequestError('an owned Flux resource was deleted; explicit recovery is required')
                 results.append((doc,None,False));continue
             if not record or not saved:raise InvalidRequestError('preexisting central Flux resource is not owned by this journal')
-            desired=desired_resource(doc,self.bundle.digest,record['nonce'])
+            if not isinstance(saved.get('nonce'),str) or len(saved['nonce'])!=32:raise InvalidRequestError('central Flux object intent binding is absent')
+            desired=desired_resource(doc,self.bundle.digest,saved['nonce'])
             meta=actual.get('metadata',{});uid=meta.get('uid')
             if not isinstance(uid,str) or not uid or not contains(actual,desired) or (saved.get('uid') and saved['uid']!=uid):raise InvalidRequestError('central Flux resource ownership or approved specification drifted')
             if meta.get('deletionTimestamp'):raise InvalidRequestError('owned central Flux resource is being deleted')
@@ -160,8 +161,10 @@ class FluxInstaller:
                 if not is_ready:return False
                 continue
             collection,path=route(doc)
-            record['objects'][path]={'state':'SUBMITTING'};journal.save()
-            try:api.create(collection,desired_resource(doc,self.bundle.digest,record['nonce']))
+            saved=record['objects'].setdefault(path,{'nonce':secrets.token_hex(16)})
+            if not isinstance(saved.get('nonce'),str) or len(saved['nonce'])!=32:raise InvalidRequestError('central Flux object intent binding is absent')
+            saved['state']='SUBMITTING';journal.save()
+            try:api.create(collection,desired_resource(doc,self.bundle.digest,saved['nonce']))
             except InvalidRequestError:
                 record['objects'][path]['state']='UNKNOWN';journal.save();raise
             record['objects'][path]['state']='SUBMITTED';journal.save()

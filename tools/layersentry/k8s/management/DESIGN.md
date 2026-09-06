@@ -106,8 +106,9 @@ cluster-admin locally is unnecessary for remote reconciliation. Official guidanc
 permits removing aggregate roles and unused token creation. No upstream core patches
 or new package readiness claims result.
 
-The installer creates only exact approved native resource identities, saves operation
-nonce/bundle binding before POST, observes before retry, rejects foreign or changed
+The installer creates only exact approved native resource identities, saves independent per-object
+nonce/bundle binding before POST (an earlier public annotation cannot predict the
+next resource intent), observes before retry, rejects foreign or changed
 resources and records native UIDs. It never overwrites an existing object or repairs
 a deleted owned object silently. Exact controller args/images, CRD served schemas,
 RBAC and current-generation readiness gate completion. CAPI readiness alone cannot
