@@ -21,12 +21,10 @@ import { vueProps } from '@/vue-app'
 const loadedLanguage = []
 const messages = {}
 
-// Keep upstream API/resource names unchanged, but present infrastructure in
-// customer language. CloudStack's backend Zone and Pod objects remain untouched;
-// only their customer-facing labels are translated to Site and Infrastructure
-// group. The zone wizard separately calls the Pod networking step Management
-// network because that is what the customer is configuring there.
-const layersentryEnglishTerminology = {
+// Keep upstream API/resource names unchanged, but present LayerSentry's KVM
+// infrastructure in customer language. CloudStack's backend resource model is
+// untouched. Ambiguous concepts such as Cluster are not globally renamed.
+export const layersentryEnglishTerminology = {
   'label.layersentry.quick.provision': 'Quick Provision',
   'label.layersentry.platform-admin': 'Platform Administrator',
   'label.layersentry.department-admin': 'Department Administrator',
@@ -34,6 +32,7 @@ const layersentryEnglishTerminology = {
   'label.layersentry.read-only': 'Read-only / Auditor',
   'label.layersentry.project': 'Project',
   'label.layersentry.platform.operations': 'LayerSentry Platform Operations',
+  'label.layersentry.self.service': 'LayerSentry Self Service',
   'label.layersentry.all.sites': 'All Sites',
   'label.layersentry.kvm.hosts': 'KVM Hosts',
   'label.layersentry.compute.clusters': 'Compute Clusters',
@@ -58,18 +57,23 @@ const layersentryEnglishTerminology = {
   'message.layersentry.platform.dashboard': 'KVM infrastructure health, capacity, service readiness and recent exceptions reported by CloudStack.',
   'message.layersentry.platform.dashboard.failed': 'The Platform Dashboard could not be loaded. Check CloudStack API access and retry.',
   'message.layersentry.backup.dashboard.fact': 'Backup availability is shown from configured CloudStack backup offerings; this does not claim that every VM is protected.',
-  'message.layersentry.native.kubernetes.dashboard.fact': 'This is the native CloudStack Kubernetes service inventory, separate from LayerSentry-managed RKE2.',
   'message.layersentry.bucket.dashboard.fact': 'Bucket count is shown only when the CloudStack bucket API is granted to this role.',
   'message.layersentry.optional.services.unavailable': 'No optional service inventory API is currently available to this role.',
   'message.layersentry.kvm.select.site': 'Select a Site to check KVM availability.',
   'message.layersentry.kvm.checking': 'Checking KVM availability for the selected Site…',
   'message.layersentry.kvm.unavailable': 'The selected Site does not report KVM capability. Choose another Site or ask your administrator to configure KVM.',
   'message.layersentry.kvm.lookup.failed': 'KVM availability could not be verified. Check your connection and permissions, then select the Site again.',
-  'message.layersentry.kvm.image.invalid': 'The selected OS image cannot be verified for KVM in this Site. Select a ready KVM image or a compatible bootable ISO. Snapshot sources must have a readable KVM volume.',
-  'message.layersentry.kvm.image.lookup.failed': 'The selected image could not be checked. Check your connection and permissions, then retry.',
-  'message.layersentry.kvm.selection.changed': 'The Site or image selection changed during validation. Review your selection and submit again.',
+  'message.layersentry.kvm.image.invalid': 'The selected OS Image cannot be verified for KVM in this Site. Select a ready KVM OS Image or a compatible bootable ISO. Snapshot sources must have a readable KVM volume.',
+  'message.layersentry.kvm.image.lookup.failed': 'The selected OS Image could not be checked. Check your connection and permissions, then retry.',
+  'message.layersentry.kvm.selection.changed': 'The Site or OS Image selection changed during validation. Review your selection and submit again.',
+
+  // CloudStack Zone -> LayerSentry Site.
   'label.zone': 'Site',
   'label.zones': 'Sites',
+  'label.all.zone': 'All Sites',
+  'label.select.a.zone': 'Select a Site',
+  'label.select.zones': 'Select Sites',
+  'label.destination.zone': 'Destination Site',
   'label.zone.id': 'Site ID',
   'label.zoneid': 'Site',
   'label.zonename': 'Site',
@@ -84,6 +88,61 @@ const layersentryEnglishTerminology = {
   'label.action.edit.zone': 'Edit site',
   'label.action.update.zone': 'Update site',
 
+  // CloudStack Pod -> LayerSentry Infrastructure Group.
+  'label.pod': 'Infrastructure Group',
+  'label.pods': 'Infrastructure Groups',
+  'label.podid': 'Infrastructure Group',
+  'label.podname': 'Infrastructure Group name',
+  'label.pod.name': 'Infrastructure Group name',
+  'label.pod.dedicated': 'Dedicated Infrastructure Group',
+  'label.destination.pod': 'Destination Infrastructure Group',
+  'label.action.delete.pod': 'Delete Infrastructure Group',
+  'label.action.disable.pod': 'Disable Infrastructure Group',
+  'label.action.enable.pod': 'Enable Infrastructure Group',
+  'label.action.update.pod': 'Update Infrastructure Group',
+  'label.podstorageaccessgroups': 'Infrastructure Group storage access groups',
+
+  // CloudStack Domain is the LayerSentry Department tenancy boundary.
+  'label.domain': 'Department',
+  'label.domains': 'Departments',
+  'label.domain.id': 'Department ID',
+  'label.domain.name': 'Department name',
+  'label.domainid': 'Department',
+  'label.domainname': 'Department',
+  'label.domainpath': 'Department',
+
+  // KVM-only host presentation.
+  'label.host': 'KVM Host',
+  'label.hosts': 'KVM Hosts',
+
+  // CloudStack Service Offering -> LayerSentry Compute Profile.
+  'label.compute.offerings': 'Compute Profiles',
+  'label.service.offering': 'Compute Profile',
+  'label.serviceofferingid': 'Compute Profile',
+  'label.serviceofferingname': 'Compute Profile',
+
+  // CloudStack Disk Offering -> VM Storage Profile.
+  'label.disk.offerings': 'Storage Profiles',
+  'label.diskoffering': 'Storage Profile',
+  'label.diskofferingdisplaytext': 'Storage Profile',
+  'label.diskofferingid': 'Storage Profile',
+  'label.data.disk.offering': 'Data Storage Profile',
+
+  // CloudStack VM Template -> LayerSentry OS Image. Email/quota templates use
+  // separate keys and are therefore unaffected.
+  'label.template': 'OS Image',
+  'label.templates': 'OS Images',
+  'label.template.select': 'Select an OS Image',
+  'label.template.select.existing': 'Select an existing OS Image',
+  'label.templateid': 'Select an OS Image',
+  'label.templatename': 'OS Image',
+  'label.templateiso': 'OS Image / ISO',
+  'label.create.template': 'Create OS Image',
+  'label.register.template': 'Register OS Image',
+  'label.upload.template.from.local': 'Upload OS Image from local file',
+  'label.confirm.delete.templates': 'Please confirm you wish to delete the selected OS Images.',
+  'label.deleting.template': 'Deleting OS Image',
+
   'label.core.zone.type': 'Network design',
   'label.core': 'Datacenter site',
   'label.edge': 'Edge site',
@@ -92,23 +151,12 @@ const layersentryEnglishTerminology = {
   'label.menu.security.groups': 'VM firewall groups',
 
   'label.network': 'Networks',
+  'label.guest.networks': 'Workload Networks',
   'label.physical.network': 'Datacenter network',
   'label.public.traffic': 'Public / Internet network',
   'label.guest.traffic': 'VM / Workload network',
   'label.storage.traffic': 'Storage network',
   'label.management.network': 'Management network',
-
-  'label.pod': 'Infrastructure group',
-  'label.pods': 'Infrastructure groups',
-  'label.podid': 'Infrastructure group',
-  'label.podname': 'Infrastructure group name',
-  'label.pod.name': 'Infrastructure group name',
-  'label.pod.dedicated': 'Dedicated infrastructure group',
-  'label.action.delete.pod': 'Delete infrastructure group',
-  'label.action.disable.pod': 'Disable infrastructure group',
-  'label.action.enable.pod': 'Enable infrastructure group',
-  'label.action.update.pod': 'Update infrastructure group',
-  'label.podstorageaccessgroups': 'Infrastructure group storage access groups',
 
   'label.reserved.system.gateway': 'Management network gateway',
   'label.reserved.system.netmask': 'Management network subnet mask',
@@ -117,14 +165,13 @@ const layersentryEnglishTerminology = {
 
   'label.add.resources': 'Compute & storage',
   'label.launch': 'Review & create',
-  'label.register.template': 'OS image',
 
-  'message.desc.core.zone': 'Use this for a normal datacenter or private-cloud site. It supports the full infrastructure model including compute clusters, hypervisor hosts, shared storage, isolated workload networks and high availability.',
+  'message.desc.core.zone': 'Use this for a normal datacenter or private-cloud site. It supports the full infrastructure model including compute clusters, KVM hosts, shared storage, isolated workload networks and high availability.',
   'message.desc.edge.zone': 'Use this for a small remote or branch location with a reduced infrastructure footprint. Choose this only when you intentionally need an edge deployment.',
   'message.desc.advanced.zone': 'Recommended for enterprise and private-cloud deployments. Supports isolated VM networks, VLANs, VPC-style networking, firewall, VPN and load-balancing services.',
   'message.desc.basic.zone': 'A simpler shared-network model where workloads use addresses directly from the same network. Choose this only for small or uncomplicated environments.',
   'message.advanced.security.group': 'Optional VM-level source-IP filtering. Leave this off when you plan to use isolated networks and network-level firewall policies.',
-  'message.add.pod.during.zone.creation': 'Create the first infrastructure group and define its management network. An infrastructure group is a set of compute clusters and hypervisor hosts that share the same management subnet. For a small single-cluster deployment, one infrastructure group is normally enough.',
+  'message.add.pod.during.zone.creation': 'Create the first Infrastructure Group and define its management network. An Infrastructure Group is a set of Compute Clusters and KVM Hosts that share the same management subnet. For a small single-cluster deployment, one Infrastructure Group is normally enough.',
   'message.installwizard.tooltip.addpod.name': 'Enter a friendly group name, for example rack-01 or management-group-01.',
   'message.installwizard.tooltip.addpod.reservedsystemgateway': 'Enter the gateway for the management subnet.',
   'message.tooltip.reserved.system.netmask': 'Enter the subnet mask for the management network.',
@@ -132,9 +179,9 @@ const layersentryEnglishTerminology = {
   'message.installwizard.tooltip.addpod.reservedsystemendip': 'Enter the last IP address in the management IP pool reserved for platform system services.',
   'message.network.description': 'Configure the networks used for platform management, virtual-machine workloads, storage and optional public access.',
   'message.network.hint': 'Use separate VLANs or subnets for management, workloads and storage when your network design supports it.',
-  'message.add.resource.description': 'Add the compute cluster, virtualization hosts and storage that will run this site.',
-  'message.launch.zone.description': 'Review the configuration before creating the site.',
-  'message.zone.detail.description': 'Name the site and configure the basic platform and DNS settings for this location.'
+  'message.add.resource.description': 'Add the Compute Cluster, KVM Hosts and storage that will run this Site.',
+  'message.launch.zone.description': 'Review the configuration before creating the Site.',
+  'message.zone.detail.description': 'Name the Site and configure the basic platform and DNS settings for this location.'
 }
 
 export const i18n = createI18n({
