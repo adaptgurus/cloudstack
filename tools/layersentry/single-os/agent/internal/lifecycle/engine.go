@@ -6,6 +6,7 @@ import (
  "fmt"
  "time"
 
+ "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/cluster"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/config"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/firewall"
@@ -17,7 +18,7 @@ import (
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/provider"
 )
 
-type Engine struct{Registry *provider.Registry;Store *journal.Store;Runner executor.Runner;LockPath string}
+type Engine struct{Registry *provider.Registry;Store *journal.Store;Runner executor.Runner;Cluster *cluster.Client;LockPath string}
 
 func(e *Engine)Plan(ctx context.Context,req model.ServiceRequest)(model.Plan,model.Operation,error){
  if err:=config.Validate(req);err!=nil{return model.Plan{},model.Operation{},err}
@@ -71,7 +72,13 @@ func(e *Engine)Install(ctx context.Context,req model.ServiceRequest,confirmedPla
  if err=(mounts.Manager{Runner:e.Runner}).Prepare(ctx,req.Storage);err!=nil{return fail("storage",err,false)}
  op.Stage="install";_ = e.Store.SaveOperation(op);if err=p.Install(ctx,op,plan);err!=nil{return fail("install",err,isAmbiguous(err))}
  op.Stage="configure";_ = e.Store.SaveOperation(op);if err=p.Configure(ctx,op,plan);err!=nil{return fail("configure",err,isAmbiguous(err))}
- op.Stage="initialize";_ = e.Store.SaveOperation(op);if req.Topology=="cluster"{if err=p.Join(ctx,op,plan);err!=nil{return fail("join",err,isAmbiguous(err))}}else if err=p.Initialize(ctx,op,plan);err!=nil{return fail("initialize",err,isAmbiguous(err))}
+ if req.Topology=="cluster"&&req.Cluster.EnrollmentPeer!=""{
+  if e.Cluster==nil{return fail("cluster-enrollment",errors.New("cluster enrollment client unavailable"),false)}
+  op.Stage="cluster-enrollment";_ = e.Store.SaveOperation(op);if _,err=e.Cluster.Enroll(ctx,req);err!=nil{return fail("cluster-enrollment",err,isAmbiguous(err))}
+  op.Stage="join";_ = e.Store.SaveOperation(op);if err=p.Join(ctx,op,plan);err!=nil{return fail("join",err,isAmbiguous(err))}
+ }else{
+  op.Stage="initialize";_ = e.Store.SaveOperation(op);if err=p.Initialize(ctx,op,plan);err!=nil{return fail("initialize",err,isAmbiguous(err))}
+ }
  st:=model.ServiceState{ID:req.ServiceID,Provider:req.Provider,Category:req.Category,ReleaseLine:req.ReleaseLine,ResolvedVersion:plan.ResolvedVersion,Topology:req.Topology,Storage:req.Storage,Network:req.Network,Maintenance:req.Maintenance,Backup:req.Backup,Cluster:req.Cluster,SecretRefs:req.SecretRefs,ConfigDigest:requestDigest,PlanDigest:plan.Digest,Status:"installing",UpdatedAt:time.Now().UTC()}
  op.Stage="service-start";_ = e.Store.SaveOperation(op);if err=p.Start(ctx,op,st);err!=nil{return fail("service-start",err,isAmbiguous(err))}
  op.Stage="firewall";_ = e.Store.SaveOperation(op);if err=(firewall.Manager{Runner:e.Runner}).Apply(ctx,req.ServiceID,req.Network.Port,req.Network.AllowedCIDRs);err!=nil{return fail("firewall",err,isAmbiguous(err))}
