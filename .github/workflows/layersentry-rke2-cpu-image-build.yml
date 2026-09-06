@@ -31,7 +31,7 @@ jobs:
           python3 -m unittest discover -s tools/layersentry/k8s/image -p 'test_*.py' -v
           bash -n tools/layersentry/k8s/image/customize_guest.sh
           sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends qemu-utils libguestfs-tools linux-image-generic
+          sudo apt-get install -y --no-install-recommends qemu-utils libguestfs-tools linux-image-generic policycoreutils python3-guestfs
           # Record the installed CLI contract before the expensive image build.
           virt-customize --help
           virt-cat --help
@@ -41,6 +41,7 @@ jobs:
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
           mkdir build-evidence
           dpkg-query -W > build-evidence/hosted-builder-packages.tsv
+          /usr/bin/python3 tools/layersentry/k8s/image/inspect_labels.py --preflight build-evidence/selinux-appliance.json
       - name: Materialize and verify locked inputs
         shell: bash
         run: |

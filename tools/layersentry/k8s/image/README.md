@@ -44,3 +44,5 @@ python3 tools/layersentry/k8s/image/boot_qga_acceptance.py \
 ```
 
 Cleanup refuses a changed domain disk/network, malformed ownership or failed libvirt connection. The original candidate image remains unchanged. Evidence includes requested/actual XML, guest facts, source image metadata and at most 2 MiB of serial log. A retained runtime copy contains generated guest host keys and must remain private; never upload that mutated disk as the sealed release image. Native CloudStack registration, after separate trusted qualification, represents this SHA-256 checksum as `{SHA-256}<64hex>`; this harness performs no registration.
+
+The exact Rocky QGA policy is extended only with `guest-exec` and `guest-exec-status` for authorized host-mediated SSH host-key discovery and bounded acceptance commands. Existing allowed management RPCs are preserved; all-RPC mode and guest-file RPC additions are prohibited. This is a managed-image trust boundary, not a host-global or customer API permission. The private virtio channel remains accessible only through authorized hypervisor/Runner control. `qga-policy.json` records the policy digest and precise added RPCs in the image.

@@ -77,11 +77,13 @@ def build(inputs, output):
             os.link(inputs / item['file'], payload / item['file'])
         shutil.copytree(inputs / 'trust', payload / 'trust')
         shutil.copyfile(inputs / 'inputs.lock.json', payload / 'inputs.lock.json')
+        shutil.copyfile(ROOT / 'configure_qga.py', payload / 'configure_qga.py')
         log = work / 'customize.log'
         with log.open('wb') as stream:
             run(['virt-customize', '--format=qcow2', '-a', str(image), '--no-network', '--memsize', '4096', '--smp', '2', '--copy-in', f'{payload}:/opt', '--run', str(ROOT / 'customize_guest.sh'), '--selinux-relabel'], timeout=2400, stdout=stream, env=env)
         run(['qemu-img', 'check', '-f', 'qcow2', str(image)])
         image_complete = True
+        run(['/usr/bin/python3', str(ROOT / 'inspect_labels.py'), '--image', str(image), '--output', str(work / 'selinux-labels.json')], timeout=240, env=env)
         inventory = work / 'rpm-inventory.tsv'
         version = work / 'rke2-version.txt'
         for destination, guest_path in [(inventory, '/usr/share/layersentry/node-image/rpm-inventory.tsv'), (version, '/usr/share/layersentry/node-image/rke2-version.txt')]:
@@ -93,7 +95,7 @@ def build(inputs, output):
             run(['qemu-img', 'info', '--output=json', str(image)], timeout=60, stdout=stream)
         # No volatile VM/template identity or invented runtime facts belong here.
         source = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True, timeout=30).strip()
-        manifest = {'schemaVersion': '1.0', 'artifactType': 'layersentry-rke2-node-image', 'status': 'CI_VERIFIED', 'qualificationStatus': 'NOT_TESTED', 'sourceCommit': source, 'os': 'rocky9', 'osVersion': '9.8', 'architecture': 'amd64', 'rke2Version': lock['rke2Version'], 'cni': 'canal', 'sha256': sha256(image), 'sizeBytes': image.stat().st_size, 'inputLockSha256': sha256(ROOT / 'cpu-rocky9-rke2-lock.json'), 'rpmInventorySha256': sha256(inventory), 'rke2Installed': True, 'rke2Started': False, 'runtimeQualified': False, 'signed': False, 'templateId': None, 'qualificationEvidenceSha256': None, 'hostBootTested': False, 'joinTested': False, 'storageTested': False}
+        manifest = {'schemaVersion': '1.0', 'artifactType': 'layersentry-rke2-node-image', 'status': 'CI_VERIFIED', 'qualificationStatus': 'NOT_TESTED', 'sourceCommit': source, 'os': 'rocky9', 'osVersion': '9.8', 'architecture': 'amd64', 'rke2Version': lock['rke2Version'], 'cni': 'canal', 'sha256': sha256(image), 'sizeBytes': image.stat().st_size, 'inputLockSha256': sha256(ROOT / 'cpu-rocky9-rke2-lock.json'), 'selinuxLabelsSha256': sha256(work / 'selinux-labels.json'), 'rpmInventorySha256': sha256(inventory), 'rke2Installed': True, 'rke2Started': False, 'runtimeQualified': False, 'signed': False, 'templateId': None, 'qualificationEvidenceSha256': None, 'hostBootTested': False, 'joinTested': False, 'storageTested': False}
         (work / 'candidate-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
         for tool in ['qemu-img', 'virt-customize', 'virt-cat']:
             with (work / (tool + '-version.txt')).open('wb') as stream:
