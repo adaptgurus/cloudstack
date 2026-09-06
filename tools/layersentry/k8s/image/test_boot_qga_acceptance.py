@@ -28,7 +28,7 @@ class BootAcceptanceTests(unittest.TestCase):
         work = boot.PREFIX / ('layersentry-cpuqc-' + identity)
         return {'domainUuid': identity, 'domainName': work.name,
                 'diskPath': str(work / 'runtime.qcow2'), 'seedPath': str(work / 'seed.iso'),
-                'consolePath': str(work / 'console.log'), 'sourceSha256': 'a' * 64}
+                'consolePath': str(boot.LOG_ROOT / (work.name + '-console.log')), 'sourceSha256': 'a' * 64}
 
     def test_domain_is_networkless_and_binds_only_owned_disks(self):
         record = self.record()
@@ -39,6 +39,9 @@ class BootAcceptanceTests(unittest.TestCase):
                          [node.get('file') for node in xml.findall('./devices/disk/source')])
         self.assertEqual('org.qemu.guest_agent.0', xml.find('./devices/channel/target').get('name'))
         self.assertEqual('q35', xml.find('./os/type').get('machine'))
+        self.assertEqual('pty', xml.find('./devices/serial').get('type'))
+        self.assertEqual(record['consolePath'], xml.find('./devices/serial/log').get('file'))
+        self.assertIsNone(xml.find('./devices/serial/source'))
 
     def test_ownership_rejects_path_name_mismatch_and_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
