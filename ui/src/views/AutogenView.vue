@@ -537,6 +537,16 @@
     <div
       :style="this.$store.getters.maintenanceInitiated || this.$store.getters.shutdownTriggered ? 'margin-top: 24px; margin-bottom: 12px' : null"
     >
+      <layer-sentry-page-state
+        v-if="layersentryProfile"
+        :title="(dataView && (resource.name || resource.displayname)) || $t($route.meta.title || 'label.details')"
+        :description="pagePresentation.description"
+        :loading="loading"
+        :failure="readError"
+        :has-data="items.length > 0"
+        :empty="readComplete && !items.length"
+        :updated-at="readUpdatedAt"
+        @retry="fetchData({ irefresh: true })" />
       <div v-if="dataView">
         <slot
           name="resource"
@@ -618,10 +628,14 @@ import ResourceIcon from '@/components/view/ResourceIcon'
 import BulkActionProgress from '@/components/view/BulkActionProgress'
 import TooltipLabel from '@/components/widgets/TooltipLabel'
 import DetailsInput from '@/components/widgets/DetailsInput'
+import LayerSentryPageState from '@/components/page/LayerSentryPageState'
+import { isLayersentryKvmProfile } from '@/config/productProfile'
+import { layersentryPage, readFailure } from '@/config/layersentryPage'
 
 export default {
   name: 'Resource',
   components: {
+    LayerSentryPageState,
     Breadcrumb,
     ResourceView,
     ListView,
@@ -651,6 +665,11 @@ export default {
     return {
       apiName: '',
       loading: false,
+      readGeneration: 0,
+      readScope: '',
+      readError: null,
+      readComplete: false,
+      readUpdatedAt: '',
       actionLoading: false,
       columnKeys: [],
       allColumns: [],
@@ -685,6 +704,7 @@ export default {
     }
   },
   beforeUnmount () {
+    this.readGeneration++
     eventBus.off('vm-refresh-data')
     eventBus.off('async-job-complete')
     eventBus.off('exec-action')
@@ -827,6 +847,12 @@ export default {
     }
   },
   computed: {
+    layersentryProfile () {
+      return isLayersentryKvmProfile(this.$config)
+    },
+    pagePresentation () {
+      return layersentryPage(this.$route.name)
+    },
     activeFiltersList () {
       const queryParams = Object.assign({}, this.$route.query)
       const activeFilters = []
@@ -928,6 +954,11 @@ export default {
       })
     },
     fetchData (params = {}) {
+      const generation = ++this.readGeneration
+      const requestPath = this.$route.path
+      this.readError = null
+      this.readComplete = false
+      this.loading = false
       if (['deployVirtualMachine', 'usage'].includes(this.$route.name)) {
         return
       }
@@ -1167,7 +1198,17 @@ export default {
         delete params.listall
       }
 
+      const scope = JSON.stringify([this.apiName, params, this.$store.getters.project?.id,
+        this.$store.getters.userInfo.id, this.$store.getters.userInfo.roleid])
+      if (scope !== this.readScope) {
+        this.items = []
+        this.itemCount = 0
+        this.resource = {}
+        this.readUpdatedAt = ''
+        this.readScope = scope
+      }
       callAPI(this.apiName, params).then(json => {
+        if (generation !== this.readGeneration || requestPath !== this.$route.path) return
         var responseName
         var objectName
         for (const key in json) {
@@ -1186,20 +1227,20 @@ export default {
           break
         }
 
-        if ('id' in this.$route.params && this.$route.params.id !== params.id) {
-          console.log('DEBUG - Discarding API response as its `id` does not match the uuid on the browser path')
-          return
-        }
-
+        // Request generation and path bind the result even for native name-based
+        // APIs (for example SSH keys), where params.id is intentionally absent.
         this.items = json[responseName][objectName]
         if (!this.items || this.items.length === 0) {
           this.items = []
         }
         this.itemCount = apiItemCount
 
-        if (this.dataView && this.$route.path.includes('/zone/') && 'listVmwareDcs' in this.$store.getters.apis) {
+        if (this.items.length && this.dataView && this.$route.path.includes('/zone/') && 'listVmwareDcs' in this.$store.getters.apis) {
           getAPI('listVmwareDcs', { zoneid: this.items[0].id }).then(response => {
+            if (generation !== this.readGeneration || requestPath !== this.$route.path) return
             this.items[0].vmwaredc = response.listvmwaredcsresponse.VMwareDC
+          }).catch(error => {
+            if (generation === this.readGeneration && requestPath === this.$route.path) this.readError = readFailure(error)
           })
         }
 
@@ -1244,12 +1285,19 @@ export default {
           this.resource = this.items?.[0] || {}
           this.$emit('change-resource', this.resource)
         }
+        this.readComplete = true
+        this.readUpdatedAt = new Date().toISOString()
       }).catch(error => {
+        if (generation !== this.readGeneration || requestPath !== this.$route.path || error?.__CANCEL__) return
+        this.readError = readFailure(error)
+        // Keep the failed read and its diagnostic in context. Global session
+        // handling remains in the existing request interceptor.
+        if (this.layersentryProfile) return
         if (!error || !error.message) {
           console.log('API request likely got cancelled due to route change:', this.apiName)
           return
         }
-        if ([401].includes(error.response.status)) {
+        if ([401].includes(error.response?.status)) {
           return
         }
 
@@ -1257,7 +1305,7 @@ export default {
           this.itemCount = 0
           this.items = []
           this.$message.error({
-            content: error.response.headers['x-description'],
+            content: error.response?.headers?.['x-description'] || error.message,
             duration: 5
           })
           return
@@ -1265,18 +1313,19 @@ export default {
 
         this.$notifyError(error)
 
-        if ([405].includes(error.response.status)) {
+        if ([405].includes(error.response?.status)) {
           this.$router.push({ path: '/exception/403' })
         }
 
-        if ([430, 431, 432].includes(error.response.status)) {
+        if ([430, 431, 432].includes(error.response?.status)) {
           this.$router.push({ path: '/exception/404' })
         }
 
-        if ([530, 531, 532, 533, 534, 535, 536, 537].includes(error.response.status)) {
+        if ([530, 531, 532, 533, 534, 535, 536, 537].includes(error.response?.status)) {
           this.$router.push({ path: '/exception/500' })
         }
       }).finally(f => {
+        if (generation !== this.readGeneration || requestPath !== this.$route.path) return
         this.loading = false
         this.searchParams = params
       })

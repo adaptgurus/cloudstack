@@ -24,6 +24,7 @@ import notification from 'ant-design-vue/es/notification'
 import { CURRENT_PROJECT } from '@/store/mutation-types'
 import { i18n } from '@/locales'
 import store from '@/store'
+import { isOptionalAuthenticationProbe } from './authRequests'
 
 let source
 const service = axios.create({
@@ -51,7 +52,7 @@ const err = (error) => {
       })
     }
     if (response.status === 401) {
-      if (response.config && response.config.params && ['forgotPassword', 'listIdps', 'cloudianIsEnabled'].includes(response.config.params.command)) {
+      if (isOptionalAuthenticationProbe(response.config)) {
         return
       }
       const originalPath = router.currentRoute.value.path

@@ -17,6 +17,7 @@
 
 <template>
   <div>
+    <a href="#layersentry-main-content" class="ls-skip-link" @click.prevent="$refs.mainContent?.$el?.focus()">{{ $t('label.layersentry.skip.content') }}</a>
     <announcement-banner />
     <a-affix v-if="this.$store.getters.maintenanceInitiated" >
       <a-alert :message="$t('message.maintenance.initiated')" type="error" banner :showIcon="false" class="maintenanceHeader" />
@@ -107,6 +108,10 @@
 
         <!-- layout content -->
         <a-layout-content
+        id="layersentry-main-content"
+        ref="mainContent"
+        role="main"
+        tabindex="-1"
         class="layout-content"
         :class="{'is-header-fixed': fixedHeader}">
           <slot></slot>

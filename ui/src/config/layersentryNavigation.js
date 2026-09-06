@@ -16,7 +16,7 @@
 // under the License.
 
 import { vueProps } from '@/vue-app'
-import { getLayersentryFeatureState, LAYERSENTRY_FEATURES } from './layersentryCapabilities'
+import { getLayersentryFeatureState, hasApi, LAYERSENTRY_FEATURES } from './layersentryCapabilities'
 import { isLayersentryKvmProfile } from './productProfile'
 
 const KVM_SCOPED_ROUTES = new Set(['vm', 'host', 'cluster', 'template'])
@@ -80,6 +80,8 @@ export function shouldHideLayersentrySection (sectionName, userInfo = {}, config
 
 export function shouldHideLayersentryFeatureRoute (routeName, apis = {}, config = vueProps.$config) {
   if (!isLayersentryKvmProfile(config)) return false
+  const backupReadApi = { backup: 'listBackups', backupschedule: 'listBackupSchedule', backupoffering: 'listBackupOfferings' }[routeName]
+  if (backupReadApi) return !hasApi(apis, backupReadApi, config)
   const feature = FEATURE_ROUTES[routeName]
   if (!feature) return false
   return !getLayersentryFeatureState(feature, apis, config).visible
