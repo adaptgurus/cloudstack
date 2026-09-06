@@ -20,6 +20,7 @@ import (
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/journal"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lifecycle"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/maintenance"
+	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/nodeexec"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/privileged"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/provider"
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/providerexec"
@@ -29,6 +30,7 @@ import (
 	keyvalueprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/keyvalue"
 	mysqlprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/mysqlfamily"
 	nginxprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/nginx"
+	nodeprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/nodejsmodule"
 	pgprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/postgresql"
 	runtimeprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/runtime"
 	tomcatprovider "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/providers/tomcat"
@@ -74,6 +76,7 @@ func buildRuntime() (*runtimeState, error) {
 	providerRunner := providerexec.NewClient(providerexec.DefaultSocket)
 	runner := providerexec.Router{Core: coreRunner, Provider: providerRunner}
 	valkeyRunner := valkeyexec.NewClient(valkeyexec.DefaultSocket)
+	nodeRunner := nodeexec.NewClient(nodeexec.DefaultSocket)
 	st, err := journal.New(root)
 	if err != nil {
 		return nil, err
@@ -100,7 +103,7 @@ func buildRuntime() (*runtimeState, error) {
 		nginxprovider.New(runner),
 		apacheprovider.New(runner),
 		tomcatprovider.New(runner),
-		runtimeprovider.New(runner, runtimeprovider.Spec{ID: "nodejs-runtime", Package: "nodejs", RepoID: "appstream", AllowedReleaseLines: map[string]string{"22": "22"}, Description: "Rocky AppStream Node.js runtime"}),
+		nodeprovider.New(nodeRunner),
 		runtimeprovider.New(runner, runtimeprovider.Spec{ID: "python-runtime", Package: "python3.12", RepoID: "appstream", AllowedReleaseLines: map[string]string{"3.12": "3.12"}, Description: "Rocky AppStream Python 3.12 runtime"}),
 		runtimeprovider.New(runner, runtimeprovider.Spec{ID: "podman-runtime", Package: "podman", RepoID: "appstream", AllowedReleaseLines: map[string]string{"rocky9": ""}, Description: "Rocky AppStream Podman runtime; no OCI workload is started by this package-only provider"}),
 	}
@@ -167,15 +170,15 @@ func privilegedHelper() error {
 	runner := executor.OSRunner{Timeout: 5 * time.Minute, MaxOutput: 1 << 20}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	errCh := make(chan error, 3)
+	errCh := make(chan error, 4)
 	go func() { errCh <- privileged.Serve(ctx, privileged.DefaultSocket, "layersentry", runner) }()
 	go func() { errCh <- providerexec.Serve(ctx, providerexec.DefaultSocket, "layersentry", runner) }()
 	go func() { errCh <- valkeyexec.Serve(ctx, valkeyexec.DefaultSocket, "layersentry", runner) }()
+	go func() { errCh <- nodeexec.Serve(ctx, nodeexec.DefaultSocket, "layersentry", runner) }()
 	first := <-errCh
 	cancel()
-	second := <-errCh
-	third := <-errCh
-	for _, err := range []error{first, second, third} {
+	errs := []error{first, <-errCh, <-errCh, <-errCh}
+	for _, err := range errs {
 		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
 		}
