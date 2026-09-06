@@ -203,7 +203,7 @@ import json,pathlib,stat
 report=pathlib.Path('/usr/share/layersentry/node-image/cpuqc-report.json')
 key=report.with_name('ssh_host_ed25519_key.pub')
 if not report.exists() or not key.exists():
- print('{}')
+ print(json.dumps({'pending':{'reportExists':report.exists(),'publicExportExists':key.exists()}}))
 else:
  for path,limit in [(report,65536),(key,4096)]:
   info=path.lstat()
@@ -215,12 +215,13 @@ else:
  exported=key.read_text().split()
  assert len(exported)==2 and exported[0]=='ssh-ed25519'
  if facts['sshHostEd25519PublicKey'].split()[:2]!=exported:
-  print('{}') # Recovered disks can retain the preceding boot export until the oneshot runs.
+  print(json.dumps({'pending':{'publicExportMatchesReport':False}}))
  else:
   facts['hostPublicKeyExportVerified']=True
   print(json.dumps(facts,sort_keys=True))
 """
     deadline = time.monotonic() + 240
+    pending = {}
     process = agent(identity, {'execute': 'guest-exec', 'arguments': {'path': '/usr/bin/python3', 'arg': ['-c', script], 'capture-output': True}})
     while time.monotonic() < deadline:
         status = agent(identity, {'execute': 'guest-exec-status', 'arguments': {'pid': process['pid']}})
@@ -234,9 +235,12 @@ else:
             facts = json.loads(stdout)
             if facts.get('fixtureId') == identity:
                 return facts
+            pending = {name: value for name, value in facts.get('pending', {}).items()
+                       if name in {'reportExists', 'publicExportExists', 'publicExportMatchesReport'}
+                       and isinstance(value, bool)}
             process = agent(identity, {'execute': 'guest-exec', 'arguments': {'path': '/usr/bin/python3', 'arg': ['-c', script], 'capture-output': True}})
         time.sleep(2)
-    raise TimeoutError('guest checks exceeded 240 seconds')
+    raise TimeoutError('guest checks exceeded 240 seconds; last public readiness=' + json.dumps(pending, sort_keys=True))
 
 
 def boot(args):

@@ -42,6 +42,18 @@ class BootAcceptanceTests(unittest.TestCase):
             if call.args[1]['execute'] == 'guest-exec':
                 compile(call.args[1]['arguments']['arg'][1], '<qga-reader>', 'exec')
 
+    def test_timeout_retains_only_allowlisted_public_readiness(self):
+        status = {'exited': True, 'exitcode': 0, 'out-data': base64.b64encode(json.dumps({
+            'pending': {'reportExists': True, 'publicExportExists': False,
+                        'unexpectedPrivateValue': 'must-not-appear'}}).encode()).decode()}
+        with patch.object(boot, 'agent', side_effect=[{'pid': 1}, status, {'pid': 2}]), \
+                patch.object(boot.time, 'monotonic', side_effect=[0, 0, 241]), patch.object(boot.time, 'sleep'):
+            with self.assertRaises(TimeoutError) as failure:
+                boot.guest_checks(str(uuid.uuid4()))
+        self.assertIn('"publicExportExists": false', str(failure.exception))
+        self.assertIn('"reportExists": true', str(failure.exception))
+        self.assertNotIn('must-not-appear', str(failure.exception))
+
     def record(self):
         identity = str(uuid.uuid4())
         work = boot.PREFIX / ('layersentry-cpuqc-' + identity)
