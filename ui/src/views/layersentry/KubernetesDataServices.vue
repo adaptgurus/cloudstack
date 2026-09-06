@@ -124,7 +124,6 @@ or more contributor license agreements. See the NOTICE file
                         <a-select-option value="cilium">Cilium</a-select-option>
                         <a-select-option value="canal">Canal</a-select-option>
                         <a-select-option value="calico">Calico</a-select-option>
-                        <a-select-option value="flannel">Flannel</a-select-option>
                       </a-select>
                     </a-form-item>
                   </a-col>

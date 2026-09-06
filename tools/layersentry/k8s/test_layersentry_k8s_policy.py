@@ -111,6 +111,11 @@ def base_db(**overrides):
 
 
 class ClusterPolicyTest(unittest.TestCase):
+    def test_cni_outside_exact_caprke2_contract_is_rejected(self):
+        plan = plan_cluster_create(base_cluster(cni="flannel"), ReleaseGates(), [GENERAL])
+        self.assertFalse(plan.executable)
+        self.assertIn("unsupported primary CNI", plan.blockers[0])
+
     def test_9345_gate_is_mandatory(self):
         gates = ReleaseGates(
             tuple_reconciliation=True,

@@ -223,7 +223,7 @@ SUPPORTED_CLUSTER_CLASSES = {
     "layersentry-custom-rke2",
 }
 
-SUPPORTED_CNIS = {"cilium", "canal", "calico", "flannel"}
+SUPPORTED_CNIS = {"cilium", "canal", "calico"}
 SUPPORTED_DATABASE_ENGINES = {"postgresql", "mysql", "mongodb", "redis", "valkey"}
 SUPPORTED_APAAS_PACKAGES = {"openbao", "harbor"}
 SUPPORTED_STREAMING_PACKAGES = {"strimzi-kafka"}
@@ -317,8 +317,6 @@ def validate_cluster_request(
     warnings: List[str] = []
     if request.channel == ReleaseChannel.PREVIEW:
         warnings.append("Preview channel is not a production certification statement.")
-    if request.cni == "flannel":
-        warnings.append("Flannel is not the LayerSentry hardened NetworkPolicy default.")
     if request.cluster_class == "layersentry-custom-rke2":
         warnings.append("Custom ClusterClass requires elevated/admin policy review.")
     return warnings
