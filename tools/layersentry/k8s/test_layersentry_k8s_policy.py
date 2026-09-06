@@ -50,6 +50,16 @@ GENERAL = StorageProfile(
     certified=True,
 )
 
+NON_NVME_DB = StorageProfile(
+    id="standard-db",
+    name="Standard Database",
+    provisioner="cloudstack-csi",
+    access_modes=(StorageAccess.RWO,),
+    purposes=(StoragePurpose.DATABASE,),
+    certified=True,
+    nvme=False,
+)
+
 DIRECT = StorageProfile(
     id="node-scratch",
     name="Node Scratch",
@@ -177,7 +187,7 @@ class DatabasePolicyTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValidationError, "NVMe"):
             validate_database_request(
-                base_db(storage_profile_id="general"), gates, [GENERAL]
+                base_db(storage_profile_id="standard-db"), gates, [NON_NVME_DB]
             )
 
     def test_pitr_requires_restore_evidence(self):

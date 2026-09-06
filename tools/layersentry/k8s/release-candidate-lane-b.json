@@ -5,6 +5,13 @@
   "cloudstack": "4.22.1.1",
   "capi": "1.13.5",
   "capc": "0.6.1",
+  "capcUpstreamCommit": "7521b14a31e6c46f81f16aae3738a27c08ad063f",
+  "capcDownstream": {
+    "manifest": "tools/layersentry/k8s/downstream/capc/manifest.json",
+    "patchSha256": "6d3fc88ccf986bd025fc6d714ec7b4fa19d0c2afe6f10c50ef02a198286cea74",
+    "clusterEndpointAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-rke2-endpoint=true",
+    "machineVolumeOwnershipAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-volume-ownership=true"
+  },
   "caprke2": "0.25.2",
   "rke2": "1.36.4+rke2r1",
   "kubernetes": "1.36.x",
