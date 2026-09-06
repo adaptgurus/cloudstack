@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0",
+  "status": "CI_VERIFIED",
+  "scope": "amd64 CSI driver/syncer unsigned OCI build and isolated image smoke tests",
+  "layersentrySourceCommit": "d40c54acb8a18b71475b154f14dd631460c94f89",
+  "upstreamCommit": "a84477e922d62b82387ab55134fafc9c0b5aaf64",
+  "repository": "adaptgurus/cloudstack",
+  "workflowRun": 34047140051,
+  "job": 101524118290,
+  "artifact": {
+    "id": 9993465630,
+    "sha256": "102c9642a5a0cd81fcafe4d6e5771f18688a228bcf601706578f45f12f24c534",
+    "sizeBytes": 48030165,
+    "retentionDays": 14
+  },
+  "images": {
+    "cloudstack-csi-driver": {
+      "archiveSha256": "0a52fdf6194ac4efa5ac3f155f3a14a07f12d0fc98e9565db55e137fe53e5919",
+      "imageManifestDigest": "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+      "imageConfigDigest": "sha256:22d6f58a31262790032745d8079a8fc985c0c677937277b526fa0ea10b0d1c3c",
+      "attestations": {
+        "provenance": {
+          "digest": "sha256:c1a4798197b8e6345e11017c4dd6a074e17e316d6a61ce670e5bd088dbcd9ae3",
+          "predicateType": "https://slsa.dev/provenance/v1"
+        },
+        "sbom": {
+          "digest": "sha256:3d5c9a1934018f526c19626f66fd523a026bb1599280f1a463d1766aaa85a7c9",
+          "predicateType": "https://spdx.dev/Document"
+        }
+      },
+      "sbomPackageCount": 98
+    },
+    "cloudstack-csi-sc-syncer": {
+      "archiveSha256": "f0839c00895f754be994760d82ee4a0d498fbbc4bc2a88b407b7406634ecdd59",
+      "imageManifestDigest": "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+      "imageConfigDigest": "sha256:7cc43f84321070a6a5cd472f5248d0f451d154628bc0148d452ac042ebaf793c",
+      "attestations": {
+        "sbom": {
+          "digest": "sha256:c23d902a11526c2b8d08cd100db46f054a514986332a15d1502aa87a26109021",
+          "predicateType": "https://spdx.dev/Document"
+        },
+        "provenance": {
+          "digest": "sha256:fd37c069b12f05db900fff7a7abcf8ddd9996f71f346e1d0b433ec70dad8dacc",
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "sbomPackageCount": 67
+    }
+  },
+  "registryPublished": false,
+  "signed": false,
+  "liveVerified": false,
+  "productionCertified": false,
+  "arm64ImageBuilt": false
+}

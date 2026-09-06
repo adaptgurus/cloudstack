@@ -1,6 +1,6 @@
 # CloudStack CSI immutable runtime package closure
 
-Status: `PARTIAL`. Scope: CloudStack CSI 3.0.2 downstream build only; no CloudStack core or runtime mutation.
+Status: `CI_VERIFIED` for the amd64 artifact build and isolated image smoke tests; production/runtime qualification remains `PARTIAL`. Scope: CloudStack CSI 3.0.2 downstream build only; no CloudStack core or runtime mutation.
 
 ## Research and design decision
 
@@ -30,4 +30,21 @@ Preliminary local verification passed:
 - all 48 arm64 driver/syncer package signatures checked using arm64 keys extracted from the digest-verified base; arm64 binaries were not executed;
 - overlay materialization applied cleanly to a fresh exact-upstream checkout and then recognized the result as `ALREADY_APPLIED`; existing expansion source changes and their upstream tests are byte-for-byte preserved in the patch.
 
-Local logs are under `/tmp/layersentry-csi-package-proof/`: `driver-offline-v2.log`, `syncer-offline-v2.log`, `arm64-signatures.log`. No Docker/Podman/Buildah daemon or executable is available (`docker buildx version` exited 127), so a complete OCI build remains `NOT_TESTED`. No image digest/signature was invented, and `apkPackageLayerDeterministic` remains false pending exact OCI build verification. No DC/DR/lab mutation occurred.
+Local logs are under `/tmp/layersentry-csi-package-proof/`: `driver-offline-v2.log`, `syncer-offline-v2.log`, `arm64-signatures.log`. No Docker/Podman/Buildah daemon or executable is available (`docker buildx version` exited 127), so a complete OCI build was `NOT_TESTED` at this preliminary local checkpoint. The subsequent hosted result below supersedes that build limitation. No image digest/signature was invented, and `apkPackageLayerDeterministic` remains false pending exact OCI build verification. No DC/DR/lab mutation occurred.
+
+## Hosted OCI qualification — CI_VERIFIED
+
+The authorized build-only isolated-branch workflow `.github/workflows/layersentry-csi-artifact-qualification.yml` succeeded in [run 34047140051](https://github.com/adaptgurus/cloudstack/actions/runs/34047140051), job `101524118290`, at exact LayerSentry source `d40c54acb8a18b71475b154f14dd631460c94f89`. It used Ubuntu 24.04 hosted execution, Buildx 0.37.0, digest-pinned BuildKit 0.33.0 and a digest-pinned Syft scanner. No signing secrets, registry publication permissions or lab access were used. The workflow builds only the isolated branch; unrelated broad Java/UI workflows triggered by that branch were cancelled to conserve runner work.
+
+Artifact `9993465630`, SHA-256 `102c9642a5a0cd81fcafe4d6e5771f18688a228bcf601706578f45f12f24c534`, size 48,030,165 bytes, retains both unsigned OCI archives, SPDX SBOM and SLSA-format provenance statements, source/lock/base identities, build logs, image inspection, binary versions and smoke results. Retention is 14 days; durable release promotion must copy and verify the exact approved bytes before expiry. These are format/provenance records, not a claim of SLSA certification or signature verification.
+
+| Component | Runtime image manifest digest | OCI archive SHA-256 |
+| --- | --- | --- |
+| CSI driver | `sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5` | `0a52fdf6194ac4efa5ac3f155f3a14a07f12d0fc98e9565db55e137fe53e5919` |
+| Storage-class syncer | `sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb` | `f0839c00895f754be994760d82ee4a0d498fbbc4bc2a88b407b7406634ecdd59` |
+
+Both built binaries report `3.0.2-layersentry.d40c54acb8a18b71475b154f14dd631460c94f89`; the driver reports upstream commit `a84477e922d62b82387ab55134fafc9c0b5aaf64`, Go 1.23.12 and linux/amd64. Both images passed no-network, read-only-rootfs, dropped-capability, no-new-privileges version/CA checks. The driver additionally formatted ext4, expanded a regular-file filesystem from 32 MiB to 64 MiB, passed e2fsck, formatted a 512 MiB XFS file, and identified both filesystem types with blkid. Runtime mount/umount/udevadm and xfs_growfs binaries executed version checks. No mounted-volume growth or actual CloudStack CSI operation is claimed.
+
+Nine package/OCI verification tests passed. The OCI verifier checks all blob SHA-256 values, descriptor reachability/sizes, one linux/amd64 runtime manifest, expected entrypoint, equality of the smoke-tested Docker config digest to the archived OCI config, and matching SBOM/provenance subjects. Negative cases cover corrupt blobs, missing SBOM, wrong attestation subject and another smoke image. An initial local fixture exposed incorrect traversal of an image config as a manifest; commit `d40c54acb8` fixed it before the successful build. The downloaded OCI archives were independently reverified locally and matched both recorded image identities; their SBOMs contain 98 driver and 67 syncer packages.
+
+Machine-readable evidence is `2026-09-06-csi-oci-build.json`. These results establish the amd64 locked package build path and isolated artifact smoke behavior only. Arm64 image build, registry promotion, vulnerability/license qualification, signing, Rocky Linux 9 attach/mount/resize/project lifecycle and destructive PVC survival remain separate gates. No release live booleans were changed by this checkpoint.
