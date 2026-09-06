@@ -17,7 +17,7 @@ func ValidateIntentCapabilities(id string, r model.ServiceRequest) error {
 	switch id {
 	case "postgresql":
 		return onlySecretRefs(r, "admin_password")
-	case "mysql", "mariadb", "redis":
+	case "mysql", "mariadb", "redis", "valkey":
 		if len(r.Storage) != 0 {
 			return fmt.Errorf("%s does not consume attached storage in the current qualified provider", id)
 		}
