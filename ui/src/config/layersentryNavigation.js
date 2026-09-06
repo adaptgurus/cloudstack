@@ -44,8 +44,9 @@ const DOMAIN_ADMIN_HIDDEN_SECTIONS = new Set([
   'customaction'
 ])
 
+// Only GUI/provider surfaces owned by Workstream A are gated here. Native
+// CloudStack Kubernetes and data-service products are intentionally untouched.
 const FEATURE_ROUTES = Object.freeze({
-  kubernetes: LAYERSENTRY_FEATURES.NATIVE_KUBERNETES,
   backup: LAYERSENTRY_FEATURES.BACKUP,
   backupschedule: LAYERSENTRY_FEATURES.BACKUP,
   buckets: LAYERSENTRY_FEATURES.BUCKETS

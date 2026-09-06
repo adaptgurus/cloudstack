@@ -59,19 +59,8 @@ describe('LayerSentry navigation presentation', () => {
     expect(shouldHideLayersentrySection('config', { roletype: 'Admin' }, profile)).toBe(false)
   })
 
-  it('keeps native Kubernetes behind both the feature switch and CloudStack API permission', () => {
-    expect(shouldHideLayersentryFeatureRoute('kubernetes', { listKubernetesClusters: {} }, {
-      ...profile,
-      layersentry: { features: { nativeKubernetes: { enabled: false } } }
-    })).toBe(true)
-    expect(shouldHideLayersentryFeatureRoute('kubernetes', {}, {
-      ...profile,
-      layersentry: { features: { nativeKubernetes: { enabled: true } } }
-    })).toBe(true)
-    expect(shouldHideLayersentryFeatureRoute('kubernetes', { listKubernetesClusters: {} }, {
-      ...profile,
-      layersentry: { features: { nativeKubernetes: { enabled: true } } }
-    })).toBe(false)
+  it('does not apply Workstream A feature gating to Kubernetes routes', () => {
+    expect(shouldHideLayersentryFeatureRoute('kubernetes', {}, profile)).toBe(false)
   })
 
   it('keeps Backup and Bucket routes hidden until explicit provider readiness exists', () => {

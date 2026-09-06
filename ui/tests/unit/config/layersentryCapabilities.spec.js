@@ -25,7 +25,7 @@ const profile = {
   productProfile: 'layersentry-kvm'
 }
 
-describe('LayerSentry capability gates', () => {
+describe('LayerSentry GUI capability gates', () => {
   it('enables Quick Provision only when the native deploy API is granted', () => {
     expect(isLayersentryFeatureVisible(
       LAYERSENTRY_FEATURES.QUICK_PROVISION,
@@ -43,7 +43,7 @@ describe('LayerSentry capability gates', () => {
     expect(missing.missingApis).toEqual(['deployVirtualMachine'])
   })
 
-  it('does not expose LayerSentry-only features outside the LayerSentry product profile', () => {
+  it('does not expose LayerSentry-only GUI features outside the LayerSentry profile', () => {
     const state = getLayersentryFeatureState(
       LAYERSENTRY_FEATURES.QUICK_PROVISION,
       { deployVirtualMachine: {} },
@@ -53,70 +53,58 @@ describe('LayerSentry capability gates', () => {
     expect(state.reason).toBe('product-profile')
   })
 
-  it('keeps managed modules hidden until policy marks the real backend ready', () => {
+  it('keeps provider-backed GUI routes hidden until policy marks them ready', () => {
     const disabled = getLayersentryFeatureState(
-      LAYERSENTRY_FEATURES.DBAAS,
-      {},
+      LAYERSENTRY_FEATURES.BACKUP,
+      { listBackupOfferings: {} },
       profile
     )
     expect(disabled.visible).toBe(false)
     expect(disabled.reason).toBe('disabled')
 
     const notReady = getLayersentryFeatureState(
-      LAYERSENTRY_FEATURES.DBAAS,
-      {},
+      LAYERSENTRY_FEATURES.BACKUP,
+      { listBackupOfferings: {} },
       {
         ...profile,
-        layersentry: { features: { dbaas: { enabled: true } } }
+        layersentry: { features: { backup: { enabled: true } } }
       }
     )
     expect(notReady.visible).toBe(false)
     expect(notReady.reason).toBe('not-ready')
   })
 
-  it('supports explicit backend API requirements for managed modules', () => {
+  it('requires both provider readiness and the prerequisite API', () => {
     const config = {
       ...profile,
       layersentry: {
         features: {
-          managedKubernetes: {
-            enabled: true,
-            ready: true,
-            requiredApis: ['listLayerSentryClusters', 'createLayerSentryCluster']
-          }
+          backup: { enabled: true, ready: true },
+          buckets: { enabled: true, ready: true }
         }
       }
     }
 
-    const missing = getLayersentryFeatureState(
-      LAYERSENTRY_FEATURES.MANAGED_KUBERNETES,
-      { listLayerSentryClusters: {} },
-      config
-    )
-    expect(missing.visible).toBe(false)
-    expect(missing.reason).toBe('missing-api')
-    expect(missing.missingApis).toEqual(['createLayerSentryCluster'])
-
     expect(isLayersentryFeatureVisible(
-      LAYERSENTRY_FEATURES.MANAGED_KUBERNETES,
-      {
-        listLayerSentryClusters: {},
-        createLayerSentryCluster: {}
-      },
+      LAYERSENTRY_FEATURES.BACKUP,
+      { listBackupOfferings: {} },
+      config
+    )).toBe(true)
+    expect(isLayersentryFeatureVisible(
+      LAYERSENTRY_FEATURES.BACKUP,
+      {},
+      config
+    )).toBe(false)
+    expect(isLayersentryFeatureVisible(
+      LAYERSENTRY_FEATURES.BUCKETS,
+      { listBuckets: {} },
       config
     )).toBe(true)
   })
 
-  it('supports the native CKS inventory only when CloudStack exposes it', () => {
-    expect(isLayersentryFeatureVisible(
-      LAYERSENTRY_FEATURES.NATIVE_KUBERNETES,
-      { listKubernetesClusters: {} },
-      profile
-    )).toBe(true)
-    expect(isLayersentryFeatureVisible(
-      LAYERSENTRY_FEATURES.NATIVE_KUBERNETES,
-      {},
-      profile
-    )).toBe(false)
+  it('treats non-GUI product modules as unknown in this workstream', () => {
+    const state = getLayersentryFeatureState('managedKubernetes', {}, profile)
+    expect(state.visible).toBe(false)
+    expect(state.reason).toBe('unknown-feature')
   })
 })

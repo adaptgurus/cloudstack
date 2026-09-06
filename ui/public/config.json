@@ -30,25 +30,6 @@
       "quickProvision": {
         "enabled": true
       },
-      "nativeKubernetes": {
-        "enabled": true
-      },
-      "managedKubernetes": {
-        "enabled": false,
-        "ready": false
-      },
-      "dbaas": {
-        "enabled": false,
-        "ready": false
-      },
-      "apaas": {
-        "enabled": false,
-        "ready": false
-      },
-      "streaming": {
-        "enabled": false,
-        "ready": false
-      },
       "buckets": {
         "enabled": false,
         "ready": false

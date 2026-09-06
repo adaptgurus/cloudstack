@@ -18,13 +18,10 @@
 import { vueProps } from '@/vue-app'
 import { isLayersentryKvmProfile } from './productProfile'
 
+// GUI-only capability gates. Kubernetes, DBaaS, APaaS and streaming belong to
+// separate workstreams and are intentionally not represented here.
 export const LAYERSENTRY_FEATURES = Object.freeze({
   QUICK_PROVISION: 'quickProvision',
-  NATIVE_KUBERNETES: 'nativeKubernetes',
-  MANAGED_KUBERNETES: 'managedKubernetes',
-  DBAAS: 'dbaas',
-  APAAS: 'apaas',
-  STREAMING: 'streaming',
   BUCKETS: 'buckets',
   BACKUP: 'backup',
   DR: 'dr'
@@ -35,31 +32,6 @@ const FEATURE_DEFINITIONS = Object.freeze({
     defaultEnabled: true,
     requiredApis: ['deployVirtualMachine'],
     requireReady: false
-  },
-  [LAYERSENTRY_FEATURES.NATIVE_KUBERNETES]: {
-    defaultEnabled: true,
-    requiredApis: ['listKubernetesClusters'],
-    requireReady: false
-  },
-  [LAYERSENTRY_FEATURES.MANAGED_KUBERNETES]: {
-    defaultEnabled: false,
-    requiredApis: [],
-    requireReady: true
-  },
-  [LAYERSENTRY_FEATURES.DBAAS]: {
-    defaultEnabled: false,
-    requiredApis: [],
-    requireReady: true
-  },
-  [LAYERSENTRY_FEATURES.APAAS]: {
-    defaultEnabled: false,
-    requiredApis: [],
-    requireReady: true
-  },
-  [LAYERSENTRY_FEATURES.STREAMING]: {
-    defaultEnabled: false,
-    requiredApis: [],
-    requireReady: true
   },
   [LAYERSENTRY_FEATURES.BUCKETS]: {
     defaultEnabled: false,
