@@ -49,6 +49,47 @@ Before changing anything:
 
 ## Current checkpoint
 
+### LIVE_VERIFIED (bounded provider scope) — 2026-09-07 full/incremental capture and selected-point guest recovery
+
+Actual Rocky/libvirt provider run `34060101224`, job `101558974891`, passed at
+runner `99733f131ea1deb0262f256afc04e7c1bb79c34b` and source
+`8f94ee6e2ac1e360e39b71b8247e64b62187ef0d`. Artifact `9997314864`, SHA256
+`832b7291ec87d810403ea6591b3cc9e168c633600debb45470b75f5832f163ae`.
+Exact receipt: `evidence/dr/2026-09-07-native-libvirt-live-capture-recovery.json`.
+One full point and two real incremental points committed; both selected
+incremental points materialized, booted and returned exact independent guest
+marker hashes, including the later explicit-zero data. Lost acknowledgement
+resumed without recapturing or changing checkpoint count. Completed-epoch replay
+preserved head/checkpoints, conflicting mode was rejected, and retained replica
+integrity stayed unchanged. Both temporary recovery runtimes were removed.
+
+The source fixture `d0c9b525-e7f5-458d-98f4-65c6011c2cbc` and replication workspace
+`/var/lib/libvirt/images/layersentry-drqc-87f338d8-baab-44e8-a3e8-f10ad8167fa7`
+remain retained. Its passing networkless image boot is `34059634877`, artifact
+`9997098465`. Old failed capture/fixture evidence remains preserved separately.
+This acceptance uses one disk, crash consistency, same-host mounted transport
+and local test UUIDs; it DOES NOT prove CloudStack native recovery/import,
+cross-site transfer, multidisk consistency, failover/failback/fencing, RKE2/CSI
+or independent production failure domains. Catalog receipt guest_validation
+remains NOT_TESTED; the separate acceptance binds actual guest checks to the two
+exact epoch/manifest IDs. No blanket catalog or product readiness promotion.
+
+Current module UI artifact build `34059760313` passed at source
+`dc58f76f67dac13aa886c8d45475944f31b0c039`: build/lint/331 tests. Artifact
+`9997163877`, ZIP SHA256 `691f196def90dbfbee9428d33d3077d4879a4668d2d69de582e57e086f2d6451`;
+deployable tar SHA256 `131717933f8c7fbe4a4385dfa313abd700ffd016926164d825b6bde86aa90edf`.
+Guarded exact DR UI deploy is prepared; no current-module served GUI pass yet.
+
+Read-only DC outcome `34059957658` confirms initial Hyper-V journal all intents
+false and no new NIC; File.Replace failed before Add. Corrected narrow journal
+replacement may continue once scheduled. Actual DHCP range10.10.10.10–250
+invalidates proposed Pod21–254; revised existing subset2–9 plus exact fixed-address
+DHCP exclusions14/20 are being prepared. No native Zone activation or DHCP change
+at this checkpoint. DC has only HTTP8080; native trusted HTTPS is a separate
+first-management prerequisite. Source CSI render/OCI collection is integrated,
+with all node/project/data-safety deployment gates still false.
+
+
 ### PARTIAL / CI_VERIFIED — 2026-09-07 durable incremental sealing and preserved old fixture
 
 Sealing source `8f94ee6e2ac1e360e39b71b8247e64b62187ef0d` passed Rocky9.8 workflow

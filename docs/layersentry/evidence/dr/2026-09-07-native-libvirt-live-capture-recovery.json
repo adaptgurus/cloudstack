@@ -1,0 +1,281 @@
+{
+  "schemaVersion": "1.0",
+  "workflowRunId": "34060101224",
+  "jobId": "101558974891",
+  "runnerCommit": "99733f131ea1deb0262f256afc04e7c1bb79c34b",
+  "cloudstackSource": "8f94ee6e2ac1e360e39b71b8247e64b62187ef0d",
+  "artifactId": "9997314864",
+  "artifactSha256": "832b7291ec87d810403ea6591b3cc9e168c633600debb45470b75f5832f163ae",
+  "runnerReceipt": {
+    "captureAttempted": true,
+    "captureExitCode": 0,
+    "captureReplay": "PROHIBITED_WITHOUT_RECONCILIATION",
+    "captureStatus": "LIVE_VERIFIED",
+    "collection": {
+      "archiveBytes": 79245,
+      "archiveSha256": "e3800e99ffcaa2392c42a7d19b6cae0a7a3ae35fac41d21153b25232b57fe837",
+      "fileCount": 50,
+      "uncompressedBytes": 225953
+    },
+    "finishedAt": "2026-09-06T21:16:10.447159+00:00",
+    "freeBytesBefore": 44042223616,
+    "imageSha256": "7580d64a5b9f27d930d7a5f5688f67063db042252dd43c7cf280fdb3e101a34d",
+    "productionQualified": false,
+    "replicationOwnershipManifest": "/var/lib/libvirt/images/layersentry-drqc-87f338d8-baab-44e8-a3e8-f10ad8167fa7/ownership.json",
+    "replicationWorkspace": "/var/lib/libvirt/images/layersentry-drqc-87f338d8-baab-44e8-a3e8-f10ad8167fa7",
+    "replicationWorkspaceCleanupAttempted": false,
+    "schemaVersion": "1.0",
+    "scope": "same-host networkless libvirt QCOW2 provider acceptance",
+    "sourceCommit": "8f94ee6e2ac1e360e39b71b8247e64b62187ef0d",
+    "sourceDomainUuid": "d0c9b525-e7f5-458d-98f4-65c6011c2cbc",
+    "sourceFixtureRetained": true,
+    "sourceOwnershipManifest": "/var/lib/libvirt/images/layersentry-cpuqc-d0c9b525-e7f5-458d-98f4-65c6011c2cbc/ownership.json",
+    "stage": "CAPTURE_COMPLETE",
+    "startedAt": "2026-09-06T21:08:38.610594+00:00",
+    "status": "LIVE_VERIFIED"
+  },
+  "providerAcceptance": {
+    "crossSiteTransportTested": false,
+    "failoverTested": false,
+    "idempotency": {
+      "negativeModeConflict": "EPOCH_MODE_CONFLICT",
+      "oldCompletedEpochReplayPassed": true,
+      "providerCheckpointsUnchanged": true,
+      "sourceHeadUnchanged": true
+    },
+    "libvirtVersion": 11010000,
+    "lostAck": {
+      "captureProhibitedDuringResume": true,
+      "checkpointCountUnchanged": true,
+      "destinationCommitted": true,
+      "stateBeforeResume": {
+        "active_epoch": "5842a462-6bce-49c7-a8b2-9640c633d85d",
+        "active_state": "TRANSFERRING",
+        "age_of_last_acknowledged_point_seconds": 44,
+        "destination_current_health": "UNKNOWN",
+        "head": {
+          "epoch_id": "4e438958-87d1-43b5-8a3b-d85e9068e8c3",
+          "manifest_sha256": "59fb7d446629b496b602273e2a4bc27f8a449f9554659d5736a8428e074354ed",
+          "receipt": {
+            "acknowledged_at_epoch": 1788728955,
+            "bytes": 2727477248,
+            "captured_at_epoch": 1788728920,
+            "chain_length": 1,
+            "epoch_id": "4e438958-87d1-43b5-8a3b-d85e9068e8c3",
+            "guest_validation": "NOT_TESTED",
+            "manifest_sha256": "59fb7d446629b496b602273e2a4bc27f8a449f9554659d5736a8428e074354ed",
+            "state": "COMMITTED"
+          },
+          "reseed_required": false
+        },
+        "plan_id": "87f338d8-baab-44e8-a3e8-f10ad8167fa7",
+        "target_rpo_seconds": 300
+      }
+    },
+    "multiDiskTested": false,
+    "nativeCloudStackRecoveryTested": false,
+    "ownershipManifest": "/var/lib/libvirt/images/layersentry-drqc-87f338d8-baab-44e8-a3e8-f10ad8167fa7/ownership.json",
+    "phases": [
+      {
+        "elapsedSeconds": 36.196,
+        "epochId": "4e438958-87d1-43b5-8a3b-d85e9068e8c3",
+        "marker": {
+          "allZero": false,
+          "sha256": "23ccc6e0f80ca67dcd84e70c1411aebb94cf45ad6c1abd232f19199440f36dc0",
+          "sizeBytes": 1048576,
+          "stage": "FULL"
+        },
+        "receipt": {
+          "acknowledged_at_epoch": 1788728955,
+          "bytes": 2727477248,
+          "captured_at_epoch": 1788728920,
+          "chain_length": 1,
+          "epoch_id": "4e438958-87d1-43b5-8a3b-d85e9068e8c3",
+          "guest_validation": "NOT_TESTED",
+          "manifest_sha256": "59fb7d446629b496b602273e2a4bc27f8a449f9554659d5736a8428e074354ed",
+          "state": "COMMITTED"
+        },
+        "stage": "FULL"
+      },
+      {
+        "elapsedSeconds": 15.053,
+        "epochId": "5842a462-6bce-49c7-a8b2-9640c633d85d",
+        "marker": {
+          "allZero": false,
+          "sha256": "46fa19b0ee1812083c9b815b5c49d18b8a531c086bff3fb1965fb92fed82bd37",
+          "sizeBytes": 1048576,
+          "stage": "INC1"
+        },
+        "receipt": {
+          "acknowledged_at_epoch": 1788728970,
+          "bytes": 3145728,
+          "captured_at_epoch": 1788728959,
+          "chain_length": 2,
+          "epoch_id": "5842a462-6bce-49c7-a8b2-9640c633d85d",
+          "guest_validation": "NOT_TESTED",
+          "manifest_sha256": "f3f569c66e6fad30e00e0ecd7240acf80f6b67a6484ecb68bbbd8e03ea75df4d",
+          "state": "COMMITTED"
+        },
+        "stage": "INC1"
+      },
+      {
+        "elapsedSeconds": 8.775,
+        "epochId": "0e941c6f-c775-4b24-a04a-05ddc467f304",
+        "marker": {
+          "allZero": true,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+          "sizeBytes": 1048576,
+          "stage": "INC2"
+        },
+        "receipt": {
+          "acknowledged_at_epoch": 1788728979,
+          "bytes": 2883584,
+          "captured_at_epoch": 1788728974,
+          "chain_length": 3,
+          "epoch_id": "0e941c6f-c775-4b24-a04a-05ddc467f304",
+          "guest_validation": "NOT_TESTED",
+          "manifest_sha256": "a655229049ec7b8613a18ea385ba83ac283f76613b4903cb96bcd201431f96f5",
+          "state": "COMMITTED"
+        },
+        "stage": "INC2"
+      }
+    ],
+    "productionQualified": false,
+    "qemuVersion": 10001000,
+    "qualificationLimits": [
+      "same-host mounted transport",
+      "one writable disk",
+      "crash consistency",
+      "no native CloudStack recovery/import",
+      "no failover/failback/fencing",
+      "no RKE2 start or Kubernetes/storage qualification"
+    ],
+    "recoveries": [
+      {
+        "elapsedSeconds": 180.385,
+        "epochId": "0e941c6f-c775-4b24-a04a-05ddc467f304",
+        "guestBootAndQgaPassed": true,
+        "guestMarker": {
+          "allZero": true,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+          "sizeBytes": 1048576,
+          "stage": "INC2"
+        },
+        "materialization": {
+          "disks": [
+            {
+              "device": "vda",
+              "filename": "vda.qcow2",
+              "sha256": "977c5915a26650aed0618cefa7f4a67f1a9f45a4e816bec264c6e6f32dec2c61",
+              "size": 2723545088,
+              "virtual_bytes": 10737418240,
+              "volume_id": "00abc2f8-5c2d-4bd9-aca0-55e2cc135510"
+            }
+          ],
+          "epoch_id": "0e941c6f-c775-4b24-a04a-05ddc467f304",
+          "guest_validation": "NOT_TESTED",
+          "output_directory": "/var/lib/libvirt/images/layersentry-drqc-87f338d8-baab-44e8-a3e8-f10ad8167fa7/restore/restore-de4cf6ef-4cc4-4c6a-b1ed-997b938429ad",
+          "source_manifest_sha256": "a655229049ec7b8613a18ea385ba83ac283f76613b4903cb96bcd201431f96f5",
+          "state": "MATERIALIZED"
+        },
+        "ownedRuntimeRemoved": true,
+        "stage": "INC2"
+      },
+      {
+        "elapsedSeconds": 191.083,
+        "epochId": "5842a462-6bce-49c7-a8b2-9640c633d85d",
+        "guestBootAndQgaPassed": true,
+        "guestMarker": {
+          "allZero": false,
+          "sha256": "46fa19b0ee1812083c9b815b5c49d18b8a531c086bff3fb1965fb92fed82bd37",
+          "sizeBytes": 1048576,
+          "stage": "INC1"
+        },
+        "materialization": {
+          "disks": [
+            {
+              "device": "vda",
+              "filename": "vda.qcow2",
+              "sha256": "17b32b3bda377a8fe5ab9fb89e4b0c190b2c8dcb24b67703385c5e4893843292",
+              "size": 2724528128,
+              "virtual_bytes": 10737418240,
+              "volume_id": "00abc2f8-5c2d-4bd9-aca0-55e2cc135510"
+            }
+          ],
+          "epoch_id": "5842a462-6bce-49c7-a8b2-9640c633d85d",
+          "guest_validation": "NOT_TESTED",
+          "output_directory": "/var/lib/libvirt/images/layersentry-drqc-87f338d8-baab-44e8-a3e8-f10ad8167fa7/restore/restore-7139b1a1-824e-432a-8b97-29cc3c4a59e2",
+          "source_manifest_sha256": "f3f569c66e6fad30e00e0ecd7240acf80f6b67a6484ecb68bbbd8e03ea75df4d",
+          "state": "MATERIALIZED"
+        },
+        "ownedRuntimeRemoved": true,
+        "stage": "INC1"
+      }
+    ],
+    "retainedReceipts": {
+      "FULL": {
+        "bytes": 2727477248,
+        "captured_at_epoch": 1788728920,
+        "chain_length": 1,
+        "epoch_id": "4e438958-87d1-43b5-8a3b-d85e9068e8c3",
+        "manifest_sha256": "59fb7d446629b496b602273e2a4bc27f8a449f9554659d5736a8428e074354ed",
+        "state": "COMMITTED"
+      },
+      "INC1": {
+        "bytes": 3145728,
+        "captured_at_epoch": 1788728959,
+        "chain_length": 2,
+        "epoch_id": "5842a462-6bce-49c7-a8b2-9640c633d85d",
+        "manifest_sha256": "f3f569c66e6fad30e00e0ecd7240acf80f6b67a6484ecb68bbbd8e03ea75df4d",
+        "state": "COMMITTED"
+      },
+      "INC2": {
+        "bytes": 2883584,
+        "captured_at_epoch": 1788728974,
+        "chain_length": 3,
+        "epoch_id": "0e941c6f-c775-4b24-a04a-05ddc467f304",
+        "manifest_sha256": "a655229049ec7b8613a18ea385ba83ac283f76613b4903cb96bcd201431f96f5",
+        "state": "COMMITTED"
+      }
+    },
+    "retainedReplicaIntegrityUnchanged": true,
+    "rke2Started": false,
+    "scope": "same-host networkless libvirt QCOW2 provider acceptance",
+    "sourceCommit": "8f94ee6e2ac1e360e39b71b8247e64b62187ef0d",
+    "sourceDomainUuid": "d0c9b525-e7f5-458d-98f4-65c6011c2cbc",
+    "sourceFixtureRetained": true,
+    "sourceImageSha256": "7580d64a5b9f27d930d7a5f5688f67063db042252dd43c7cf280fdb3e101a34d",
+    "status": "LIVE_VERIFIED",
+    "testIdentityScope": "local qualification UUIDs, not CloudStack site/resource IDs",
+    "testPlan": {
+      "capture_timeout": 600,
+      "disks": [
+        {
+          "device": "vda",
+          "source_path": "/var/lib/libvirt/images/layersentry-cpuqc-d0c9b525-e7f5-458d-98f4-65c6011c2cbc/runtime.qcow2",
+          "virtual_bytes": 10737418240,
+          "volume_id": "00abc2f8-5c2d-4bd9-aca0-55e2cc135510"
+        }
+      ],
+      "domain_name": "layersentry-cpuqc-d0c9b525-e7f5-458d-98f4-65c6011c2cbc",
+      "domain_uuid": "d0c9b525-e7f5-458d-98f4-65c6011c2cbc",
+      "libvirt_version": 11010000,
+      "max_bytes": 22548578304,
+      "max_chain": 4,
+      "max_points": 8,
+      "minimum_retention_seconds": 0,
+      "plan_id": "87f338d8-baab-44e8-a3e8-f10ad8167fa7",
+      "qemu_version": 10001000,
+      "recovery_site_id": "4a7405b3-0832-4c30-aadf-ff22c7034c27",
+      "repository_id": "c99de937-cdac-496a-a4b2-1cda8969391f",
+      "reserve_bytes": 1073741824,
+      "retention_count": 3,
+      "rpo_seconds": 300,
+      "source_site_id": "3e441319-cbcb-4248-bf88-adbf2d17b995",
+      "tenant_id": "9c99d2e9-d7fd-4f85-8045-a4b8c57ae36d",
+      "transfer_timeout": 900,
+      "workload_id": "d0c9b525-e7f5-458d-98f4-65c6011c2cbc"
+    },
+    "workspace": "/var/lib/libvirt/images/layersentry-drqc-87f338d8-baab-44e8-a3e8-f10ad8167fa7"
+  }
+}
