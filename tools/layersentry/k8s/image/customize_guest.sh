@@ -72,6 +72,7 @@ cloud-init clean --logs --machine-id
 rm -f /etc/ssh/ssh_host_* /root/.ssh/authorized_keys
 find /home -path '*/.ssh/authorized_keys' -type f -delete
 truncate -s 0 /etc/machine-id
+install -d -m 0755 /var/lib/dbus
 rm -f /var/lib/dbus/machine-id
 ln -s /etc/machine-id /var/lib/dbus/machine-id
 rm -rf /var/lib/cloud/instances /var/lib/cloud/instance
