@@ -9,6 +9,8 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 import Cookies from 'js-cookie'
+import { vueProps } from '@/vue-app'
+import { ACCESS_TOKEN } from '@/store/mutation-types'
 
 const BASE = '/client/layersentry-k8s/v1/kubernetes'
 
@@ -23,7 +25,9 @@ export class KubernetesRequestError extends Error {
 // This JSON boundary deliberately has no CloudStack request interceptors.
 export async function kubernetesRequest (path, { method = 'GET', body, idempotencyKey, signal, timeout = 15000 } = {}) {
   if (!/^\/(readiness|clusters|operations|images|packages)(\/[a-zA-Z0-9-]+)*(\?[^#]*)?$/.test(path)) throw new Error('Invalid Kubernetes API path')
-  const sessionKey = Cookies.get('sessionkey')
+  // Match the native API client: normal login stores the token through the
+  // expiring local-storage plugin; the server's session cookie is HttpOnly.
+  const sessionKey = vueProps.$localStorage.get(ACCESS_TOKEN) || Cookies.get('sessionkey')
   if (!sessionKey) throw new KubernetesRequestError('Sign in again to access Kubernetes services.', { status: 401 })
   const mutation = method !== 'GET'
   if (mutation && !/^[a-zA-Z0-9_-]{16,128}$/.test(idempotencyKey || '')) throw new Error('A mutation request identifier is required.')

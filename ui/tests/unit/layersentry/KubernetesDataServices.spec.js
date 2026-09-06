@@ -12,6 +12,7 @@ import Page from '@/views/layersentry/KubernetesDataServices.vue'
 import { kubernetesRequest } from '@/api/layersentryKubernetes'
 
 jest.mock('@/api', () => ({ getAPI: jest.fn() }))
+jest.mock('@/vue-app', () => ({ vueProps: { $localStorage: { get: jest.fn() } } }))
 jest.mock('@/api/layersentryKubernetes', () => ({
   ...jest.requireActual('@/api/layersentryKubernetes'),
   kubernetesRequest: jest.fn(),

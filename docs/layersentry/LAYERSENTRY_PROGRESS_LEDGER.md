@@ -1,5 +1,9 @@
 # LayerSentry V1 — Durable Progress Ledger
 
+## 2026-09-07 Kubernetes native login client corrected in source
+
+The Kubernetes JSON client now uses the existing native ACCESS_TOKEN lookup before readable-cookie fallback; normal CloudStack login uses an HttpOnly session cookie. Two focused suites passed 34 tests, including authenticated requests without a readable cookie and current-token precedence. Artifact CI and actual served browser evidence remain pending. [Source decision and exact native contract](evidence/k8s/2026-09-07-native-login-session-client.md). Native GUI identity Plan 34065167747 succeeded through the verified owned SSH listener; one reviewed project creation is tracked separately and is not yet a browser verification claim.
+
 ## 2026-09-07 native Pod range reconciled; fresh modular-libvirt and routing baseline
 
 Pod Apply 34064917403 passed at 0cca70255715af143851517e744c15a640215068, recorded native job c26cfdf1-5f7b-47af-a89c-626aa96f786e and RECONCILED journal, with actual range 10.10.10.2–10.10.10.9. Original Plan hash remains bound; Zone is Disabled and usage remains UNKNOWN. No second Apply was dispatched. [Pod receipt and current lab observations](evidence/dr/2026-09-07-pod-apply-and-current-lab-prerequisites.json).

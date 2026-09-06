@@ -8,19 +8,39 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 import Cookies from 'js-cookie'
+import { vueProps } from '@/vue-app'
+import { ACCESS_TOKEN } from '@/store/mutation-types'
 import { kubernetesRequest, discoverKubernetesResources, operationNeedsPolling, mutationAttempt } from '@/api/layersentryKubernetes'
 
 jest.mock('js-cookie', () => ({ get: jest.fn() }))
+jest.mock('@/vue-app', () => ({ vueProps: { $localStorage: { get: jest.fn() } } }))
 Object.defineProperty(window, 'crypto', { value: require('crypto').webcrypto, configurable: true })
 const response = (body, status = 200, type = 'application/json') => ({ ok: status < 400, status, headers: { get: () => type }, json: async () => body })
 
 beforeEach(() => {
+  vueProps.$localStorage.get.mockReset()
   Cookies.get.mockReturnValue('runtime-session')
   global.fetch = jest.fn()
 })
 afterEach(() => { jest.useRealTimers(); delete global.fetch })
 
 describe('Kubernetes JSON trust boundary', () => {
+  it('uses the native login token when the session cookie is HttpOnly', async () => {
+    Cookies.get.mockReturnValue(undefined)
+    vueProps.$localStorage.get.mockReturnValue('native-login-session')
+    fetch.mockResolvedValue(response({ kubernetes: false }))
+    await kubernetesRequest('/readiness')
+    expect(vueProps.$localStorage.get).toHaveBeenCalledWith(ACCESS_TOKEN)
+    expect(fetch.mock.calls[0][1].headers['X-LayerSentry-Session-Key']).toBe('native-login-session')
+    expect(Cookies.get).not.toHaveBeenCalled()
+  })
+  it('prefers current native login state over a stale readable cookie', async () => {
+    vueProps.$localStorage.get.mockReturnValue('current-native-session')
+    Cookies.get.mockReturnValue('stale-cookie')
+    fetch.mockResolvedValue(response({ kubernetes: false }))
+    await kubernetesRequest('/readiness')
+    expect(fetch.mock.calls[0][1].headers['X-LayerSentry-Session-Key']).toBe('current-native-session')
+  })
   it('uses only same-origin credentials and a session header, without native API query injection', async () => {
     fetch.mockResolvedValue(response({ kubernetes: false }))
     await kubernetesRequest('/readiness')
