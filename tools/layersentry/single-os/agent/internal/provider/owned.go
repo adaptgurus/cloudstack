@@ -16,16 +16,12 @@ import (
 
 var ownerScopeRE = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,95}$`)
 
-// OwnershipSpec describes one guest-global resource that must not be represented
-// by multiple independent LayerSentry ServiceState objects. PostgreSQL uses a
-// release-scoped owner because vendor units/data roots are major-version scoped;
-// package-only runtimes use one owner per provider/package.
 type OwnershipSpec struct {
-	ScopeForRequest func(model.ServiceRequest) string
-	ScopeForState   func(model.ServiceState) string
+	ScopeForRequest   func(model.ServiceRequest) string
+	ScopeForState     func(model.ServiceState) string
 	PackageForRequest func(model.ServiceRequest) string
 	PackageForState   func(model.ServiceState) string
-	PreexistingPaths func(model.ServiceRequest) []string
+	PreexistingPaths  func(model.ServiceRequest) []string
 }
 
 type Owned struct {
@@ -50,10 +46,14 @@ func (p *Owned) Validate(ctx context.Context, r model.ServiceRequest) error {
 		return nil
 	}
 	if p.Runner == nil { return errors.New("ownership preflight executor unavailable") }
-	pkg := p.Spec.PackageForRequest(r)
-	if pkg == "" { return errors.New("ownership package identity unavailable") }
+	if p.Spec.PackageForRequest == nil { return errors.New("ownership package resolver unavailable") }
+	pkg := p.Spec.PackageForRequest(r); if pkg == "" { return errors.New("ownership package identity unavailable") }
 	res, runErr := p.Runner.Run(ctx, "/usr/bin/rpm", "-q", pkg)
-	if runErr == nil && res.ExitCode == 0 { return fmt.Errorf("refusing to adopt unmanaged pre-existing package %s", pkg) }
+	if runErr == nil {
+		if res.ExitCode == 0 { return fmt.Errorf("refusing to adopt unmanaged pre-existing package %s", pkg) }
+		return fmt.Errorf("unexpected successful ownership probe state for %s: exit=%d", pkg, res.ExitCode)
+	}
+	if res.ExitCode != 1 { return fmt.Errorf("cannot authoritatively determine whether %s is already installed: %w", pkg, runErr) }
 	if p.Spec.PreexistingPaths != nil {
 		for _, path := range p.Spec.PreexistingPaths(r) {
 			if path == "" || !filepath.IsAbs(path) { return errors.New("ownership preexisting path is invalid") }
@@ -68,15 +68,15 @@ func (p *Owned) Install(ctx context.Context,op model.Operation,plan model.Plan)e
 func (p *Owned) Configure(ctx context.Context,op model.Operation,plan model.Plan)error{scope,err:=p.requestScope(plan.Request);if err!=nil{return err};if err=p.ensureOwner(scope,plan.ServiceID,true);err!=nil{return err};return p.Inner.Configure(ctx,op,plan)}
 func (p *Owned) Initialize(ctx context.Context,op model.Operation,plan model.Plan)error{return p.Inner.Initialize(ctx,op,plan)}
 func (p *Owned) Join(ctx context.Context,op model.Operation,plan model.Plan)error{return p.Inner.Join(ctx,op,plan)}
-func (p *Owned) Health(ctx context.Context,st model.ServiceState)(model.HealthResult,error){return p.Inner.Health(ctx,st)}
-func (p *Owned) Start(ctx context.Context,op model.Operation,st model.ServiceState)error{return p.Inner.Start(ctx,op,st)}
+func (p *Owned) Health(ctx context.Context,st model.ServiceState)(model.HealthResult,error){if err:=p.verifyStateOwner(st);err!=nil{return model.HealthResult{},err};return p.Inner.Health(ctx,st)}
+func (p *Owned) Start(ctx context.Context,op model.Operation,st model.ServiceState)error{if err:=p.verifyStateOwner(st);err!=nil{return err};return p.Inner.Start(ctx,op,st)}
 func (p *Owned) Stop(ctx context.Context,op model.Operation,st model.ServiceState)error{if err:=p.verifyStateOwner(st);err!=nil{return err};return p.Inner.Stop(ctx,op,st)}
 func (p *Owned) Restart(ctx context.Context,op model.Operation,st model.ServiceState)error{if err:=p.verifyStateOwner(st);err!=nil{return err};return p.Inner.Restart(ctx,op,st)}
 func (p *Owned) Upgrade(ctx context.Context,op model.Operation,plan model.Plan)error{scope,err:=p.requestScope(plan.Request);if err!=nil{return err};if err=p.ensureOwner(scope,plan.ServiceID,false);err!=nil{return err};return p.Inner.Upgrade(ctx,op,plan)}
 func (p *Owned) Repair(ctx context.Context,op model.Operation,plan model.Plan)error{scope,err:=p.requestScope(plan.Request);if err!=nil{return err};if err=p.ensureOwner(scope,plan.ServiceID,false);err!=nil{return err};return p.Inner.Repair(ctx,op,plan)}
 func (p *Owned) Backup(ctx context.Context,op model.Operation,st model.ServiceState)(model.BackupRecord,error){if err:=p.verifyStateOwner(st);err!=nil{return model.BackupRecord{},err};return p.Inner.Backup(ctx,op,st)}
 func (p *Owned) Restore(ctx context.Context,op model.Operation,st model.ServiceState,b model.BackupRecord)error{if err:=p.verifyStateOwner(st);err!=nil{return err};return p.Inner.Restore(ctx,op,st,b)}
-func (p *Owned) Uninstall(ctx context.Context,op model.Operation,st model.ServiceState,destroy bool)error{scope,err:=p.stateScope(st);if err!=nil{return err};if err=p.ensureOwner(scope,st.ID,false);err!=nil{return err};if err=p.Inner.Uninstall(ctx,op,st,destroy);err!=nil{return err};return p.removeOwner(scope,st.ID)}
+func (p *Owned) Uninstall(ctx context.Context,op model.Operation,st model.ServiceState,destroy bool)error{scope,err:=p.stateScope(st);if err!=nil{return err};if err=p.verifyStateOwner(st);err!=nil{return err};if err=p.Inner.Uninstall(ctx,op,st,destroy);err!=nil{return err};return p.removeOwner(scope,st.ID)}
 func (p *Owned) ResidueAudit(ctx context.Context,st model.ServiceState)(map[string]string,error){out,err:=p.Inner.ResidueAudit(ctx,st);if err!=nil{return nil,err};scope,scopeErr:=p.stateScope(st);if scopeErr!=nil{return nil,scopeErr};_,exists,readErr:=p.readOwner(scope);if readErr!=nil{return nil,readErr};if exists{out["provider_owner"]="present"}else{out["provider_owner"]="absent"};return out,nil}
 
 func (p *Owned) requestScope(r model.ServiceRequest)(string,error){if p.Spec.ScopeForRequest==nil{return "",errors.New("ownership request scope unavailable")};return validateOwnerScope(p.Spec.ScopeForRequest(r))}
