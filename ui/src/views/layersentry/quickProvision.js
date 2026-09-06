@@ -114,8 +114,10 @@ export function validateQuickProvisionCompute (form = {}, offerings = []) {
     if (!isPositiveInteger(form.memory)) errors.push('The selected custom Compute Profile requires positive memory in MiB.')
   }
 
-  if (offering.diskofferingstrictness && form.rootdiskofferingid && offering.diskofferingid && offering.diskofferingid !== form.rootdiskofferingid) {
-    errors.push('The selected Compute Profile enforces its linked root Storage Profile and cannot use this root override.')
+  if (offering.diskofferingstrictness && form.rootdiskofferingid) {
+    if (!offering.diskofferingid || offering.diskofferingid !== form.rootdiskofferingid) {
+      errors.push('The selected Compute Profile enforces its linked root Storage Profile and cannot use this root override.')
+    }
   }
   return errors
 }
@@ -224,7 +226,12 @@ export function buildQuickProvisionDeployParams ({
   }
   if (form.keypair) params.keypair = form.keypair
 
-  if (form.rootdiskofferingid) params.overridediskofferingid = form.rootdiskofferingid
+  // A strict Compute Profile owns its root Storage Profile. Never emit a stale
+  // browser-side root override in that case, even if the user changed profiles
+  // after making a prior selection.
+  if (form.rootdiskofferingid && !computeOffering?.diskofferingstrictness) {
+    params.overridediskofferingid = form.rootdiskofferingid
+  }
   if (isPositiveNumber(form.rootdisksize)) params.rootdisksize = Number(form.rootdisksize)
 
   const volumes = Array.isArray(form.dataVolumes) ? form.dataVolumes : []
