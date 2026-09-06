@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1.0",
+  "status": "CI_VERIFIED",
+  "scope": "corrected unsigned offline Rocky CPU image build, appliance capability and exact sealed SELinux label inspection",
+  "workflowRun": 34054451765,
+  "workflowJob": 101543633197,
+  "workflowUrl": "https://github.com/adaptgurus/cloudstack/actions/runs/34054451765",
+  "sourceCommit": "394263c14e008f264565aa2965394e4c0145da33",
+  "artifact": {
+    "id": 9995730547,
+    "name": "layersentry-rke2-cpu-image-394263c14e008f264565aa2965394e4c0145da33-1",
+    "sizeBytes": 2678283417,
+    "sha256": "05dc0cdc336e3f09fad933a0a401cf122d5b6b789b7dbab81ca442fdf2cad5f2",
+    "expiresAt": "2026-09-20T19:31:43Z"
+  },
+  "imagePath": "cpu-image/layersentry-rke2-rocky9-amd64.qcow2",
+  "candidateManifest": {
+    "schemaVersion": "1.0",
+    "artifactType": "layersentry-rke2-node-image",
+    "status": "CI_VERIFIED",
+    "qualificationStatus": "NOT_TESTED",
+    "sourceCommit": "394263c14e008f264565aa2965394e4c0145da33",
+    "os": "rocky9",
+    "osVersion": "9.8",
+    "architecture": "amd64",
+    "rke2Version": "v1.36.4+rke2r1",
+    "cni": "canal",
+    "sha256": "61c0b8088fc0c08a0263d8076dc6a9f2b402bc7e05becd6d7c1cde60e1a0c356",
+    "sizeBytes": 2678194176,
+    "inputLockSha256": "4089511224af32c21a8828bd5bf34993ec050a09c6d8e629ed5d5e6b12d4a47b",
+    "selinuxLabelsSha256": "edb03f5b34594c7eee3a81536ff6ad67a06f3990ae159bff9ed92330e66126c2",
+    "rpmInventorySha256": "3b702c9bef0cf78934acf02db45823de2d3ae3ab06029161dc009bd7b58603b7",
+    "rke2Installed": true,
+    "rke2Started": false,
+    "runtimeQualified": false,
+    "signed": false,
+    "templateId": null,
+    "qualificationEvidenceSha256": null,
+    "hostBootTested": false,
+    "joinTested": false,
+    "storageTested": false
+  },
+  "selinuxInspection": {
+    "schemaVersion": "1.0",
+    "preflight": false,
+    "runtimeQualified": false,
+    "imageModified": false,
+    "guestfsVersion": {
+      "major": 1,
+      "minor": 52,
+      "release": 0,
+      "extra": ""
+    },
+    "applianceSelinuxRelabelAvailable": true,
+    "autorelabelExists": false,
+    "selinuxConfig": "enforcing",
+    "files": {
+      "/usr/lib64/ld-linux-x86-64.so.2": {
+        "realPath": "/usr/lib64/ld-linux-x86-64.so.2",
+        "label": "system_u:object_r:ld_so_t:s0\u0000"
+      },
+      "/usr/bin/bash": {
+        "realPath": "/usr/bin/bash",
+        "label": "system_u:object_r:shell_exec_t:s0\u0000"
+      },
+      "/usr/bin/python3": {
+        "realPath": "/usr/bin/python3.9",
+        "label": "system_u:object_r:bin_t:s0\u0000"
+      },
+      "/usr/bin/qemu-ga": {
+        "realPath": "/usr/bin/qemu-ga",
+        "label": "system_u:object_r:virt_qemu_ga_exec_t:s0\u0000"
+      },
+      "/usr/lib/systemd/systemd": {
+        "realPath": "/usr/lib/systemd/systemd",
+        "label": "system_u:object_r:init_exec_t:s0\u0000"
+      },
+      "/usr/sbin/sshd": {
+        "realPath": "/usr/sbin/sshd",
+        "label": "system_u:object_r:sshd_exec_t:s0\u0000"
+      },
+      "/etc/sysconfig/qemu-ga": {
+        "realPath": "/etc/sysconfig/qemu-ga",
+        "label": "system_u:object_r:etc_t:s0\u0000"
+      },
+      "/etc/selinux/config": {
+        "realPath": "/etc/selinux/config",
+        "label": "system_u:object_r:selinux_config_t:s0\u0000"
+      }
+    },
+    "status": "CI_VERIFIED"
+  },
+  "applianceCapability": {
+    "schemaVersion": "1.0",
+    "preflight": true,
+    "runtimeQualified": false,
+    "imageModified": false,
+    "guestfsVersion": {
+      "major": 1,
+      "minor": 52,
+      "release": 0,
+      "extra": ""
+    },
+    "applianceSelinuxRelabelAvailable": true,
+    "status": "CI_VERIFIED"
+  },
+  "sourceTestsPassed": 17,
+  "metadataVerification": {
+    "status": "CI_VERIFIED",
+    "scope": "independent ranged small artifact reads and label/inventory hash bindings",
+    "fullArchiveDownloaded": false,
+    "fullImageDownloaded": false
+  },
+  "runtimeQualification": {
+    "status": "NOT_TESTED",
+    "productionQualified": false,
+    "signed": false,
+    "templateRegistered": false,
+    "sshConnectivityTested": false,
+    "joinTested": false,
+    "storageTested": false,
+    "rke2Started": false
+  },
+  "runtimeHandoff": {
+    "nativeChecksum": "{SHA-256}61c0b8088fc0c08a0263d8076dc6a9f2b402bc7e05becd6d7c1cde60e1a0c356",
+    "qcow2VirtualBytes": 10737418240,
+    "qcow2Compatibility": "1.1",
+    "standalone": true,
+    "compression": "zlib format capability; artifact ZIP stored without compression",
+    "hostPublicExport": "/usr/share/layersentry/node-image/ssh_host_ed25519_key.pub",
+    "rootOwnsLiveDispatch": true
+  }
+}
