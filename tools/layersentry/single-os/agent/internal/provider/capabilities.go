@@ -11,6 +11,9 @@ import (
 // It rejects data roles, backup semantics and secrets a provider does not own;
 // each provider still performs product-specific validation afterwards.
 func ValidateIntentCapabilities(id string, r model.ServiceRequest) error {
+	if r.Network.VIP.Mode == "vrrp" && r.Network.ListenAddress != "0.0.0.0" {
+		return errors.New("VRRP services must bind 0.0.0.0 so the process can accept the floating VIP on either MASTER or BACKUP after role transition")
+	}
 	if r.Category == model.CategoryDatabase && r.Maintenance.AutoPatch && !r.Backup.Enabled {
 		return errors.New("automatic database patching requires a provider-managed backup policy")
 	}
