@@ -12,6 +12,10 @@
 
 ## 0. Latest continuation checkpoint
 
+The NodeDiskSet source contract is implemented at `efcd97056b`. It adds exact project/Site/disk-offering/node-pool/Machine/logical-disk ownership, durable CloudStack volume-ID bindings, complete tags, retain/delete, expand-only resize and explicit reattach/recreate replacement semantics. The planner rejects durable application/database data in favor of CSI/PVC ownership and fails closed for missing, ambiguous or cross-scope inventory. All 22 local Workstream E policy/planner tests passed.
+
+This does not enable direct disks in production. The release/UI evidence gate remains false because the BFF executor and destructive Rocky replacement/idempotency tests are `NOT_TESTED`. Design evidence is `docs/layersentry/evidence/k8s/2026-09-06-e0-nodediskset-design.md`. Resume with exact CloudStack CSI `3.0.2` project-scoped lifecycle and resize idempotency qualification, then the BFF/controller execution layer.
+
 Implementation continued directly on the integration branch from fetched head `f61c4d8198a7af4d3147ea893f77830d4f8f21f0`.
 
 Exact E0 endpoint/volume source commit:
@@ -220,7 +224,7 @@ Base K8s policy/UI foundation        SOURCE_COMPLETE
 Lane B runtime reconciliation        PENDING
 6443 + 9345 endpoint runtime         BLOCKED/PENDING
 CAPC volume ownership fix            BLOCKED/PENDING
-NodeDiskSet                           PENDING
+NodeDiskSet source planner            SOURCE_COMPLETE; runtime NOT_TESTED
 CloudStack CSI qualification          PENDING
 Flux remote package lifecycle         PENDING runtime proof
 PostgreSQL DBaaS mutation              BLOCKED by E0

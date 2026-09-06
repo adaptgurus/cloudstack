@@ -49,6 +49,18 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE — 2026-09-06 E0 NodeDiskSet ownership/planning contract
+
+Exact implementation commit:
+
+`efcd97056b`
+
+Workstream E added a LayerSentry-owned NodeDiskSet policy/planner without changing Apache CloudStack Java/API/schema/KVM source. Each disk definition carries an exact logical ID, disk-offering ID, size, scratch/cache purpose, retain/delete policy, expand-only/disabled resize policy and reattach/recreate replacement policy. Each durable binding records the exact CloudStack volume ID and CAPI Machine UID. Reconciliation and every destructive action verify the recorded ID, project, Site, disk offering and complete LayerSentry ownership tags; missing, conflicting, ambiguous, cross-scope or wrong-offering inventory fails closed. Durable workload/database data is rejected because it remains CSI/PVC-owned.
+
+Local source evidence: all 22 Workstream E Python policy/planner tests passed, including create idempotency, binding/tag enforcement, expand/no-shrink, retain/delete, reattach/recreate, duplicate target rejection and project/Site/offering destructive guards. The release manifest now exposes `nodeDiskSetOwnership=false`, and the existing GUI remains fail-closed for direct node disks. Design evidence: `docs/layersentry/evidence/k8s/2026-09-06-e0-nodediskset-design.md`.
+
+This is a source planning contract only. The BFF/saga executor, async timeout reconciliation, CloudStack mutation, Machine replacement and destructive Rocky tests remain `NOT_TESTED`; the gate stays false. Next Workstream E gate: qualify and, where needed, patch exact CloudStack CSI `3.0.2` project-scoped lifecycle and resize idempotency, then bind the policy/planners to the LayerSentry controller.
+
 ### SOURCE_COMPLETE — 2026-09-06 E0 CAPC endpoint and Machine-volume ownership overlay
 
 Exact implementation commit:
