@@ -11,20 +11,22 @@ ExecStart=/usr/bin/layersentryd privileged-helper
 Restart=on-failure
 RestartSec=3s
 UMask=0077
+NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
-ProtectSystem=full
+# DNF/RPM legitimately mutate /usr, /etc and provider-owned system paths. Do not
+# use ProtectSystem=full/strict or an unproven capability bounding set here and
+# then weaken it ad hoc. The reviewed typed helper protocol is the mutation
+# boundary; the unprivileged API process retains the stronger filesystem sandbox.
+ProtectSystem=false
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
 LockPersonality=true
-RestrictSUIDSGID=true
 RestrictRealtime=true
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
-ReadWritePaths=/run/layersentryd /etc /var/lib/pgsql /var/lib/mysql /var/lib/redis /var/lib/valkey /var/log /srv /data /opt/layersentry-data /var/log/layersentry-services
-CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID CAP_SYS_ADMIN CAP_NET_ADMIN CAP_AUDIT_WRITE
 AmbientCapabilities=
 
 [Install]
