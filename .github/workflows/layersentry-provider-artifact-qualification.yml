@@ -1,0 +1,73 @@
+name: LayerSentry provider artifact qualification
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/k8s-provider-artifact-qualification]
+    paths:
+      - .github/workflows/layersentry-provider-artifact-qualification.yml
+      - tools/layersentry/k8s/downstream/provider-artifacts/**
+permissions:
+  contents: read
+concurrency:
+  group: layersentry-provider-artifact-qualification
+  cancel-in-progress: false
+jobs:
+  build-only:
+    if: github.repository == 'adaptgurus/cloudstack' && github.ref == 'refs/heads/codex/k8s-provider-artifact-qualification'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: capc
+            repository: kubernetes-sigs/cluster-api-provider-cloudstack
+            commit: 7521b14a31e6c46f81f16aae3738a27c08ad063f
+          - component: cloudstack-ccm
+            repository: apache/cloudstack-kubernetes-provider
+            commit: 4740dbcacc7fc5892354b03b2f0be7ebf5c92584
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.commit }}
+          path: upstream-provider
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          version: v0.37.0
+          driver-opts: image=moby/buildkit@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+      - name: Verify exact source and downstream overlay
+        shell: bash
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          set -euo pipefail
+          mkdir evidence
+          git rev-parse HEAD > evidence/layersentry-source.txt
+          git -C upstream-provider rev-parse HEAD > evidence/upstream-source.txt
+          docker version > evidence/docker-version.txt
+          docker buildx version > evidence/buildx-version.txt
+          python3 -m unittest discover -s tools/layersentry/k8s/downstream/provider-artifacts -p 'test_*.py' -v 2>&1 | tee evidence/source-tests.log
+          python3 tools/layersentry/k8s/downstream/materialize.py --source upstream-provider --manifest "tools/layersentry/k8s/downstream/$COMPONENT/manifest.json" --apply | tee evidence/materialize.json
+          cp "tools/layersentry/k8s/downstream/$COMPONENT/manifest.json" evidence/overlay-manifest.json
+          cp tools/layersentry/k8s/downstream/provider-artifacts/*.Containerfile evidence/
+      - name: Build OCI archive and bind installable provider components
+        shell: bash
+        env:
+          COMPONENT: ${{ matrix.component }}
+          BUILDX_METADATA_PROVENANCE: max
+        run: |
+          set -euo pipefail
+          tools/layersentry/k8s/downstream/provider-artifacts/qualify.sh "$COMPONENT" upstream-provider evidence
+      - name: Retain unsigned build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: layersentry-${{ matrix.component }}-build-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
