@@ -6,50 +6,19 @@ import (
  "encoding/json"
  "errors"
  "fmt"
+ "io"
  "net"
  "path/filepath"
+ "regexp"
  "strings"
 
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/model"
 )
 
-func DecodeStrict(data []byte) (model.ServiceRequest, error) {
- var req model.ServiceRequest
- dec := json.NewDecoder(strings.NewReader(string(data)))
- dec.DisallowUnknownFields()
- if err := dec.Decode(&req); err != nil { return req, fmt.Errorf("decode request: %w", err) }
- if dec.More() { return req, errors.New("multiple JSON values are not allowed") }
- if err := Validate(req); err != nil { return req, err }
- return req, nil
-}
-
-func Validate(req model.ServiceRequest) error {
- if req.SchemaVersion != 1 { return fmt.Errorf("unsupported schema_version %d", req.SchemaVersion) }
- for name, v := range map[string]string{"request_id":req.RequestID,"service_id":req.ServiceID,"operation_id":req.OperationID,"idempotency_key":req.IdempotencyKey,"provider":req.Provider,"release_line":req.ReleaseLine,"topology":req.Topology} {
-  if strings.TrimSpace(v)=="" { return fmt.Errorf("%s is required", name) }
-  if len(v)>256 { return fmt.Errorf("%s too long", name) }
- }
- if req.Category != model.CategoryDatabase && req.Category != model.CategoryApplication { return errors.New("category must be database or application") }
- if req.Topology != "standalone" && req.Topology != "cluster" { return errors.New("topology must be standalone or cluster") }
- if req.Topology == "cluster" && strings.TrimSpace(req.Cluster.Role)=="" { return errors.New("cluster role is required") }
- if req.Network.Port < 1 || req.Network.Port > 65535 { return errors.New("network.port outside 1..65535") }
- if req.Network.ListenAddress != "" && net.ParseIP(req.Network.ListenAddress)==nil { return errors.New("invalid listen_address") }
- for _, cidr := range req.Network.AllowedCIDRs { if _,_,err:=net.ParseCIDR(cidr); err!=nil { return fmt.Errorf("invalid allowed CIDR %q", cidr) } }
- seenDevices := map[string]bool{}; seenMounts:=map[string]bool{}
- for _, s := range req.Storage {
-  if !strings.HasPrefix(s.Device,"/dev/disk/by-") { return fmt.Errorf("device must use stable /dev/disk/by-* identity: %q", s.Device) }
-  if seenDevices[s.Device] { return fmt.Errorf("duplicate device %q",s.Device) }; seenDevices[s.Device]=true
-  clean:=filepath.Clean(s.MountPoint)
-  if !filepath.IsAbs(clean) || clean=="/" || strings.HasPrefix(clean,"/boot") || strings.HasPrefix(clean,"/proc") || strings.HasPrefix(clean,"/sys") || strings.HasPrefix(clean,"/dev") { return fmt.Errorf("unsafe mount point %q",s.MountPoint) }
-  if clean!=s.MountPoint { return fmt.Errorf("mount point must be canonical: %q",s.MountPoint) }
-  if seenMounts[clean] { return fmt.Errorf("duplicate mount point %q",clean) }; seenMounts[clean]=true
-  if s.Format && !s.ConfirmFormat { return fmt.Errorf("format requires confirm_format for %q",s.Device) }
-  switch s.Filesystem { case "xfs","ext4","": default: return fmt.Errorf("unsupported filesystem %q",s.Filesystem) }
- }
- for k,v := range req.SecretRefs { if strings.TrimSpace(k)=="" || !strings.HasPrefix(v,"secret://") { return fmt.Errorf("secret_refs must contain secret:// references") } }
- return nil
-}
-
-func CanonicalDigest(req model.ServiceRequest) (string,error) {
- b,err:=json.Marshal(req); if err!=nil{return "",err}; s:=sha256.Sum256(b); return hex.EncodeToString(s[:]),nil
-}
+var uuidRE=regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
+var secretRE=regexp.MustCompile(`^secret://[0-9a-f]{32}$`)
+func DecodeStrict(data []byte)(model.ServiceRequest,error){var req model.ServiceRequest;dec:=json.NewDecoder(strings.NewReader(string(data)));dec.DisallowUnknownFields();if err:=dec.Decode(&req);err!=nil{return req,fmt.Errorf("decode request: %w",err)};var extra any;if err:=dec.Decode(&extra);err!=io.EOF{return req,errors.New("multiple JSON values are not allowed")};if err:=Validate(req);err!=nil{return req,err};return req,nil}
+func Validate(req model.ServiceRequest)error{if req.SchemaVersion!=1{return fmt.Errorf("unsupported schema_version %d",req.SchemaVersion)};for name,v:=range map[string]string{"request_id":req.RequestID,"service_id":req.ServiceID,"operation_id":req.OperationID}{if !uuidRE.MatchString(v){return fmt.Errorf("%s must be a UUID",name)}};if strings.TrimSpace(req.IdempotencyKey)==""||len(req.IdempotencyKey)>256{return errors.New("idempotency_key is required and must be <=256 bytes")};if strings.TrimSpace(req.Provider)==""||len(req.Provider)>64{return errors.New("provider is required and must be <=64 bytes")};if strings.TrimSpace(req.ReleaseLine)==""||len(req.ReleaseLine)>64{return errors.New("release_line is required and must be <=64 bytes")};if req.Category!=model.CategoryDatabase&&req.Category!=model.CategoryApplication{return errors.New("category must be database or application")};if req.Topology!="standalone"&&req.Topology!="cluster"{return errors.New("topology must be standalone or cluster")};if err:=validateMaintenance(req.Maintenance);err!=nil{return err};if req.Backup.Retention<0||req.Backup.Retention>3650{return errors.New("backup retention outside 0..3650")};if req.Backup.Enabled&&req.Backup.Retention<1{return errors.New("enabled backup requires retention >=1")};if req.Network.Port<1||req.Network.Port>65535{return errors.New("network.port outside 1..65535")};if req.Network.ListenAddress!=""&&net.ParseIP(req.Network.ListenAddress)==nil{return errors.New("invalid listen_address")};seenCIDR:=map[string]bool{};for _,cidr:=range req.Network.AllowedCIDRs{_,n,err:=net.ParseCIDR(cidr);if err!=nil{return fmt.Errorf("invalid allowed CIDR %q",cidr)};canon:=n.String();if seenCIDR[canon]{return fmt.Errorf("duplicate allowed CIDR %q",cidr)};seenCIDR[canon]=true};seenDevices:=map[string]bool{};seenMounts:=map[string]bool{};for _,s:=range req.Storage{if !strings.HasPrefix(s.Device,"/dev/disk/by-"){return fmt.Errorf("device must use stable /dev/disk/by-* identity: %q",s.Device)};if seenDevices[s.Device]{return fmt.Errorf("duplicate device %q",s.Device)};seenDevices[s.Device]=true;clean:=filepath.Clean(s.MountPoint);if !filepath.IsAbs(clean)||clean=="/"||under(clean,"/boot")||under(clean,"/proc")||under(clean,"/sys")||under(clean,"/dev")||under(clean,"/run"){return fmt.Errorf("unsafe mount point %q",s.MountPoint)};if clean!=s.MountPoint{return fmt.Errorf("mount point must be canonical: %q",s.MountPoint)};if seenMounts[clean]{return fmt.Errorf("duplicate mount point %q",clean)};seenMounts[clean]=true;if s.Format&&!s.ConfirmFormat{return fmt.Errorf("format requires confirm_format for %q",s.Device)};switch s.Filesystem{case "xfs","ext4","":default:return fmt.Errorf("unsupported filesystem %q",s.Filesystem)};switch s.Purpose{case "database-data","database-wal","database-logs","database-backup","application-data","application-logs","cache","temporary":default:return fmt.Errorf("unsupported storage purpose %q",s.Purpose)}};for k,v:=range req.SecretRefs{if strings.TrimSpace(k)==""||!secretRE.MatchString(v){return fmt.Errorf("secret_refs must contain canonical secret:// references")}};if req.Topology=="cluster"{if strings.TrimSpace(req.Cluster.Role)==""{return errors.New("cluster role is required")};seen:=map[string]bool{};for _,peer:=range req.Cluster.Peers{ip:=net.ParseIP(peer);if ip==nil{return fmt.Errorf("invalid cluster peer %q",peer)};canon:=ip.String();if seen[canon]{return fmt.Errorf("duplicate cluster peer %q",peer)};seen[canon]=true;if req.Network.ListenAddress!=""&&canon==net.ParseIP(req.Network.ListenAddress).String(){return errors.New("cluster peer may not equal this node listen address")}};if req.Cluster.JoinTokenRef!=""&&!secretRE.MatchString(req.Cluster.JoinTokenRef){return errors.New("cluster join token must be a secret reference")}}else if len(req.Cluster.Peers)>0||req.Cluster.Role!=""||req.Cluster.JoinTokenRef!=""{return errors.New("cluster fields are not allowed for standalone topology")};return nil}
+func validateMaintenance(p model.MaintenancePolicy)error{switch p.Mode{case "manual","daily","weekly","monthly","notify-only":default:return fmt.Errorf("unsupported maintenance mode %q",p.Mode)};if p.AutoPatch&&!p.ReleaseLineLocked{return errors.New("auto_patch requires release_line_locked")};if p.Mode=="weekly"&&p.Day!=""{valid:=map[string]bool{"Monday":true,"Tuesday":true,"Wednesday":true,"Thursday":true,"Friday":true,"Saturday":true,"Sunday":true};if !valid[p.Day]{return errors.New("invalid weekly maintenance day")}};if p.Window!=""{var h1,m1,h2,m2 int;if _,err:=fmt.Sscanf(p.Window,"%d:%d-%d:%d",&h1,&m1,&h2,&m2);err!=nil||h1>23||h2>23||m1>59||m2>59||h1<0||h2<0||m1<0||m2<0{return errors.New("maintenance window must be HH:MM-HH:MM")}};return nil}
+func under(path,root string)bool{return path==root||strings.HasPrefix(path,root+string(filepath.Separator))}
+func CanonicalDigest(req model.ServiceRequest)(string,error){b,err:=json.Marshal(req);if err!=nil{return "",err};s:=sha256.Sum256(b);return hex.EncodeToString(s[:]),nil}
