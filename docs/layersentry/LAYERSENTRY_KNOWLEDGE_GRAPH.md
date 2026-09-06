@@ -210,6 +210,8 @@ CloudStack CSI retained OCI artifact lock
 Native CSI review bundle
   RENDERS -> exact upstream chart with pinned amd64 runtime digests and existing project Secret reference
   COLLECTS -> unchanged driver/syncer attestation indexes plus verified sidecar runtime layers
+  QUALIFIES_OFFLINE -> exact RKE2 containerd runtime/index bindings after repeated native imports
+  REQUIRES_FOR_AIRGAP -> verified exact local preload on every workload node with IfNotPresent and real CRI visibility
   REQUIRES -> real CloudStack node/project metadata binding, trusted namespace ownership and E0 data survival
   DOES_NOT_PROVIDE -> registry publication, signature trust or live storage qualification
   SOURCE -> tools/layersentry/k8s/downstream/cloudstack-csi/native/README.md

@@ -1,0 +1,301 @@
+{
+  "airgapCandidate": {
+    "imagePullPolicy": "IfNotPresent",
+    "liveNodePreloadVerified": false,
+    "requiresExactPreloadOnEveryWorkloadNode": true,
+    "runtimeNamesVerified": true
+  },
+  "cleanup": {
+    "privateDaemonStopped": true,
+    "scope": "isolated ephemeral hosted runner only"
+  },
+  "deployable": false,
+  "githubArtifact": {
+    "expiresAt": "2026-09-20T21:16:23Z",
+    "id": 9997317899,
+    "name": "layersentry-csi-native-234b76f2ed320968ece48689d0f28a6bb1ddc89d-1",
+    "sha256": "f1d53616b822348d041fca7cf228816db5f56407d33668c16653bf97ab199b61",
+    "sizeBytes": 165226658
+  },
+  "images": {
+    "archives": [
+      {
+        "archive": "cloudstack-csi-driver.oci.tar",
+        "component": "cloudstack-csi-driver",
+        "fullRetainedIndex": true,
+        "runtimeDigest": "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+        "sha256": "0a52fdf6194ac4efa5ac3f155f3a14a07f12d0fc98e9565db55e137fe53e5919"
+      },
+      {
+        "archive": "cloudstack-csi-sc-syncer.oci.tar",
+        "component": "cloudstack-csi-sc-syncer",
+        "fullRetainedIndex": true,
+        "runtimeDigest": "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+        "sha256": "f0839c00895f754be994760d82ee4a0d498fbbc4bc2a88b407b7406634ecdd59"
+      },
+      {
+        "archive": "csi-provisioner.oci.tar",
+        "component": "csi-provisioner",
+        "fullRetainedIndex": false,
+        "provenanceVerified": false,
+        "runtimeDigest": "sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb",
+        "sha256": "6a58b77073754bea5736e2468ecab7a6c047b49e7f8992aa8c1f26dcac28d480",
+        "signatureVerified": false
+      },
+      {
+        "archive": "csi-attacher.oci.tar",
+        "component": "csi-attacher",
+        "fullRetainedIndex": false,
+        "provenanceVerified": false,
+        "runtimeDigest": "sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43",
+        "sha256": "dbab1a00d025d543eda729245d2f2b518e5821f434f0f42667a08e10c2d341b6",
+        "signatureVerified": false
+      },
+      {
+        "archive": "csi-resizer.oci.tar",
+        "component": "csi-resizer",
+        "fullRetainedIndex": false,
+        "provenanceVerified": false,
+        "runtimeDigest": "sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73",
+        "sha256": "4caa0527921f800c73cfa6a10eefadcbdbcc928c3874105cbcd2ddf093738e6c",
+        "signatureVerified": false
+      },
+      {
+        "archive": "livenessprobe.oci.tar",
+        "component": "livenessprobe",
+        "fullRetainedIndex": false,
+        "provenanceVerified": false,
+        "runtimeDigest": "sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa",
+        "sha256": "8fbb92c82cc97029fa54d00287089238dafb720a8f89b920cc471c0b2d95e349",
+        "signatureVerified": false
+      },
+      {
+        "archive": "csi-node-driver-registrar.oci.tar",
+        "component": "csi-node-driver-registrar",
+        "fullRetainedIndex": false,
+        "provenanceVerified": false,
+        "runtimeDigest": "sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db",
+        "sha256": "f3c69061c588a43b85b2a63fe929615bfe2f6053f35ee4f74d2539707f2a9d5e",
+        "signatureVerified": false
+      }
+    ],
+    "artifactType": "layersentry-native-csi-image-collection",
+    "deployable": false,
+    "inputsSha256": "2aaeb1c2d969bcb69aac68cdaa8bf179adc8a82f2165d427605cc631158912da",
+    "qualification": {
+      "credentialsProjectScopeVerified": false,
+      "kubernetes136SidecarsVerified": false,
+      "liveVerified": false,
+      "machineDataSurvivalQualified": false,
+      "nodeIdentityQualified": false,
+      "productionCertified": false,
+      "projectLifecycleQualified": false,
+      "registryPublicationVerified": false,
+      "resizeIdempotencyQualified": false
+    },
+    "registryPublished": false,
+    "schemaVersion": "1.0",
+    "signed": false,
+    "status": "SOURCE_COMPLETE"
+  },
+  "nativeImport": {
+    "binarySha256": {
+      "containerd": "fcb35183e9181fc2735bc131245d223fdf23f75b17f735290868e1c1a1e8db1d",
+      "containerd-shim-runc-v2": "f2061d1918ec0de7ecfcc3d1312d23c5a16443869aa5868035a550ee18087177",
+      "ctr": "aee886f9dd324d06db314a9c9545ecde0797309f3887ca671bf52f02d5f2bc08",
+      "runc": "d450efc859dff197b3e77ea2635322b285c31458fe90e24d1f010ad11727305f"
+    },
+    "containerdVersion": "containerd github.com/k3s-io/containerd v2.3.4-k3s1.36 b92ab05c7f4bfac0033a4ce560c5698bfb2b26c9",
+    "criPodExecutionVerified": false,
+    "imports": [
+      {
+        "attempt": 1,
+        "contentDigestsVerified": [
+          "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+          "sha256:863a4d6280fb2d354071c8fef7020297985e506a6f7a4fbce38ecb34a0357b43",
+          "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+          "sha256:7deba98bf6851481ded002d13779f4ef43f666f6385dbfce2291037b5cafca73",
+          "sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb",
+          "sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43",
+          "sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73",
+          "sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa",
+          "sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db"
+        ],
+        "exactRuntimeImages": {
+          "registry.invalid/layersentry/cloudstack-csi-driver@sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5": "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+          "registry.invalid/layersentry/cloudstack-csi-sc-syncer@sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb": "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+          "registry.k8s.io/sig-storage/csi-attacher@sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43": "sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43",
+          "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db": "sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db",
+          "registry.k8s.io/sig-storage/csi-provisioner@sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb": "sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb",
+          "registry.k8s.io/sig-storage/csi-resizer@sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73": "sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73",
+          "registry.k8s.io/sig-storage/livenessprobe@sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa": "sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa"
+        },
+        "mode": "native-local"
+      },
+      {
+        "attempt": 2,
+        "contentDigestsVerified": [
+          "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+          "sha256:863a4d6280fb2d354071c8fef7020297985e506a6f7a4fbce38ecb34a0357b43",
+          "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+          "sha256:7deba98bf6851481ded002d13779f4ef43f666f6385dbfce2291037b5cafca73",
+          "sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb",
+          "sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43",
+          "sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73",
+          "sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa",
+          "sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db"
+        ],
+        "exactRuntimeImages": {
+          "registry.invalid/layersentry/cloudstack-csi-driver@sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5": "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+          "registry.invalid/layersentry/cloudstack-csi-sc-syncer@sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb": "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+          "registry.k8s.io/sig-storage/csi-attacher@sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43": "sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43",
+          "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db": "sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db",
+          "registry.k8s.io/sig-storage/csi-provisioner@sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb": "sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb",
+          "registry.k8s.io/sig-storage/csi-resizer@sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73": "sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73",
+          "registry.k8s.io/sig-storage/livenessprobe@sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa": "sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa"
+        },
+        "mode": "native-local"
+      }
+    ],
+    "liveNodePreloadVerified": false,
+    "runtimeEnvelopes": {
+      "cloudstack-csi-driver": {
+        "imageBlobsModified": false,
+        "originalArchiveSha256": "0a52fdf6194ac4efa5ac3f155f3a14a07f12d0fc98e9565db55e137fe53e5919",
+        "retainedIndexDigest": "sha256:863a4d6280fb2d354071c8fef7020297985e506a6f7a4fbce38ecb34a0357b43",
+        "runtimeDigest": "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+        "runtimeEnvelopeSha256": "ca23a88cf183d7663205e1c686eefa54017801e33285e658e5ee062c5d68eb93"
+      },
+      "cloudstack-csi-sc-syncer": {
+        "imageBlobsModified": false,
+        "originalArchiveSha256": "f0839c00895f754be994760d82ee4a0d498fbbc4bc2a88b407b7406634ecdd59",
+        "retainedIndexDigest": "sha256:7deba98bf6851481ded002d13779f4ef43f666f6385dbfce2291037b5cafca73",
+        "runtimeDigest": "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+        "runtimeEnvelopeSha256": "50775921a02f99b2234fa331094dd70c1841dd678ff17d275b17db458bd8e414"
+      }
+    },
+    "runtimeImage": "docker.io/rancher/rke2-runtime@sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9"
+  },
+  "qualification": {
+    "credentialsProjectScopeVerified": false,
+    "kubernetes136SidecarsVerified": false,
+    "liveVerified": false,
+    "machineDataSurvivalQualified": false,
+    "nodeIdentityQualified": false,
+    "productionCertified": false,
+    "projectLifecycleQualified": false,
+    "registryPublicationVerified": false,
+    "resizeIdempotencyQualified": false
+  },
+  "registryPublished": false,
+  "repositoryLicenseCheck": {
+    "conclusion": "failure",
+    "runId": 34060514519,
+    "unapprovedFiles": 315,
+    "waived": false
+  },
+  "reviewBundle": {
+    "artifactLockSha256": "ecbe36013f66bf6015321f07bb2ebbc5ed3d87125c60c5958099b1f0b297d19f",
+    "artifactType": "layersentry-native-csi-review-bundle",
+    "deployable": false,
+    "images": [
+      {
+        "archive": "cloudstack-csi-driver.oci.tar",
+        "archiveSha256": "0a52fdf6194ac4efa5ac3f155f3a14a07f12d0fc98e9565db55e137fe53e5919",
+        "component": "cloudstack-csi-driver",
+        "enabled": true,
+        "indexDigest": "sha256:863a4d6280fb2d354071c8fef7020297985e506a6f7a4fbce38ecb34a0357b43",
+        "plannedReference": "registry.invalid/layersentry/cloudstack-csi-driver@sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+        "registryReference": null,
+        "runtimeDigest": "sha256:9c1fac533078231833c41111f6b351904f81011801ac5c61ce54e43f2566dfa5",
+        "signatureVerified": false
+      },
+      {
+        "archive": "cloudstack-csi-sc-syncer.oci.tar",
+        "archiveSha256": "f0839c00895f754be994760d82ee4a0d498fbbc4bc2a88b407b7406634ecdd59",
+        "component": "cloudstack-csi-sc-syncer",
+        "enabled": false,
+        "indexDigest": "sha256:7deba98bf6851481ded002d13779f4ef43f666f6385dbfce2291037b5cafca73",
+        "plannedReference": "registry.invalid/layersentry/cloudstack-csi-sc-syncer@sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+        "registryReference": null,
+        "runtimeDigest": "sha256:c33d4988fefc444356a6559490cf46a2b45154e3cdf426f330685cd92188beeb",
+        "signatureVerified": false
+      },
+      {
+        "component": "csi-provisioner",
+        "enabled": true,
+        "indexDigest": "sha256:405a14e1aa702f7ea133cea459e8395fe40a6125c088c55569e696d48e1bd385",
+        "provenanceVerified": false,
+        "registryReference": "registry.k8s.io/sig-storage/csi-provisioner@sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb",
+        "runtimeDigest": "sha256:94add3feccf10c5191059f338e51d3a1f3ef5012e4e37ea8bd28c1a8d3d393eb",
+        "signatureVerified": false
+      },
+      {
+        "component": "csi-attacher",
+        "enabled": true,
+        "indexDigest": "sha256:b4d611100ece2f9bc980d1cb19c2285b8868da261e3b1ee8f45448ab5512ab94",
+        "provenanceVerified": false,
+        "registryReference": "registry.k8s.io/sig-storage/csi-attacher@sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43",
+        "runtimeDigest": "sha256:a70202a7cb71dd692c4299514951ead0485345bf64d9381a09f06490d39ebf43",
+        "signatureVerified": false
+      },
+      {
+        "component": "csi-resizer",
+        "enabled": true,
+        "indexDigest": "sha256:a541e6cc2d8b011bb21b1d4ffec6b090e85270cce6276ee302d86153eec0af43",
+        "provenanceVerified": false,
+        "registryReference": "registry.k8s.io/sig-storage/csi-resizer@sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73",
+        "runtimeDigest": "sha256:d435d5bb8637f4c0229c5eb5ce515f0718ee5dc55a49128a163f40b2a497af73",
+        "signatureVerified": false
+      },
+      {
+        "component": "livenessprobe",
+        "enabled": true,
+        "indexDigest": "sha256:5baeb4a6d7d517434292758928bb33efc6397368cbb48c8a4cf29496abf4e987",
+        "provenanceVerified": false,
+        "registryReference": "registry.k8s.io/sig-storage/livenessprobe@sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa",
+        "runtimeDigest": "sha256:9fd908d3729d6653017614c77ca29d18f5a607ba568fd4974f8daae81a965cfa",
+        "signatureVerified": false
+      },
+      {
+        "component": "csi-node-driver-registrar",
+        "enabled": true,
+        "indexDigest": "sha256:f25af73ee708ff9c82595ae99493cdef9295bd96953366cddf36305f82555dac",
+        "provenanceVerified": false,
+        "registryReference": "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db",
+        "runtimeDigest": "sha256:bf2dc90ad453963c1006d10c36eb4fd3f4e2811d8e9df003c80c4fa4b69663db",
+        "signatureVerified": false
+      }
+    ],
+    "inputsSha256": "2aaeb1c2d969bcb69aac68cdaa8bf179adc8a82f2165d427605cc631158912da",
+    "manifestSha256": "5adcfb004bfafa92ae6b0da641cba79448e80e510ac2f50598b3e863ecff775b",
+    "namespace": "layersentry-cloudstack-csi",
+    "objectCount": 16,
+    "qualification": {
+      "credentialsProjectScopeVerified": false,
+      "kubernetes136SidecarsVerified": false,
+      "liveVerified": false,
+      "machineDataSurvivalQualified": false,
+      "nodeIdentityQualified": false,
+      "productionCertified": false,
+      "projectLifecycleQualified": false,
+      "registryPublicationVerified": false,
+      "resizeIdempotencyQualified": false
+    },
+    "schemaVersion": "1.0",
+    "secretReference": "cloudstack-project-credentials",
+    "status": "SOURCE_COMPLETE"
+  },
+  "runId": "34060514601",
+  "schemaVersion": "1.0",
+  "scope": "offline native CSI artifact import/reimport only",
+  "signatureVerified": false,
+  "sourceCommit": "234b76f2ed320968ece48689d0f28a6bb1ddc89d",
+  "sourceTests": {
+    "helmVersion": "3.18.6",
+    "parser": "PyYAML6.0.2",
+    "passed": 23,
+    "skipped": 0
+  },
+  "status": "CI_VERIFIED"
+}
