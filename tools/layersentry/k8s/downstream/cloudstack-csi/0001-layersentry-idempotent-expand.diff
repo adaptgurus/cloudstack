@@ -1,0 +1,124 @@
+diff --git a/pkg/cloud/volumes.go b/pkg/cloud/volumes.go
+index 3db152f..56f8089 100644
+--- a/pkg/cloud/volumes.go
++++ b/pkg/cloud/volumes.go
+@@ -161,6 +161,12 @@ func (c *client) ExpandVolume(ctx context.Context, volumeID string, newSizeInGB
+ 	currentSize := volume.Size
+ 	currentSizeInGB := util.RoundUpBytesToGB(currentSize)
+ 	volumeName := volume.Name
++	if currentSizeInGB >= newSizeInGB {
++		logger.V(2).Info("CloudStack volume already satisfies expansion request", "volumeID", volumeID,
++			"currentSize", currentSizeInGB, "requestedSize", newSizeInGB)
++
++		return nil
++	}
+ 	p := c.Volume.NewResizeVolumeParams(volumeID)
+ 	p.SetId(volumeID)
+ 	p.SetSize(newSizeInGB)
+diff --git a/pkg/driver/controller.go b/pkg/driver/controller.go
+index 9ca1185..72cc799 100644
+--- a/pkg/driver/controller.go
++++ b/pkg/driver/controller.go
+@@ -689,7 +689,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
+ 		return nil, status.Error(codes.OutOfRange, "Volume size exceeds the limit specified")
+ 	}
+ 
+-	_, err := cs.connector.GetVolumeByID(ctx, volumeID)
++	volume, err := cs.connector.GetVolumeByID(ctx, volumeID)
+ 	if err != nil {
+ 		if errors.Is(err, cloud.ErrNotFound) {
+ 			return nil, status.Errorf(codes.NotFound, "Volume %v not found", volumeID)
+@@ -706,6 +706,27 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
+ 	}
+ 	defer cs.operationLocks.ReleaseExpandLock(volumeID)
+ 
++	nodeExpansionRequired := true
++	// Node expansion is not required for raw block volumes.
++	volCap := req.GetVolumeCapability()
++	if volCap != nil && volCap.GetBlock() != nil {
++		nodeExpansionRequired = false
++	}
++
++	requestedSizeBytes := util.GigaBytesToBytes(volSizeGB)
++	if volume.Size >= requestedSizeBytes {
++		logger.Info("Volume already satisfies expansion request",
++			"volumeID", volumeID,
++			"currentSizeBytes", volume.Size,
++			"requestedSizeBytes", requestedSizeBytes,
++		)
++
++		return &csi.ControllerExpandVolumeResponse{
++			CapacityBytes:         volume.Size,
++			NodeExpansionRequired: nodeExpansionRequired,
++		}, nil
++	}
++
+ 	err = cs.connector.ExpandVolume(ctx, volumeID, volSizeGB)
+ 	if err != nil {
+ 		return nil, status.Errorf(codes.Internal, "Could not resize volume %q to size %v: %v", volumeID, volSizeGB, err)
+@@ -716,13 +737,6 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
+ 		"volumeSize", volSizeGB,
+ 	)
+ 
+-	nodeExpansionRequired := true
+-	// Node expansion is not required for raw block volumes.
+-	volCap := req.GetVolumeCapability()
+-	if volCap != nil && volCap.GetBlock() != nil {
+-		nodeExpansionRequired = false
+-	}
+-
+ 	return &csi.ControllerExpandVolumeResponse{
+ 		CapacityBytes:         util.GigaBytesToBytes(volSizeGB),
+ 		NodeExpansionRequired: nodeExpansionRequired,
+diff --git a/pkg/driver/controller_test.go b/pkg/driver/controller_test.go
+index a939f28..daa2479 100644
+--- a/pkg/driver/controller_test.go
++++ b/pkg/driver/controller_test.go
+@@ -20,9 +20,13 @@
+ package driver
+ 
+ import (
++	"context"
+ 	"testing"
+ 
+ 	"github.com/container-storage-interface/spec/lib/go/csi"
++
++	"github.com/cloudstack/cloudstack-csi-driver/pkg/cloud/fake"
++	"github.com/cloudstack/cloudstack-csi-driver/pkg/util"
+ )
+ 
+ func TestDetermineSize(t *testing.T) {
+@@ -59,3 +63,33 @@ func TestDetermineSize(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestControllerExpandVolumeIsIdempotent(t *testing.T) {
++	ctx := context.Background()
++	connector := fake.New()
++	volumeID, err := connector.CreateVolume(ctx, "offering-1", "zone-1", "idempotent-volume", 5)
++	if err != nil {
++		t.Fatalf("CreateVolume failed: %v", err)
++	}
++	server := NewControllerServer(connector)
++	req := &csi.ControllerExpandVolumeRequest{
++		VolumeId: volumeID,
++		CapacityRange: &csi.CapacityRange{
++			RequiredBytes: util.GigaBytesToBytes(2),
++		},
++		VolumeCapability: &csi.VolumeCapability{
++			AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}},
++		},
++	}
++
++	response, err := server.ControllerExpandVolume(ctx, req)
++	if err != nil {
++		t.Fatalf("ControllerExpandVolume failed: %v", err)
++	}
++	if response.CapacityBytes != util.GigaBytesToBytes(5) {
++		t.Fatalf("expected observed capacity, got %d", response.CapacityBytes)
++	}
++	if !response.NodeExpansionRequired {
++		t.Fatal("filesystem volume must preserve node expansion requirement")
++	}
++}

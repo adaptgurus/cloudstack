@@ -16,6 +16,12 @@
   "rke2": "1.36.4+rke2r1",
   "kubernetes": "1.36.x",
   "cloudstackCsi": "3.0.2",
+  "cloudstackCsiUpstreamCommit": "a84477e922d62b82387ab55134fafc9c0b5aaf64",
+  "cloudstackCsiDownstream": {
+    "manifest": "tools/layersentry/k8s/downstream/cloudstack-csi/manifest.json",
+    "patchSha256": "64853e92e82f4a6e5e298b9d114a1522aea21d04f84c02e1667079c54d4f9635",
+    "requiredProjectConfig": "global.project-id"
+  },
   "architecture": {
     "infrastructureOwner": "CloudStack",
     "machineOwner": "CAPI/CAPC",
