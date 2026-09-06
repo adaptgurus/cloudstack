@@ -81,6 +81,44 @@ def environ(method="GET", origin="", cookie=True, header_key=SESSION_KEY):
 
 
 class CloudStackSessionAuthenticatorTest(unittest.TestCase):
+    def test_selected_resource_scope_uses_only_callers_session_and_project(self):
+        from controller.service import parse_cluster_request
+        from test_controller import cluster_payload
+        actor = Actor("session", "", "", ("project-1",), ())
+        request = parse_cluster_request(cluster_payload())
+        resources = [("listZones", "zone", "zone-1"), ("listNetworks", "network", "network-1"),
+                     ("listPublicIpAddresses", "publicipaddress", "public-ip-1"),
+                     ("listServiceOfferings", "serviceoffering", "offering-control"),
+                     ("listServiceOfferings", "serviceoffering", "offering-worker"),
+                     ("listTemplates", "template", "image-rke2")]
+        responses = [{cmd.lower() + "response": {key: [{"id": value}]}} for cmd, key, value in resources]
+        opener = RecordingOpener(responses)
+        auth = CloudStackSessionAuthenticator(config(), opener=opener)
+        auth.require_cluster_access(environ("POST", "https://cloud.example.test"), actor, request)
+        self.assertEqual(len(opener.requests), len(resources))
+        for (http, timeout), (command, _, _) in zip(opener.requests, resources):
+            values = urllib.parse.parse_qs(http.data.decode())
+            self.assertEqual(values["sessionkey"], [SESSION_KEY])
+            self.assertIn(SESSION_ID, http.get_header("Cookie"))
+            self.assertLessEqual(timeout, 15)
+            if command != "listZones":
+                self.assertEqual(values["projectid"], ["project-1"])
+        for broken in ({"listzonesresponse": {"zone": []}},
+                       {"listzonesresponse": {"zone": [{"id": "foreign"}]}},
+                       {"listzonesresponse": {"count": 2, "zone": [{"id": "zone-1"}]}}):
+            denied = CloudStackSessionAuthenticator(config(), opener=RecordingOpener([broken]))
+            with self.assertRaises(AuthorizationError):
+                denied.require_cluster_access(environ(), actor, request)
+        empty = RecordingOpener([])
+        denied = CloudStackSessionAuthenticator(config(), opener=empty)
+        with self.assertRaises(AuthorizationError):
+            denied.require_cluster_access(environ(), Actor("foreign", "", "", (), ()), request)
+        self.assertEqual(empty.requests, [])
+        malformed = parse_cluster_request(cluster_payload(control_plane_image_id=[]))
+        with self.assertRaises(InvalidRequestError):
+            denied.require_cluster_access(environ(), actor, malformed)
+        self.assertEqual(empty.requests, [])
+
     def test_authenticates_from_upstream_permissions_and_projects_only(self):
         opener = RecordingOpener([
             {"listapisresponse": {"api": [

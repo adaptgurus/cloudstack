@@ -132,8 +132,8 @@ def parse_cluster_request(payload: Mapping[str, Any]) -> ClusterRequest:
         raise InvalidRequestError("request body must be a JSON object")
     _reject_unknown(payload, _CREATE_FIELDS, "cluster")
     raw_pools = payload.get("node_pools")
-    if not isinstance(raw_pools, list):
-        raise InvalidRequestError("node_pools must be an array")
+    if not isinstance(raw_pools, list) or len(raw_pools) > 32:
+        raise InvalidRequestError("node_pools must be an array of at most 32 pools")
     pools = []
     for index, raw in enumerate(raw_pools):
         if not isinstance(raw, Mapping):

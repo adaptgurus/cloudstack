@@ -36,7 +36,7 @@ from .model import (
     InvalidRequestError,
     NotFoundError,
 )
-from .service import ControllerService
+from .service import ControllerService, parse_cluster_request
 
 
 MAX_BODY_BYTES = 1024 * 1024
@@ -118,8 +118,15 @@ class BFFApplication:
                     payload = self.service.list_clusters(actor, query["projectId"][0])
                 return self._response(start_response, HTTPStatus.OK, payload)
             if method == "POST" and path == "/v1/kubernetes/clusters":
+                payload = self._body(environ)
+                request = parse_cluster_request(payload)
+                self.service.authorizer.require(actor, "kubernetes.cluster.create", request.project_id or actor.account_id)
+                verifier = getattr(self.authenticator, "require_cluster_access", None)
+                if verifier is None:
+                    raise AuthorizationError("native resource scope verification is not configured")
+                verifier(environ, actor, request)
                 operation, created = self.service.submit_cluster_create(
-                    actor, self._body(environ), str(environ.get("HTTP_IDEMPOTENCY_KEY", "")),
+                    actor, payload, str(environ.get("HTTP_IDEMPOTENCY_KEY", "")),
                 )
                 status = HTTPStatus.ACCEPTED if created else HTTPStatus.OK
                 return self._response(start_response, status, {"operation": operation.public_dict()})

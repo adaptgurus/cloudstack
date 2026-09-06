@@ -30,6 +30,7 @@ import http.cookies
 import json
 import re
 import ssl
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -41,7 +42,8 @@ from .model import Actor, AuthenticationError, AuthorizationError, InvalidReques
 
 _SESSION_ID = re.compile(r"^[A-Za-z0-9._:-]{16,256}$")
 _SESSION_KEY = re.compile(r"^[A-Za-z0-9_-]{20,256}$")
-_READ_COMMANDS = frozenset({"listApis", "listProjects"})
+_READ_COMMANDS = frozenset({"listApis", "listProjects", "listZones", "listNetworks",
+                            "listServiceOfferings", "listTemplates", "listPublicIpAddresses"})
 _ACTION_CAPABILITIES = {
     "kubernetes.readiness.read": (),
     "kubernetes.cluster.read": ("listProjects", "listVirtualMachines"),
@@ -174,6 +176,7 @@ class CloudStackSessionAuthenticator:
 
     def _call(
         self, command: str, session_id: str, session_key: str, params: Mapping[str, Any] | None = None,
+        *, timeout_seconds: float | None = None,
     ) -> Mapping[str, Any]:
         if command not in _READ_COMMANDS:
             raise InvalidRequestError("session authenticator command is not allowed")
@@ -195,7 +198,7 @@ class CloudStackSessionAuthenticator:
             },
         )
         try:
-            with self.opener.open(request, timeout=self.config.timeout_seconds) as response:
+            with self.opener.open(request, timeout=self.config.timeout_seconds if timeout_seconds is None else timeout_seconds) as response:
                 raw = response.read(4 * 1024 * 1024 + 1)
         except (TimeoutError, urllib.error.HTTPError, urllib.error.URLError) as exc:
             raise AuthenticationError("CloudStack session validation failed") from exc
@@ -250,6 +253,39 @@ class CloudStackSessionAuthenticator:
         if len(project_ids) != len(set(project_ids)):
             raise AuthenticationError("CloudStack project scope is ambiguous")
         return tuple(sorted(project_ids))
+
+    def require_cluster_access(self, environ: Mapping[str, Any], actor: Actor, request) -> None:
+        """Verify submitted resource IDs using the caller, before privileged reconciliation."""
+        project_id = request.project_id
+        if not project_id or project_id not in actor.project_ids:
+            raise AuthorizationError("CloudStack project access is denied")
+        if len(request.node_pools) > 32:
+            raise InvalidRequestError("at most 32 node pools are allowed")
+        session_id, session_key = self._cookies(environ)
+        checks = [("listZones", "zone", request.zone_id, {}),
+                  ("listNetworks", "network", request.network_id, {"projectid": project_id}),
+                  ("listPublicIpAddresses", "publicipaddress", request.api_frontend_id, {"projectid": project_id})]
+        offerings = [request.control_plane_service_offering_id, *(pool.service_offering_id for pool in request.node_pools)]
+        images = [request.control_plane_image_id, *(pool.image_id for pool in request.node_pools)]
+        if any(not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,64}", value)
+               for value in [*(item[2] for item in checks), *offerings, *images]):
+            raise InvalidRequestError("managed Kubernetes resource ID is invalid")
+        checks.extend(("listServiceOfferings", "serviceoffering", value, {"projectid": project_id}) for value in sorted(set(offerings)))
+        checks.extend(("listTemplates", "template", value,
+                       {"projectid": project_id, "zoneid": request.zone_id, "templatefilter": "executable"}) for value in sorted(set(images)))
+        deadline = time.monotonic() + 30
+        for command, collection, resource_id, params in checks:
+            if not isinstance(resource_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,64}", resource_id):
+                raise InvalidRequestError("managed Kubernetes resource ID is invalid")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AuthorizationError("CloudStack resource scope verification timed out")
+            response = self._call(command, session_id, session_key, {"id": resource_id, **params},
+                                  timeout_seconds=min(remaining, self.config.timeout_seconds))
+            rows = response.get(collection, [])
+            if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping)
+                    or rows[0].get("id") != resource_id or response.get("count", 1) != 1):
+                raise AuthorizationError("selected CloudStack resource is unavailable in caller scope")
 
     def authenticate(self, environ: Mapping[str, Any]) -> Actor:
         self._check_origin(environ)

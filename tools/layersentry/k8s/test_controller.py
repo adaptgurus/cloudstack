@@ -92,6 +92,9 @@ class QueueExecutor:
 
 
 class StaticAuthenticator:
+    def require_cluster_access(self, environ, actor, request):
+        pass
+
     def authenticate(self, environ):
         del environ
         return ACTOR
@@ -247,6 +250,19 @@ class ControllerTest(unittest.TestCase):
         )
         self.assertEqual(status, 202)
         self.assertEqual(response["operation"]["status"], "REQUESTED")
+
+    def test_bff_denies_create_when_resource_scope_verifier_is_absent_or_denies(self):
+        class NoScopeVerifier:
+            def authenticate(self, environ):
+                return ACTOR
+        class DeniedScope(StaticAuthenticator):
+            def require_cluster_access(self, environ, actor, request):
+                raise AuthorizationError("selected resource is unavailable")
+        for authenticator in (NoScopeVerifier(), DeniedScope()):
+            status, _ = self._request(BFFApplication(self.service(), authenticator), "POST",
+                "/v1/kubernetes/clusters", cluster_payload(), "unscoped-create-0001")
+            self.assertEqual(status, 403)
+        self.assertEqual(self.store.list_project("project-1"), ([], None))
 
     def test_bff_maps_authentication_failure_and_malformed_query(self):
         class MissingSession:
