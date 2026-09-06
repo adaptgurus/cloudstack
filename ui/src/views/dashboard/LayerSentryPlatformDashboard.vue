@@ -416,8 +416,8 @@ export default {
           value: this.counts.backupOfferings === null
             ? this.$t('label.layersentry.unavailable')
             : (this.counts.backupOfferings > 0
-                ? `${this.counts.backupOfferings} ${this.$t('label.layersentry.offerings.available')}`
-                : this.$t('label.layersentry.not.configured')),
+              ? `${this.counts.backupOfferings} ${this.$t('label.layersentry.offerings.available')}`
+              : this.$t('label.layersentry.not.configured')),
           hint: this.$t('message.layersentry.backup.dashboard.fact'),
           color: this.counts.backupOfferings > 0 ? 'blue' : 'default'
         })
