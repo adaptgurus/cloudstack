@@ -17,6 +17,14 @@ Upstream `ExpandVolume` always issued `resizeVolume`, even after CloudStack alre
 
 The overlay is pinned by manifest and SHA-256 `64853e92e82f4a6e5e298b9d114a1522aea21d04f84c02e1667079c54d4f9635`. Project PVC auto-grow remains disabled.
 
+That digest identifies the original resize-only source checkpoint. The current
+overlay extends the identical resize fix with immutable builder/runtime base
+manifest pins and is SHA-256
+`ad1339342211b63d8c9c9a20994da20c66ae632e03c7ddc1c65d4215bf9c4f58`.
+The Alpine `apk add` package layer still requires an immutable mirror or exact
+package lock before a deterministic release build; the final image remains
+unresolved and disabled.
+
 ## Advantages, alternatives and risks
 
 - The fix is confined to the external CSI provider and preserves CloudStack as storage authority.

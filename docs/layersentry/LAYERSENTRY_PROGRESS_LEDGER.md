@@ -49,6 +49,26 @@ Before changing anything:
 
 ## Current checkpoint
 
+### SOURCE_COMPLETE / BLOCKED — 2026-09-06 downstream CSI container inputs
+
+Exact implementation commit:
+
+`1913631225492969e402fd89c39c369814eab5bd`
+
+The CloudStack CSI `3.0.2` idempotent-expansion overlay now also pins both
+Dockerfile builder/runtime base manifests. Current overlay SHA-256 is
+`ad1339342211b63d8c9c9a20994da20c66ae632e03c7ddc1c65d4215bf9c4f58`;
+the E0 evaluator and release manifest require that digest. Fresh application,
+exact patched `go test ./...` and repeat `ALREADY_APPLIED` checks passed, as did
+74 Workstream E Python and 5 overlay tests. Evidence:
+`docs/layersentry/evidence/k8s/2026-09-06-e1-csi-container-source.md`.
+
+The Alpine `apk add` layer still resolves from a moving repository. The
+release contract therefore records `apkPackageLayerDeterministic=false`, the
+final downstream CSI image remains null, and E1 startup remains blocked.
+Workstream B must supply a content-addressed mirror/locked package layer plus
+image digest, SBOM, provenance and signature before live qualification.
+
 ### SOURCE_COMPLETE / NOT_TESTED — 2026-09-06 CCM Kubernetes 1.36 source overlay
 
 Exact implementation commit:
@@ -199,6 +219,12 @@ Exact implementation commit:
 Workstream E pinned exact upstream CloudStack CSI tag `cloudstack-csi-3.0.2`, commit `a84477e922d62b82387ab55134fafc9c0b5aaf64`, and added a digest-verified downstream overlay without changing Apache CloudStack core. Source review verified the configured project is installed as a cloudstack-go default option and explicitly passed on volume creation. The overlay makes expansion convergent at the CSI controller and CloudStack connector layers: observed capacity at or above the rounded request returns success with actual capacity and does not replay `resizeVolume`.
 
 Local source evidence: the exact patched upstream tree passed `go test ./...` using the module-declared Go `1.23.5` toolchain. Overlay preflight/apply/reapply returned `APPLICABLE`, `APPLIED`, then `ALREADY_APPLIED`; patch SHA-256 is `64853e92e82f4a6e5e298b9d114a1522aea21d04f84c02e1667079c54d4f9635`. All 26 Workstream E policy/evidence tests and 4 overlay tests passed. `e0_qualification.py` requires exact-source Rocky 9 evidence for project create/isolation, attach/detach, snapshot/restore, repeated expand/delete, CAPC PVC survival and NodeDiskSet replacement before it returns `LIVE_VERIFIED`. Design evidence: `docs/layersentry/evidence/k8s/2026-09-06-e0-cloudstack-csi-qualification.md`.
+
+The resize-only digest above remains historical evidence for that checkpoint.
+The current overlay also pins CSI builder/runtime base manifests and has digest
+`ad1339342211b63d8c9c9a20994da20c66ae632e03c7ddc1c65d4215bf9c4f58`;
+its Alpine package-install layer remains blocked pending an immutable mirror or
+package lock, and no final downstream image is authorized.
 
 This is not live CloudStack/Kubernetes qualification. `csiProjectScope=false`, `csiResizeIdempotent=false`, project PVC auto-grow remains disabled, and all destructive cases remain `NOT_TESTED`. Next Workstream E source gate: implement the LayerSentry BFF/controller execution contract with durable sagas, supported CloudStack/CAPI/Kubernetes adapters and fail-closed release gates; then implement E1 create/status/delete/scale and central Flux reconciliation.
 

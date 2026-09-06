@@ -12,6 +12,20 @@
 
 ## 0. Latest continuation checkpoint
 
+The downstream CSI container source checkpoint is
+`1913631225492969e402fd89c39c369814eab5bd`. The existing idempotent expansion
+fix now pins immutable Go/Alpine base manifests; current combined overlay
+SHA-256 is
+`ad1339342211b63d8c9c9a20994da20c66ae632e03c7ddc1c65d4215bf9c4f58`.
+Fresh overlay apply, exact CSI `go test ./...`, repeat materialization, 74
+Workstream E Python and 5 overlay tests passed. Evidence:
+`docs/layersentry/evidence/k8s/2026-09-06-e1-csi-container-source.md`.
+
+The runtime APK package layer is still not content-addressed. The release
+manifest truthfully keeps `apkPackageLayerDeterministic=false` and the final
+CSI image null. Workstream B artifact publication and all E0/E1 live gates are
+still required before service startup or PostgreSQL mutation.
+
 CloudStack CCM Kubernetes 1.36 source qualification is implemented at
 `54121666698fde9e716bb3041ccf051a71e26726`. The digest-pinned overlay keeps
 official CCM `v1.2.0` as owner, aligns its resolved build graph to Kubernetes
