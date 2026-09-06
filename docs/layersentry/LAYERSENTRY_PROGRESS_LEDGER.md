@@ -72,8 +72,13 @@ combined Rocky CI still await this source's own evidence.
   Exact manifest: `evidence/k8s/2026-09-06-rke2-cpu-image-ordering-build.json`.
 - Actual DR boot `34057059334`, job `101550774366`, runner
   `c9c352a7b851fde8dc6109e90c4a4919ad97e546`, consumes this exact new image and
-  helper `2b7f06773216d76c455be1ab32d483cebbd38804`. Artifact binding/download
-  passed; guest acceptance remains pending. No recovery pass is inferred.
+  helper `2b7f06773216d76c455be1ab32d483cebbd38804`. Actual guest boot passed with Rocky9.8, SELinux Enforcing, confined
+  `virt_qemu_ga_t`, all three broad QGA policy booleans off, verified public
+  key export, no inherited credentials/state, and only loopback networking.
+  Artifact `9996456459`; exact guest `e8b009d6-a1f5-45c3-8c99-ebd9c8ce023d`
+  is explicitly retained for DR capture. RKE2 remains stopped; join, SSH
+  connectivity, storage and production gates remain false. Receipt:
+  `evidence/k8s/2026-09-07-rke2-cpu-live-boot.json`. No recovery pass is inferred.
 - DC storage registration attempt `34056971769` exited at launch without a
   bounded remote receipt. Shell quoting is reproduced as the source defect, but
   outcome observers `34057107214` and `34057101769` must establish journal/API

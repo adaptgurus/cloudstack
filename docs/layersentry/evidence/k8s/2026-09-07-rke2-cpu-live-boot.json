@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.0",
+  "status": "LIVE_VERIFIED",
+  "scope": "networkless Rocky CPU image boot and QGA",
+  "runId": "34057059334",
+  "jobId": "101550774366",
+  "artifactId": "9996456459",
+  "artifactSha256": "6241c54706128fd45975e422e791e5f15600f5f68d7361ffad45b4ecc37029a4",
+  "runnerCommit": "c9c352a7b851fde8dc6109e90c4a4919ad97e546",
+  "bootSource": "2b7f06773216d76c455be1ab32d483cebbd38804",
+  "imageSource": "4d0d323569805ae022d6094dfa2cfa0ced0ea071",
+  "imageSha256": "7580d64a5b9f27d930d7a5f5688f67063db042252dd43c7cf280fdb3e101a34d",
+  "domainUuid": "e8b009d6-a1f5-45c3-8c99-ebd9c8ce023d",
+  "ownershipManifest": "/var/lib/libvirt/images/layersentry-cpuqc-e8b009d6-a1f5-45c3-8c99-ebd9c8ce023d/ownership.json",
+  "guest": {
+    "os": "rocky",
+    "osVersion": "9.8",
+    "selinux": "Enforcing",
+    "qgaSelinuxContext": "system_u:system_r:virt_qemu_ga_t:s0",
+    "qgaPolicyBooleans": {
+      "virt_qemu_ga_manage_ssh": "virt_qemu_ga_manage_ssh --> off",
+      "virt_qemu_ga_read_nonsecurity_files": "virt_qemu_ga_read_nonsecurity_files --> off",
+      "virt_qemu_ga_run_unconfined": "virt_qemu_ga_run_unconfined --> off"
+    },
+    "hostPublicKeyExportVerified": true,
+    "interfaces": [
+      "lo"
+    ],
+    "rke2Version": "rke2 version v1.36.4+rke2r1 (7479a59cdd2c8ce0b8871699a24daa4b7c28cc64)\ngo version go1.26.7-X:boringcrypto",
+    "services": {
+      "firewalld": {
+        "active": "active",
+        "enabled": "enabled"
+      },
+      "qemu-guest-agent": {
+        "active": "active",
+        "enabled": "enabled"
+      },
+      "rke2-agent": {
+        "active": "inactive",
+        "enabled": "disabled"
+      },
+      "rke2-server": {
+        "active": "inactive",
+        "enabled": "disabled"
+      },
+      "sshd": {
+        "active": "active",
+        "enabled": "enabled"
+      }
+    },
+    "clusterConfigAbsent": true,
+    "serverStateAbsent": true,
+    "rootAuthorizedKeysEmpty": true,
+    "machineIdGenerated": true
+  },
+  "retainedForDrQualification": true,
+  "resultGates": {
+    "productionQualified": false,
+    "joinTested": false,
+    "storageTested": false,
+    "sshConnectivityTested": false,
+    "rke2Started": false
+  },
+  "receiptHashes": {
+    "summary.json": "d27e9328461bc51ef249f8a0e0107443f353a069ea0638398391eb2409d3251e",
+    "result.json": "8062079d158824db4c000bdd7c7b235b67a75da002534afa0426d6683c5aeaf5",
+    "ownership.json": "a9c05cb68c225ed0a8a5d61da6307a8f61aa196081629f8a0fb9f305e987e989",
+    "guest-checks.json": "7c19b9bffc0241f41b14627a527c0e954300e534eac8976ab0522c2080499a5a",
+    "cleanup.json": "39ca107bb8fe0fce995e29239a0082b47915ae4019d1ab7bc146e8cf277bbb98"
+  }
+}
