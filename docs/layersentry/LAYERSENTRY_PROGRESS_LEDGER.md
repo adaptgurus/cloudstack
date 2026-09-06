@@ -49,6 +49,54 @@ Before changing anything:
 
 ## Current checkpoint
 
+### PARTIAL / CI_VERIFIED — 2026-09-07 integrated package UI, central Flux and first actual DR capture
+
+Combined source `482c52330571420b7e29c412c332057225735c2c` passed UI workflow
+`34058574668` (build, lint, 331 tests/22 suites) and Rocky9.8 module workflow
+`34058611926` (196 Kubernetes + 32 DR tests, no skips). Rocky artifact `9996756956`,
+SHA256 `ef3ee5500d1e677b715a93f34a97b6d57152335b3bc19ea091c7daa8aa15b91d`.
+The qualified-package GUI now binds project/cluster/catalog context, original
+idempotent requests and explicit UNKNOWN observation. Central Flux installation
+uses 21 pinned native objects, per-object durable ownership and exact live
+Deployment templates; its own real OCI/provider qualification `34058039241`
+passed. These are source/artifact checks, not served browser or client-cluster
+verification. The retained unsigned CSI archive binding is independently
+verified; registry image references and live data-safety gates remain unqualified.
+
+Actual capture `34057792718` at runner `321d21f2b029c039730c816050e7f3bdf91087a8`
+committed full epoch `58dfac24-aab8-42a0-adb8-b94202ed7680` for plan
+`ddd70a78-d1dd-4ce1-a178-3216ab9fb60b`. The full manifest SHA256 is
+`df64fa370fbbd95192f3e1f852e6cdd0725d91f54bd77e248ac1b37eec61e221`.
+Incremental epoch `6101efb8-a063-4e04-a945-dc4242767028` is
+`RECONCILIATION_REQUIRED` / `UNSAFE_OR_UNSEALED_QCOW2`; no recovery guest started.
+Read-only probe `34058283613` confirms no active backup job, two exact checkpoints,
+and a 3,670,016-byte incremental QCOW2 referring to the exact live source disk.
+Libvirt11.10 creates this backing reference for incremental push. A provider-only
+sealing correction is being qualified; catalog no-external-reference validation
+remains intact. This old epoch lacks a durable pre-seal completion receipt and
+MUST NOT be replayed or automatically salvaged.
+
+The old transient guest `e8b009d6-a1f5-45c3-8c99-ebd9c8ce023d` and its source disk
+remain retained at this checkpoint. The reviewed exact-owned retirement workflow
+will stop only this guest while preserving its disk and the replication directory
+`/var/lib/libvirt/images/layersentry-drqc-ddd70a78-d1dd-4ce1-a178-3216ab9fb60b`.
+A fresh guest UUID will be used for a new capture after the fix; no cleanup of old
+evidence is authorized by that workflow.
+
+DC launch failure was reconciled by API `34057101769` and journal observer
+`34057107214` attempt2 (journal directory absent). Corrected native registration
+`34058013796` succeeded: primary pool `3ec8a7ea-ebbe-3c45-9f9c-f67d840318b7` Up,
+image store `e824ee8c-2fa1-466b-9948-629958479a78` registered. Post-registration API
+`34058157069` confirms the official SystemVM template is zone-bound and ready;
+no SystemVM instances exist. The Zone stays Disabled, B&R disabled. A DC-only
+MAC-bound guest bridge/traffic-label plan is in read-only qualification; management
+address exclusions, guest routing and actual SystemVM readiness remain gates.
+
+All live workflows share one runner/concurrency group: dispatch only one at a
+time because a second pending GitHub run can replace the first. No production
+DC/DR, CSI E0 survival, DBaaS or APaaS readiness is claimed.
+
+
 ### PARTIAL / SOURCE_COMPLETE — 2026-09-07 package API and active runtime qualification
 
 Source `526ccf9b69` connects approved package profiles to authenticated BFF routes,
