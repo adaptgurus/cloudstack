@@ -13,13 +13,14 @@ import (
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/firewall"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/journal"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lock"
+ "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/lvm"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/model"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/mounts"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/preflight"
  "github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/provider"
 )
 
-type Engine struct{Registry *provider.Registry;Store *journal.Store;Runner executor.Runner;Cluster *cluster.Client;LockPath string}
+type Engine struct{Registry *provider.Registry;Store *journal.Store;Runner executor.Runner;LVMRunner executor.Runner;Cluster *cluster.Client;LockPath string}
 
 func(e *Engine)Plan(ctx context.Context,req model.ServiceRequest)(model.Plan,model.Operation,error){
  if err:=config.Validate(req);err!=nil{return model.Plan{},model.Operation{},err}
@@ -37,9 +38,12 @@ func(e *Engine)Plan(ctx context.Context,req model.ServiceRequest)(model.Plan,mod
  resolved,err:=p.ResolveVersion(ctx,req);if err!=nil{op.Status=model.OpFailedSafe;op.Stage="version-resolution";op.Error=redact(err.Error());_ = e.Store.SaveOperation(op);return model.Plan{},op,err}
  plan,err:=p.Plan(ctx,req,resolved);if err!=nil{op.Status=model.OpFailedSafe;op.Stage="planning";op.Error=redact(err.Error());_ = e.Store.SaveOperation(op);return model.Plan{},op,err}
  if plan.ID!=req.OperationID||plan.ServiceID!=req.ServiceID||plan.Provider!=req.Provider||plan.ResolvedVersion==""{return model.Plan{},op,errors.New("provider returned an invalid plan identity")}
+ plan.Steps=append(storagePlanSteps(req),plan.Steps...)
  plan.Request=req;plan.Digest="";canonical,err:=config.PlanDigest(plan);if err!=nil{return model.Plan{},op,err};plan.Digest=canonical
  if err=e.Store.SavePlan(plan);err!=nil{return model.Plan{},op,err};op.PlanDigest=plan.Digest;op.Status=model.OpWaitingConfirmation;op.Stage="waiting-confirmation";op.Error="";if err=e.Store.SaveOperation(op);err!=nil{return model.Plan{},op,err};return plan,op,nil
 }
+
+func storagePlanSteps(req model.ServiceRequest)[]model.PlanStep{var out []model.PlanStep;for _,g:=range req.LVM{if g.InitializePVs{out=append(out,model.PlanStep{Name:"lvm-pv-initialize",Action:fmt.Sprintf("initialize confirmed attached PV devices %v for volume group %s",g.Devices,g.Name),Destructive:true,Detail:"PV INITIALIZATION DESTROYS EXISTING FILESYSTEM/LVM METADATA ON THE SELECTED ATTACHED DEVICES; OS/ROOT DISKS ARE REJECTED"})};out=append(out,model.PlanStep{Name:"lvm-volume-group",Action:fmt.Sprintf("create/reconcile LayerSentry-owned volume group %s from %v",g.Name,g.Devices)});for _,lv:=range g.LogicalVolumes{out=append(out,model.PlanStep{Name:"lvm-logical-volume",Action:fmt.Sprintf("create/reconcile %s/%s size %s for %s mounted at %s",g.Name,lv.Name,lv.Size,lv.Purpose,lv.MountPoint)});if lv.Format{out=append(out,model.PlanStep{Name:"lvm-format",Action:fmt.Sprintf("format /dev/%s/%s as %s",g.Name,lv.Name,lv.Filesystem),Destructive:true,Detail:"FILESYSTEM CREATION IS DESTRUCTIVE AND REQUIRES EXPLICIT CONFIRMATION"})}}};return out}
 
 func(e *Engine)Install(ctx context.Context,req model.ServiceRequest,confirmedPlanDigest string)(model.Operation,error){
  if err:=config.Validate(req);err!=nil{return model.Operation{},err};requestDigest,err:=config.CanonicalDigest(req);if err!=nil{return model.Operation{},err};op,err:=e.Store.GetOperation(req.OperationID);if err!=nil{return op,err}
@@ -49,9 +53,10 @@ func(e *Engine)Install(ctx context.Context,req model.ServiceRequest,confirmedPla
  op.Status=model.OpRunning;op.Stage="preflight-revalidation";op.Error="";_ = e.Store.SaveOperation(op)
  safeFail:=func(stage string,cause error)(model.Operation,error){op.Stage=stage;op.Error=redact(cause.Error());op.Status=model.OpFailedSafe;_ = e.Store.SaveOperation(op);return op,cause}
  if e.Runner==nil{return safeFail("executor",errors.New("privileged executor unavailable"))};if _,err=preflight.System(ctx,req,e.Runner);err!=nil{return safeFail("preflight-revalidation",err)}
- st:=model.ServiceState{ID:req.ServiceID,Provider:req.Provider,Category:req.Category,ReleaseLine:req.ReleaseLine,ResolvedVersion:plan.ResolvedVersion,Topology:req.Topology,Storage:req.Storage,Network:req.Network,Maintenance:req.Maintenance,Backup:req.Backup,Cluster:req.Cluster,SecretRefs:req.SecretRefs,ConfigDigest:requestDigest,PlanDigest:plan.Digest,Status:"installing",RecoveryRequired:false,LastOperationID:op.ID,UpdatedAt:time.Now().UTC()}
+ st:=model.ServiceState{ID:req.ServiceID,Provider:req.Provider,Category:req.Category,ReleaseLine:req.ReleaseLine,ResolvedVersion:plan.ResolvedVersion,Topology:req.Topology,Storage:req.Storage,LVM:req.LVM,Network:req.Network,Maintenance:req.Maintenance,Backup:req.Backup,Cluster:req.Cluster,SecretRefs:req.SecretRefs,ConfigDigest:requestDigest,PlanDigest:plan.Digest,Status:"installing",RecoveryRequired:false,LastOperationID:op.ID,UpdatedAt:time.Now().UTC()}
  if err=e.Store.SaveService(st);err!=nil{return safeFail("recovery-state",err)}
  fail:=func(stage string,cause error,ambiguous bool)(model.Operation,error){op.Stage=stage;op.Error=redact(cause.Error());if ambiguous{op.Status=model.OpUnknown;st.Status="unknown-recovery"}else{op.Status=model.OpFailedNeedsRecovery;st.Status="failed-needs-recovery"};st.RecoveryRequired=true;st.FailureStage=stage;st.LastOperationID=op.ID;_ = e.Store.SaveService(st);_ = e.Store.SaveOperation(op);return op,cause}
+ if len(req.LVM)>0{if e.LVMRunner==nil{return fail("lvm",errors.New("LVM executor unavailable"),false)};op.Stage="lvm";_ = e.Store.SaveOperation(op);if err=(lvm.Manager{Runner:e.LVMRunner}).Prepare(ctx,req.ServiceID,req.LVM);err!=nil{return fail("lvm",err,isAmbiguous(err))}}
  if err=(mounts.Manager{Runner:e.Runner}).Prepare(ctx,req.Storage);err!=nil{return fail("storage",err,false)}
  op.Stage="install";_ = e.Store.SaveOperation(op);if err=p.Install(ctx,op,plan);err!=nil{return fail("install",err,isAmbiguous(err))}
  op.Stage="configure";_ = e.Store.SaveOperation(op);if err=p.Configure(ctx,op,plan);err!=nil{return fail("configure",err,isAmbiguous(err))}
