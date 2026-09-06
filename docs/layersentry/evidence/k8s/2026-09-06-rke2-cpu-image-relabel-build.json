@@ -112,14 +112,20 @@
     "fullImageDownloaded": false
   },
   "runtimeQualification": {
-    "status": "NOT_TESTED",
+    "status": "BLOCKED",
     "productionQualified": false,
     "signed": false,
     "templateRegistered": false,
     "sshConnectivityTested": false,
     "joinTested": false,
     "storageTested": false,
-    "rke2Started": false
+    "rke2Started": false,
+    "bootRun": 34055287797,
+    "bootAcceptancePassed": false,
+    "qgaRpcWorked": true,
+    "reason": "Systemd ordering cycle skipped the public-key export service; bounded readiness timeout",
+    "ownedGuestCleanupVerified": true,
+    "ownedDomainUuid": "b65156fa-8bd8-415b-928c-7b902b852f5e"
   },
   "runtimeHandoff": {
     "nativeChecksum": "{SHA-256}61c0b8088fc0c08a0263d8076dc6a9f2b402bc7e05becd6d7c1cde60e1a0c356",
