@@ -38,6 +38,7 @@
           <a-form-item v-ctrl-enter="submitPin" ref="selectedProvider" name="selectedProvider">
              <a-select
               v-model:value="form.selectedProvider"
+              :aria-label="$t('label.select.2fa.provider')"
               @change="val => { handleSelectChange(val) }">
               <a-select-option
                 v-for="(opt) in providers"

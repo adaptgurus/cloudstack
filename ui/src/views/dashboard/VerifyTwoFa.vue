@@ -34,7 +34,9 @@
       layout="vertical">
       <a-form-item name="code" ref="code" style="text-align: center;">
         <a-input-password
-          style="width: 500px"
+          style="width: 100%; max-width: 500px"
+          :aria-label="$t('label.two.factor.authentication')"
+          autocomplete="one-time-code"
           v-model:value="form.code"
           placeholder="xxxxxx" />
       </a-form-item>

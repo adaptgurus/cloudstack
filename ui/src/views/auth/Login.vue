@@ -44,6 +44,7 @@
           <a-select
             size="large"
             :placeholder="$t('server')"
+            :aria-label="$t('server')"
             v-model:value="form.server"
             @change="onChangeServer"
             showSearch
@@ -65,6 +66,8 @@
             type="text"
             v-focus="true"
             :placeholder="$t('label.username')"
+            :aria-label="$t('label.username')"
+            autocomplete="username"
             v-model:value="form.username"
           >
             <template #prefix>
@@ -76,7 +79,8 @@
           <a-input-password
             size="large"
             type="password"
-            autocomplete="false"
+            autocomplete="current-password"
+            :aria-label="$t('label.password')"
             :placeholder="$t('label.password')"
             v-model:value="form.password"
           >
@@ -90,6 +94,7 @@
             size="large"
             type="text"
             :placeholder="$t('label.domain')"
+            :aria-label="$t('label.domain')"
             v-model:value="form.domain"
           >
             <template #prefix>

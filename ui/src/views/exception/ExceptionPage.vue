@@ -87,7 +87,7 @@ export default {
     flex: 0 1 auto;
 
     img {
-      max-width: min(320px, 38vw);
+      max-width: ~"min(320px, 38vw)";
       height: auto !important;
       object-fit: contain;
     }

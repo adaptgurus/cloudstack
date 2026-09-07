@@ -21,10 +21,10 @@
       <onboarding-dashboard />
     </div>
     <div v-else-if="layersentryProfile && $store.getters.userInfo.roletype === 'Admin' && !project">
-      <layer-sentry-platform-dashboard />
+      <layer-sentry-platform-dashboard :key="dashboardScope" />
     </div>
     <div v-else-if="layersentryProfile">
-      <layer-sentry-self-service-dashboard />
+      <layer-sentry-self-service-dashboard :key="dashboardScope" />
     </div>
     <div v-else-if="$store.getters.userInfo.roletype === 'Admin' && !project">
       <capacity-dashboard />
@@ -71,6 +71,9 @@ export default {
     }
   },
   computed: {
+    dashboardScope () {
+      return JSON.stringify([this.$store.getters.userInfo.id, this.$store.getters.userInfo.roleid, this.$store.getters.project?.id || 'account'])
+    },
     layersentryProfile () {
       return isLayersentryKvmProfile(this.$config)
     }
@@ -84,7 +87,7 @@ export default {
     if (store.getters.project && store.getters.project.id) {
       this.project = true
     }
-    this.$store.watch(
+    this.stopProjectWatch = this.$store.watch(
       (state, getters) => getters.project,
       (newValue, oldValue) => {
         if (newValue && newValue.id) {
@@ -95,13 +98,20 @@ export default {
       }
     )
   },
+  beforeUnmount () {
+    if (this.stopProjectWatch) this.stopProjectWatch()
+  },
   methods: {
     fetchData () {
-      if (!['Admin'].includes(this.$store.getters.userInfo.roletype)) {
+      if (!['Admin'].includes(this.$store.getters.userInfo.roletype) || !('listZones' in this.$store.getters.apis)) {
         return
       }
       getAPI('listZones').then(json => {
-        this.showOnboarding = json.listzonesresponse.count ? json.listzonesresponse.count === 0 : true
+        const result = json.listzonesresponse
+        this.showOnboarding = result && (result.count === 0 || (Array.isArray(result.zone) && result.zone.length === 0))
+      }).catch(() => {
+        // Unknown Site inventory is not evidence that a new platform is empty.
+        this.showOnboarding = false
       })
     }
   }

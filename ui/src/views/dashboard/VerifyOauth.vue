@@ -16,7 +16,10 @@
 // under the License.
 
 <template>
-  <div>
+  <div class="ls-oauth-status" role="status" aria-live="polite" :aria-busy="state.loginBtn">
+    <a-spin :spinning="state.loginBtn" />
+    <p>{{ $t('message.layersentry.verifying.login') }}</p>
+    <router-link to="/user/login">{{ $t('label.login') }}</router-link>
   </div>
 </template>
 
@@ -91,3 +94,7 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.ls-oauth-status { max-width: 480px; margin: 15vh auto; padding: 24px; text-align: center; }
+</style>

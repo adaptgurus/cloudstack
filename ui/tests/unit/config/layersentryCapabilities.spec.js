@@ -88,9 +88,14 @@ describe('LayerSentry GUI capability gates', () => {
 
     expect(isLayersentryFeatureVisible(
       LAYERSENTRY_FEATURES.BACKUP,
-      { listBackupOfferings: {} },
+      { listBackupOfferings: {}, assignVirtualMachineToBackupOffering: {} },
       config
     )).toBe(true)
+    expect(isLayersentryFeatureVisible(
+      LAYERSENTRY_FEATURES.BACKUP,
+      { listBackupOfferings: {} },
+      { ...config, layersentry: { features: { backup: { enabled: true, ready: true, requiredApis: [] } } } }
+    )).toBe(false)
     expect(isLayersentryFeatureVisible(
       LAYERSENTRY_FEATURES.BACKUP,
       {},

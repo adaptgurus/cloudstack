@@ -89,7 +89,9 @@ describe('LayerSentry navigation presentation', () => {
       }
     }
     expect(shouldHideLayersentryFeatureRoute('backup', { listBackupOfferings: {}, listBackups: {} }, config)).toBe(false)
-    expect(shouldHideLayersentryFeatureRoute('backup', { listBackups: {} }, config)).toBe(true)
+    expect(shouldHideLayersentryFeatureRoute('backup', { listBackups: {} }, config)).toBe(false)
+    expect(shouldHideLayersentryFeatureRoute('backup', { listBackupOfferings: {} }, config)).toBe(true)
+    expect(shouldHideLayersentryFeatureRoute('backupoffering', { listBackupOfferings: {} }, config)).toBe(false)
     expect(shouldHideLayersentryFeatureRoute('buckets', { listBuckets: {} }, config)).toBe(false)
   })
 

@@ -72,6 +72,12 @@ export function hasApi (apis = {}, api, config = vueProps.$config) {
   if (!rawHasApi(apis, api)) return false
   const gatedFeature = FEATURE_API_MAP[api]
   if (!gatedFeature || !isLayersentryKvmProfile(config)) return true
+  if (['listBackups', 'listBackupOfferings', 'listBackupSchedule'].includes(api)) {
+    const policy = normalisePolicy(config, LAYERSENTRY_FEATURES.BACKUP, FEATURE_DEFINITIONS.backup)
+    // Read-only roles retain native inventory access; assignment permission is
+    // required by Quick Provision protection, not by viewing existing backups.
+    return policy.enabled === true && policy.ready === true
+  }
   return getLayersentryFeatureState(gatedFeature, apis, config).visible
 }
 
@@ -139,9 +145,10 @@ export function getLayersentryFeatureState (feature, apis = {}, config = vueProp
     }
   }
 
-  const requiredApis = Array.isArray(policy.requiredApis)
-    ? policy.requiredApis
-    : definition.requiredApis
+  const requiredApis = [...new Set([
+    ...definition.requiredApis,
+    ...(Array.isArray(policy.requiredApis) ? policy.requiredApis : [])
+  ])]
   const missingApis = requiredApis.filter(api => !rawHasApi(apis, api))
   if (missingApis.length > 0) {
     return {

@@ -1,0 +1,96 @@
+[
+  {
+    "host": "10.10.10.20",
+    "browser": "chrome",
+    "capturedAt": "2026-09-06T16:33:07.016Z",
+    "status": "FAILED",
+    "pages": [
+      {
+        "route": "kubernetes-data-services",
+        "status": "FAILED"
+      }
+    ],
+    "blockedMutations": [],
+    "failedReads": [
+      {
+        "command": "listIdps",
+        "status": 401
+      },
+      {
+        "command": "forgotPassword",
+        "status": 401
+      },
+      {
+        "command": "logout",
+        "status": 431
+      }
+    ],
+    "browserVersion": "152.0.7977.83",
+    "rejectedRequests": [],
+    "browserErrors": [],
+    "indexSha256": "c05fa4f04d9a64cb7ad33ec18ebec6dfdc3b7d78714673ece021cddcee58f724",
+    "moduleTabs": [
+      {
+        "module": "Kubernetes",
+        "status": "BLOCKED"
+      },
+      {
+        "module": "DBaaS",
+        "status": "BLOCKED"
+      },
+      {
+        "module": "APaaS",
+        "status": "BLOCKED"
+      }
+    ],
+    "failedStage": "GUI_KUBERNETES-DATA-SERVICES",
+    "failureCode": "MODULE_LIFECYCLE_NOT_VERIFIED"
+  },
+  {
+    "host": "10.10.10.20",
+    "browser": "firefox",
+    "capturedAt": "2026-09-06T16:33:15.866Z",
+    "status": "FAILED",
+    "pages": [
+      {
+        "route": "kubernetes-data-services",
+        "status": "FAILED"
+      }
+    ],
+    "blockedMutations": [],
+    "failedReads": [
+      {
+        "command": "listIdps",
+        "status": 401
+      },
+      {
+        "command": "forgotPassword",
+        "status": 401
+      },
+      {
+        "command": "logout",
+        "status": 431
+      }
+    ],
+    "browserVersion": "155.0",
+    "rejectedRequests": [],
+    "browserErrors": [],
+    "indexSha256": "c05fa4f04d9a64cb7ad33ec18ebec6dfdc3b7d78714673ece021cddcee58f724",
+    "moduleTabs": [
+      {
+        "module": "Kubernetes",
+        "status": "BLOCKED"
+      },
+      {
+        "module": "DBaaS",
+        "status": "BLOCKED"
+      },
+      {
+        "module": "APaaS",
+        "status": "BLOCKED"
+      }
+    ],
+    "failedStage": "GUI_KUBERNETES-DATA-SERVICES",
+    "failureCode": "MODULE_LIFECYCLE_NOT_VERIFIED"
+  }
+]

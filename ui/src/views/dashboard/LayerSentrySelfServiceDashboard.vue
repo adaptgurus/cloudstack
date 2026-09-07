@@ -115,6 +115,7 @@
       </template>
       <div v-if="loadingEvents" class="ls-empty-state"><a-spin /></div>
       <div v-else-if="!hasApi('listEvents')" class="ls-empty-state">Activity is not available to this role.</div>
+      <a-alert v-else-if="eventsFailed" type="warning" show-icon :message="$t('label.layersentry.read.failed')" :description="$t('message.layersentry.read.failed')" />
       <div v-else-if="events.length === 0" class="ls-empty-state">{{ $t('label.layersentry.no.events') }}</div>
       <div v-else class="ls-activity-list">
         <router-link v-for="event in events" :key="event.id" :to="{ path: `/event/${event.id}` }" class="ls-activity-row">
@@ -168,6 +169,7 @@ export default {
     return {
       loading: false,
       loadingEvents: false,
+      eventsFailed: false,
       partialFailures: [],
       data: {
         instances: null,
@@ -256,12 +258,6 @@ export default {
   watch: {
     '$route' (to) {
       if (to.name === 'dashboard') this.refresh()
-    },
-    project: {
-      deep: true,
-      handler () {
-        this.refresh()
-      }
     }
   },
   methods: {
@@ -380,6 +376,7 @@ export default {
     },
     async loadEvents () {
       this.events = []
+      this.eventsFailed = false
       if (!this.hasApi('listEvents')) return
       this.loadingEvents = true
       try {
@@ -387,6 +384,9 @@ export default {
         params.pagesize = 8
         const response = await getAPI('listEvents', params)
         this.events = response?.listeventsresponse?.event || []
+      } catch (error) {
+        this.eventsFailed = true
+        throw error
       } finally {
         this.loadingEvents = false
       }

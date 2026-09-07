@@ -140,6 +140,7 @@ describe('LayerSentry Quick Provision native CloudStack contract', () => {
       form,
       networkType: 'Advanced',
       storageProfiles: offerings,
+      computeProfiles: [{ id: 'compute-1', iscustomized: false }],
       kvmSiteReady: false,
       imageReady: false
     })).toEqual([
@@ -150,6 +151,7 @@ describe('LayerSentry Quick Provision native CloudStack contract', () => {
       form,
       networkType: 'Advanced',
       storageProfiles: offerings,
+      computeProfiles: [{ id: 'compute-1', iscustomized: false }],
       kvmSiteReady: true,
       imageReady: true
     })).toEqual([])
