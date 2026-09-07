@@ -591,6 +591,7 @@ func validatePostgresArgs(path string, args []string) error {
 			if err := validateNewStagingFile(p, "pg_dumpall"); err == nil {
 				return nil
 			}
+		}
 	case "initdb":
 		return validateInitDB(args)
 	}
