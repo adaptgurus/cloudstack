@@ -4,7 +4,12 @@ Current execution routing is defined by:
 
 `docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`
 
-This directory retains historical/scoped workstream files for continuity, but **only Workstream E is a standing Codex implementation stream by default**.
+The active Codex scopes are now:
+
+- **Workstream A — UI / Self-Service finishing**;
+- **Workstream E — RKE2 / Kubernetes / Data Services**, the primary technical stream.
+
+Do not restart the old broad multi-agent A/B/C/D/E/F model.
 
 ## Minimal common startup
 
@@ -20,41 +25,63 @@ Do not load every workstream or historical handoff.
 
 | Workstream | Current default |
 | --- | --- |
-| A — UI / Self-service | ChatGPT defect/integration only; broad UI feature work frozen |
-| B — Release / Installer | ChatGPT by default; K8s artifact blockers may be handled inside coordinated E work |
-| C — Security / Validation | ChatGPT for shared controls; E owns K8s-specific qualification cases |
+| A — UI / Self-service | **Codex**, bounded finishing/optimization/integration only; no broad redesign |
+| B — Release / Installer | ChatGPT by default; exact K8s artifact blockers may be handled inside E |
+| C — Security / Validation | ChatGPT for shared controls; A/E own UI/K8s-specific qualification cases |
 | D — DR / HA / Upgrade | ChatGPT-led, native CloudStack recovery first |
 | E — K8s / DBaaS / APaaS / Streaming | **Primary Codex workstream** |
-| F — VM-native Single-OS DBaaS/APaaS | ChatGPT-led, Go + Ansible; no shell-script install lifecycle |
+| F — VM-native Single-OS | ChatGPT-led, Go + Ansible |
 
-Older instructions that tell the operator to start A/B/C/D/F as separate Codex sessions are superseded by the execution contract.
+## Workstream A objective
 
-## Active Codex contract
+```text
+existing LayerSentry UI
+ -> audit current defects
+ -> optimize/wire APIs
+ -> fix RBAC/routes/status/errors
+ -> preserve KVM-only UX
+ -> exact-artifact browser acceptance
+```
 
-`WORKSTREAM_E_K8S_DBAAS_APAAS.md`
+Do not design a replacement UI.
 
-Primary objective:
+## Workstream E objective
 
 ```text
 existing E0/E1 source
  -> immutable artifacts
  -> deployed controller stack
- -> one real RKE2 cluster
+ -> one real RKE2 lifecycle
  -> 6443/9345
  -> CNI/CCM/CSI/Flux
- -> status/scale/replacement/delete
- -> failure/reconciliation/upgrade/air-gap evidence
- -> PostgreSQL DBaaS vertical slice
+ -> status/scale/replacement/delete/upgrade
+ -> air-gap/failure evidence
+ -> install selected upstream services through Flux
 ```
 
-Do not expand provider breadth before the current vertical slice works.
+User K8s, DBaaS, APaaS and Streaming profiles reuse the **same RKE2 lifecycle**.
 
-## ChatGPT contracts retained here
+For current V1, upstream services are integrations, not rewrite projects:
 
-- `WORKSTREAM_D_DR_HA_UPGRADE.md` — native CloudStack recovery/troubleshooting contract;
-- `WORKSTREAM_F_SINGLE_OS_DBAAS_APAAS.md` — Go + Ansible VM-native service contract;
-- A/B/C files — specialist reference when a concrete UI/release/security task needs them.
+- OpenEverest stable v1 line for supported PostgreSQL/PXC-MySQL/MongoDB;
+- OpenBao Helm content;
+- Harbor Helm content;
+- Strimzi for Kafka.
+
+Do not create replacement database/Kafka/application operators or spend Codex on upstream application UI rebranding unless the owner explicitly assigns it.
+
+## V1 release carrier
+
+Current execution uses one logical signed platform carrier:
+
+`layersentry-platform-<release>.iso`
+
+It may contain both platform and optional Data Services/APaaS/Streaming artifacts. Bundled content is `AVAILABLE`; Flux installs only what the selected profile requests.
+
+## Concurrency
+
+A and E may run separately only with clean file ownership. Coordinate router/config/API-contract changes. Do not run multiple overlapping E implementations against the same K8s source or live cluster.
 
 ## Handoff rule
 
-Use repository/workflow/live evidence as authority. Handoffs should state exact commit, exact evidence, first unmet gate and next action. Do not create a new large master context after each small task.
+Use repository/workflow/live evidence as authority. State exact commit/artifacts, vertical step reached, tests/live actions, first unmet gate and next action. Keep handoffs concise.
