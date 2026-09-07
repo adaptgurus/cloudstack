@@ -64,19 +64,18 @@ def real_block(device: str, require_by_id: bool = True) -> str:
 
 
 def ancestry(device: str) -> Set[str]:
+    real = os.path.realpath(device)
+    _, raw, _ = run(["/usr/bin/lsblk", "-s", "-nrpo", "PATH", real])
     out: Set[str] = set()
-    cur = os.path.realpath(device)
-    for _ in range(32):
-        if not cur or cur in out:
-            break
-        out.add(cur)
-        _, parent, _ = run(["/usr/bin/lsblk", "-nro", "PKNAME", cur], ok=(0, 1))
-        parent = parent.strip()
-        if not parent:
-            break
-        if not parent.startswith("/"):
-            parent = "/dev/" + parent
-        cur = os.path.realpath(parent)
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        resolved = os.path.realpath(line)
+        if resolved:
+            out.add(resolved)
+    if not out:
+        raise RuntimeError("cannot prove block-device ancestry for %s" % device)
     return out
 
 
