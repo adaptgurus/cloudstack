@@ -122,7 +122,7 @@ func Serve(ctx context.Context, socketPath, groupName string, runner executor.Ru
 	if err != nil {
 		return err
 	}
-	if !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 || fi.Mode().Perm()&01000 == 0 {
+	if !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 || fi.Mode()&os.ModeSticky == 0 {
 		return errors.New("unsafe provider helper socket directory")
 	}
 	if old, err := os.Lstat(socketPath); err == nil {

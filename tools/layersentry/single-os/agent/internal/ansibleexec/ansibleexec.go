@@ -121,7 +121,7 @@ func Serve(ctx context.Context, socketPath, group string, runner executor.Runner
 	if err != nil {
 		return err
 	}
-	if !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 || fi.Mode().Perm()&01000 == 0 {
+	if !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 || fi.Mode()&os.ModeSticky == 0 {
 		return errors.New("unsafe Ansible helper socket directory")
 	}
 	if old, statErr := os.Lstat(socketPath); statErr == nil {

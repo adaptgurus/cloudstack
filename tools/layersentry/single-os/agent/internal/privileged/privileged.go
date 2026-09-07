@@ -159,7 +159,7 @@ func Serve(ctx context.Context, socketPath, groupName string, runner executor.Ru
 	if !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
 		return errors.New("unsafe privileged socket directory")
 	}
-	if fi.Mode().Perm()&01000 == 0 {
+	if fi.Mode()&os.ModeSticky == 0 {
 		return errors.New("privileged socket directory must be sticky")
 	}
 	if old, err := os.Lstat(socketPath); err == nil {
@@ -591,7 +591,6 @@ func validatePostgresArgs(path string, args []string) error {
 			if err := validateNewStagingFile(p, "pg_dumpall"); err == nil {
 				return nil
 			}
-		}
 	case "initdb":
 		return validateInitDB(args)
 	}
