@@ -4,21 +4,36 @@
   gather_facts: true
   become: false
   any_errors_fatal: true
+  vars:
+    layersentry_role_map:
+      postgresql: postgresql
+      mysql: mysql_family
+      mariadb: mysql_family
+      redis: keyvalue
+      valkey: keyvalue
+      nginx: nginx
+      apache-httpd: httpd
+      tomcat: tomcat
+      nodejs-runtime: nodejs
+      python-runtime: runtime
+      podman-runtime: runtime
   tasks:
-    - name: Require immutable apply invocation
+    - name: Require immutable allowlisted apply invocation
       ansible.builtin.assert:
         that:
           - layersentry_action == 'apply'
-          - layersentry_provider == 'postgresql'
+          - layersentry_provider in layersentry_role_map
           - layersentry_plan_digest | length == 64
           - layersentry_operation_id == layersentry_request.operation_id
           - layersentry_service_id == layersentry_request.service_id
-        fail_msg: Invalid or mismatched LayerSentry apply invocation.
+          - layersentry_request.topology == 'standalone'
+        fail_msg: Invalid, unsupported or mismatched LayerSentry apply invocation.
 
-    - name: Decode transient provider secrets in memory only
+    - name: Decode transient PostgreSQL secret in memory only
       ansible.builtin.set_fact:
         layersentry_secrets:
           admin_password: "{{ layersentry_secrets_b64.admin_password | b64decode }}"
+      when: layersentry_provider == 'postgresql'
       no_log: true
 
     - name: Validate Rocky Linux and security baseline
@@ -31,11 +46,11 @@
       vars:
         layersentry_recovery_only: false
 
-    - name: Install configure and initialize PostgreSQL without starting it
+    - name: Install configure and initialize selected provider without starting it
       ansible.builtin.include_role:
-        name: postgresql
+        name: "{{ layersentry_role_map[layersentry_provider] }}"
 
-    - name: Apply client firewall and optional VIP before PostgreSQL starts
+    - name: Apply client firewall and optional VIP before service start
       ansible.builtin.include_role:
         name: network_vip
       vars:
@@ -44,8 +59,16 @@
     - name: Flush network and VIP handlers before service start
       ansible.builtin.meta: flush_handlers
 
-    - name: Enable and start PostgreSQL after firewall and VIP are ready
+    - name: Enable and start provider service after firewall and VIP are ready
       ansible.builtin.systemd_service:
-        name: "postgresql-{{ layersentry_request.release_line }}.service"
+        name: "{{ layersentry_service_unit }}"
         enabled: true
         state: started
+      when: layersentry_service_unit | length > 0
+
+    - name: Bootstrap MySQL-family managed administrator after local service start
+      layersentry_mysql_bootstrap:
+        provider: "{{ layersentry_provider }}"
+        password_b64: "{{ layersentry_secrets_b64.admin_password }}"
+      when: layersentry_provider in ['mysql', 'mariadb']
+      no_log: true
