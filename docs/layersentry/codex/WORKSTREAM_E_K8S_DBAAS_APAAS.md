@@ -19,7 +19,9 @@ Read only:
 
 Open `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`, the compact architecture addendum or historical evidence only when the current gate needs detailed storage/network/VIP/provider/version semantics or an architecture conflict must be resolved. Do not load historical expanded masters/ledger by default.
 
-When working from a normal Git worktree, initialize/check the K8s writer guard from `tools/layersentry/governance/module-writer-guard.sh` before meaningful batches.
+When working from a normal Git worktree, initialize/check the K8s writer guard from `tools/layersentry/governance/module-writer-guard.sh` before meaningful batches. After staging a K8s source batch and before committing, run `tools/layersentry/governance/module-writer-guard.sh precommit k8s`. `FOREIGN_MODULE_EDIT` is a hard stop: unstage the foreign path and hand it to its owning module; never work around the guard.
+
+Every K8s source batch must pass the module-specific **LayerSentry K8s Source Validation** workflow. This is the cheap pre-live gate for Python syntax/unit tests, JSON/release-manifest integrity, downstream patch digests, systemd source checks and the commit-aware K8s path fence. A green source-validation workflow is `CI_VERIFIED` only for those checks; it does not promote E0/E1 runtime gates.
 
 ## 2. Hard file fence
 
