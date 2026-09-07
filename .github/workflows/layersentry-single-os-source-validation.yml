@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - layersentry/4.22.1.1-ui
+      - layersentry/tmp-single-os-format-20260907
     paths:
       - 'tools/layersentry/single-os/**'
       - 'tools/layersentry/ansible/**'
@@ -34,6 +35,30 @@ jobs:
           go-version: '1.23.x'
           cache: true
           cache-dependency-path: tools/layersentry/single-os/agent/go.sum
+
+      - name: Capture exact formatter output
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/layersentry-temp-output"
+          agent="$GITHUB_WORKSPACE/tools/layersentry/single-os/agent"
+          mkdir -p "$out"
+          mapfile -d '' gofiles < <(find "$agent" -type f -name '*.go' -print0 | sort -z)
+          if ((${#gofiles[@]})); then
+            gofmt -d "${gofiles[@]}" > "$out/gofmt.patch"
+            printf '%s\0' "${gofiles[@]}" | xargs -0 gofmt -w
+          fi
+          tar -C "$GITHUB_WORKSPACE/tools/layersentry/single-os" -czf "$out/single-os-formatted.tar.gz" .
+          sha256sum "$out/gofmt.patch" "$out/single-os-formatted.tar.gz" > "$out/SHA256SUMS"
+          printf 'source_sha=%s\n' "$GITHUB_SHA" > "$out/metadata.txt"
+
+      - name: Upload formatter capture
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: layersentry-single-os-format-capture-${{ github.run_id }}-${{ github.run_attempt }}
+          path: layersentry-temp-output/
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Install Ansible validation dependency
         shell: bash
