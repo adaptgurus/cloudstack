@@ -1,0 +1,26 @@
+---
+- name: Require supported package-only runtime plan
+  ansible.builtin.assert:
+    that:
+      - layersentry_provider in ['python-runtime', 'podman-runtime']
+      - layersentry_request.topology == 'standalone'
+      - layersentry_repository_id == 'appstream'
+      - layersentry_resolved_version | length > 0
+      - layersentry_request.network.port | int == 0
+      - layersentry_request.network.listen_address | length == 0
+      - (layersentry_request.storage | default([]) | length) == 0
+      - (layersentry_request.lvm | default([]) | length) == 0
+    fail_msg: Package-only runtime Ansible execution received unsupported intent.
+
+- name: Resolve runtime package identity
+  ansible.builtin.set_fact:
+    layersentry_runtime_package: "{{ 'python3.12' if layersentry_provider == 'python-runtime' else 'podman' }}"
+
+- name: Install exact runtime NEVRA
+  ansible.builtin.dnf:
+    name: "{{ layersentry_resolved_version }}"
+    state: present
+    install_weak_deps: false
+    disablerepo: '*'
+    enablerepo: appstream
+    disable_gpg_check: false
