@@ -29,6 +29,23 @@ Read large specialist masters, the debugging/security policies or the Knowledge 
 
 Always fetch/inspect actual refs before editing. Never reset a shared branch to a SHA copied from documentation. Never force-push.
 
+### 1.1 Hard context/credit-efficiency rules
+
+These rules reduce repeated AI/Codex spend without weakening required production validation:
+
+1. **Delta-first:** after startup, inspect the current gate, relevant paths and changes since the last verified evidence before broad repository reading. A whole-repository rescan is reserved for an explicitly assigned repository-level audit or when ownership/dependency discovery genuinely requires it.
+2. **No repeated unchanged reads:** within one session, do not repeatedly reload unchanged master contexts, workstreams or large source files. Re-read only the changed section/ref or when a concurrent commit invalidates the prior view.
+3. **Targeted retrieval first:** use exact paths, code search, diffs, focused logs and evidence pointers before loading large documents or full workflow logs.
+4. **No duplicate reasoning artifacts:** do not create a new master context, handoff, architecture document, recap or audit copy when an existing canonical file can be updated or referenced.
+5. **No unchanged expensive retries:** after one confirmatory rerun, do not repeat the same failing CI/lab/E2E action unless code, configuration, artifacts, environment state or the diagnostic hypothesis changed. Record the blocker/evidence instead.
+6. **Progressive validation:** use the cheapest validation that can falsify the current change first (focused source/static/unit/module checks), then the required integration/live/destructive gate. This is sequencing, not permission to skip E2E or production-certification evidence.
+7. **Raw logs stay raw:** persist compact findings, identifiers, hashes, failure signatures and evidence pointers; do not paste large logs into startup/master documents.
+8. **One implementation owner:** read-only/test-only parallelism is allowed when useful, but never pay multiple writers to independently solve the same module/gate.
+9. **Stop at a real external blocker:** when the next step requires a foreign-module change, lab reset, missing infrastructure, unavailable credential/resource or manual operator action, persist the exact blocker instead of generating speculative replacement code.
+10. **Prefer deletion/reuse over abstraction:** a new shared framework is justified only when it removes duplicated active implementations and does not create a second authority for state, lifecycle, RBAC, quota, backup or inventory.
+
+Credit efficiency must never be used to mark an unexecuted production gate as passed.
+
 ## 2. Hard module file fences
 
 A session may inspect foreign/upstream source to understand an API contract but must not edit outside its assigned fence unless the owner explicitly expands scope.
