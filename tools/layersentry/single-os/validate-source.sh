@@ -40,6 +40,9 @@ popd >/dev/null
 
 find "$ANSIBLE/library" -type f -name '*.py' -print0 | xargs -0 -r python3 -m py_compile
 find "$ROOT/acceptance" -type f -name '*.py' -print0 | xargs -0 -r python3 -m py_compile
+if [[ -d "$ANSIBLE/tests" ]]; then
+  python3 -m unittest discover -s "$ANSIBLE/tests" -p 'test_*.py'
+fi
 
 # Production uses private /run/layersentryd and /usr/lib/layersentry paths.
 # Source validation runs unprivileged from the checkout, so override only the
