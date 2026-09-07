@@ -20,11 +20,11 @@ Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
-3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
+3. `LAYERSENTRY_CURRENT_STATUS.md`;
 4. this file;
 5. exact module/artifact/failure being validated.
 
-Read the secure-engineering policy or specialist architecture only for the current trust boundary. Do not load every module context.
+Read the secure-engineering policy, specialist architecture or historical Progress Ledger evidence only for the current trust boundary. Do not load every module context.
 
 ## 3. File fence and independence
 
@@ -59,11 +59,13 @@ As applicable to the exact module/release:
 
 Use existing module fixtures whenever possible rather than building duplicate controllers/providers solely for testing.
 
-## 5. Evidence rule
+## 5. Evidence/status rule
 
 A security result records exact source/artifact, target, role/project, preconditions, action, expected result, actual result, relevant bounded logs/evidence and cleanup state.
 
 A source test is not runtime proof. A green UI state is not authorization proof. A single failover/backup test is not full DB/data-integrity certification.
+
+Persist focused security evidence at meaningful milestones. Do not append long history to the Progress Ledger. An integration/status reconciliation pass updates `LAYERSENTRY_CURRENT_STATUS.md` when the global security/release state materially changes.
 
 Use project statuses honestly: `SOURCE_COMPLETE`, `CI_VERIFIED`, `LIVE_VERIFIED`, `PARTIAL`, `BLOCKED`, `NOT_TESTED`, etc., only for the exact scope evidenced.
 
