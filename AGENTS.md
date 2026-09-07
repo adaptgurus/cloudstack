@@ -2,67 +2,126 @@
 
 This repository is Apache CloudStack 4.22.1.1 with a LayerSentry KVM-first product layer.
 
-The objective is to finish customer-operable vertical slices with the **smallest supportable LayerSentry overlay**, while preventing AI sessions from spending time or Codex credits on unrelated modules.
+The objective is to finish customer-operable vertical slices with the **smallest supportable LayerSentry overlay**, while preventing AI sessions from spending time or Codex credits on unrelated modules, stale context, duplicate implementations or lab-only automation.
 
 ## 1. Minimal startup
 
-Before changing source or runtime, read only:
+Every session reads only:
 
-1. `AGENTS.md`;
+1. `/AGENTS.md`;
 2. `docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`;
 3. `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`;
-4. exactly one specialist context/workstream for the assigned module;
-5. fetch the actual current repository/workflow/live state.
+4. the minimal module context below;
+5. actual current repository/workflow/live state for that module.
 
-Specialist context:
+Minimal module context:
 
-- UI: `docs/layersentry/codex/WORKSTREAM_A_UI_SELF_SERVICE.md`;
-- RKE2/Kubernetes/Data Services: `docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` + `docs/layersentry/codex/WORKSTREAM_E_K8S_DBAAS_APAAS.md`;
-- VM-native Single-OS: `docs/layersentry/LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` + `docs/layersentry/codex/WORKSTREAM_F_SINGLE_OS_DBAAS_APAAS.md`;
-- DC/DR: `docs/layersentry/LAYERSENTRY_DRAAS_ARCHITECTURE.md` + `docs/layersentry/codex/WORKSTREAM_D_DR_HA_UPGRADE.md`;
-- bootstrap/hypervisor/control-plane HA: `docs/layersentry/LAYERSENTRY_ANSIBLE_BOOTSTRAP_CONTROL_PLANE_CONTEXT.md`.
+- **UI:** `docs/layersentry/codex/WORKSTREAM_A_UI_SELF_SERVICE.md`.
+- **RKE2/K8s/Data Services:** `docs/layersentry/codex/WORKSTREAM_E_K8S_DBAAS_APAAS.md` plus current `tools/layersentry/k8s/release-candidate-lane-b.json`. Read `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` / architecture addendum only when the current gate requires detailed storage/network/provider/version architecture or a conflict must be resolved.
+- **VM-native Single-OS:** `docs/layersentry/codex/WORKSTREAM_F_SINGLE_OS_DBAAS_APAAS.md` plus `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`. Read the Single-OS Super Master only when a provider/architecture conflict requires it.
+- **DC/DR:** `docs/layersentry/codex/WORKSTREAM_D_DR_HA_UPGRADE.md`. Read `LAYERSENTRY_DRAAS_ARCHITECTURE.md` only for provider/failover semantics not already covered by the current gate.
+- **Bootstrap/Hypervisor/Control Plane:** `docs/layersentry/LAYERSENTRY_ANSIBLE_BOOTSTRAP_CONTROL_PLANE_CONTEXT.md`.
+- **Debugging/security:** read `LAYERSENTRY_DEBUGGING_RUNBOOK.md` or `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md` only when the current failure/trust boundary requires them.
 
-Do not load historical handoffs, old re-audits, unrelated workstreams or the whole repository by default.
+Do **not** load historical handoffs, old re-audits, legacy Codex master contexts, every workstream, the Knowledge Graph, or the whole repository by default.
+
+If the Progress Ledger contains an older embedded read order or historical owner/workstream label, this `AGENTS.md` plus the current Execution Contract supersede it. Historical checkpoint ownership text is evidence history, not permission to reactivate an old workstream.
 
 Always inspect actual refs before editing. Never reset a shared branch to a SHA copied from documentation and never force-push.
 
 ## 2. Hard module file fences
 
-A session may inspect CloudStack source outside its fence when required to understand a native API/contract, but it must **not edit outside its assigned fence** unless the owner explicitly expands scope.
+A session may inspect CloudStack/upstream source outside its fence to understand a contract, but it must **not edit outside its assigned fence** unless the owner explicitly expands scope.
 
-| Module | Normal writable paths | Do not edit from this module |
-| --- | --- | --- |
-| UI | `ui/**`, UI-specific tests/evidence | `tools/layersentry/k8s/**`, `tools/layersentry/single-os/**`, `tools/layersentry/ansible/**`, `tools/layersentry/dr*` |
-| RKE2/K8s/Data Services | `tools/layersentry/k8s/**`, K8s-specific tests/evidence, exact K8s artifact/workflow files when required | `ui/**`, `tools/layersentry/single-os/**`, `tools/layersentry/ansible/**` unless an approved fallback is activated, `tools/layersentry/dr*` |
-| VM-native Single-OS | `tools/layersentry/single-os/**`, Single-OS Ansible playbooks/roles/modules and Single-OS evidence | `ui/**`, `tools/layersentry/k8s/**`, `tools/layersentry/dr*`, hypervisor/bootstrap roles unless explicitly assigned |
-| DC/DR | `tools/layersentry/dr*`, DR-specific tests/evidence, authorized DR runner files | `ui/**`, `tools/layersentry/k8s/**`, `tools/layersentry/single-os/**`, unrelated Ansible provider roles |
-| Bootstrap/Hypervisor/Control Plane | bootstrap/hypervisor Ansible playbooks/roles, bootstrap evidence | Single-OS application-provider roles, `ui/**`, `tools/layersentry/k8s/**`, `tools/layersentry/dr*` |
-| Governance | `AGENTS.md`, execution/master/workstream authority files | product/runtime source unless separately assigned |
+### UI
 
-Module agents do not edit `AGENTS.md`, Super Master Context, execution routing or another workstream merely to document their work. Stable authority changes belong to a dedicated governance pass.
+Writable:
+
+- `ui/**`;
+- UI-specific tests/evidence.
+
+Do not edit K8s, Single-OS, Ansible, DR or global authority source. Generic release/build workflows belong to a milestone release task, not the UI writer.
+
+### RKE2/K8s/Data Services
+
+Writable:
+
+- `tools/layersentry/k8s/**`;
+- K8s-specific tests/evidence;
+- `.github/workflows/layersentry-k8s-*` when such a module-specific workflow is directly required by the failing K8s gate.
+
+Do not edit `ui/**`, Single-OS, DR, generic release workflows or `tools/layersentry/ansible/**` unless the approved CAPI fallback is formally selected and a separate fallback implementation scope is assigned.
+
+### VM-native Single-OS
+
+Writable:
+
+- `tools/layersentry/single-os/**`;
+- `tools/layersentry/ansible/playbooks/single_os_*`;
+- Single-OS provider roles/modules actually invoked by the Single-OS lifecycle;
+- `.github/workflows/layersentry-single-os-*`;
+- Single-OS tests/evidence.
+
+Normal Single-OS provider-role scope includes current provider/storage/VIP roles such as `postgresql`, `mysql_family`, `keyvalue`, `nginx`, `httpd`, `tomcat`, `nodejs`, `runtime`, `storage_lvm`, `network_vip` and their purpose-built Single-OS modules. Do not edit hypervisor/bootstrap roles.
+
+### Bootstrap/Hypervisor/Control Plane
+
+Writable:
+
+- bootstrap/hypervisor playbooks such as `bootstrap_*` and `hypervisor_*`;
+- bootstrap/hypervisor roles such as `hypervisor_*`, `network_bridge`, `firewall`, `selinux` and related host-preflight/inventory schema files;
+- `.github/workflows/layersentry-hypervisor-*` / bootstrap-specific workflows when present;
+- bootstrap/hypervisor evidence.
+
+Do not edit Single-OS application-provider roles, UI, K8s or DR source.
+
+### Shared Ansible platform files
+
+Files such as `tools/layersentry/ansible/ansible.cfg`, `collections/requirements.yml` and any role/module intentionally shared by both Single-OS and bootstrap/hypervisor are **shared platform files**, not casually writable by either module.
+
+Change them only under an explicitly assigned shared-Ansible task after fetching/reconciling all active Ansible work. A module that needs such a change records the dependency instead of silently editing a shared file during unrelated provider work.
+
+### DC/DR
+
+Writable:
+
+- `tools/layersentry/dr*`;
+- DR-specific tests/evidence;
+- explicitly authorized DR runner files in the runner repository.
+
+Do not edit UI, K8s, Single-OS or unrelated Ansible roles.
+
+### Governance
+
+Writable only during an explicitly assigned governance/audit pass:
+
+- `AGENTS.md`;
+- execution/master/workstream authority files.
+
+Normal module agents do not modify governance files to document routine work.
 
 ### Cross-module dependency rule
 
-If a session discovers a required change outside its fence:
+If a session discovers a required foreign-module change:
 
-1. record the exact required path/API/contract and failing evidence;
-2. do not implement the foreign-module change;
+1. record exact path/API/contract and failing evidence;
+2. do not implement the foreign change;
 3. hand it to the owning module/session;
-4. continue only work that remains inside the current fence.
+4. continue only in-fence work.
 
-This is a hard credit/concurrency rule, not a suggestion.
+This is a hard credit/concurrency rule.
 
 ## 3. One active writer per module
 
-Use one source-writing session per module at a time.
+Use one source-writing session per module at a time:
 
 - one primary RKE2/K8s writer;
 - one Single-OS writer;
 - one DR writer;
 - one bootstrap/hypervisor writer;
-- UI remains dormant until backend contracts are stable, then one bounded final UI writer.
+- UI dormant until backend contracts stabilize, then one bounded final UI writer.
 
-Additional sessions may perform **read-only/test-only** qualification on separate targets but must not create parallel implementations.
+Additional sessions may be read-only/test-only but must not create parallel implementations or commits to the same module source.
 
 ## 4. CloudStack boundary
 
@@ -72,11 +131,11 @@ Prefer in order:
 
 1. native CloudStack 4.22.1.1 APIs;
 2. supported CloudStack provider/plugin/configuration;
-3. mature Kubernetes ecosystem controllers when Kubernetes owns lifecycle;
+3. mature ecosystem controllers when they own the lifecycle;
 4. thin LayerSentry orchestration/policy/evidence;
 5. narrow CloudStack core change only by explicit exception.
 
-Never create a second VM scheduler, tenancy/RBAC authority, quota authority or backup/resource inventory.
+Never create a second VM scheduler, tenancy/RBAC authority, quota authority, backup catalog or conflicting resource inventory.
 
 ## 5. RKE2/Kubernetes rule
 
@@ -92,9 +151,7 @@ LayerSentry UI/BFF
  -> selected upstream packages/operators
 ```
 
-The branch already contains substantial E0/E1 source. The K8s writer must work the **first failing live gate**, not add horizontal scaffolding.
-
-Required order:
+The branch already contains substantial E0/E1 source. The K8s writer works the **first failing live gate**, not new horizontal scaffolding:
 
 ```text
 immutable artifacts
@@ -118,22 +175,22 @@ immutable artifacts
 
 Do not patch CAPC indefinitely. If a bounded qualification campaign cannot achieve CloudStack VM creation + automatic join + 6443/9345 + `Ready`, and evidence shows downstream maintenance is disproportionate, record a release decision and switch to the approved native CloudStack API + QCOW2/cloud-init + Ansible Runner + RKE2 + Flux fallback. One release has one lifecycle owner.
 
-### Existing RKE2 package-test cluster
+### Existing healthy RKE2 package-test cluster
 
-A separately provided healthy RKE2 cluster may be used in parallel as a **test-only package qualification lane** for Flux, OpenEverest, OpenBao, Harbor, Strimzi, backup/restore and offline package tests.
+A separately provided healthy RKE2 cluster is a **test-only package lane** for Flux, OpenEverest, OpenBao, Harbor, Strimzi, backup/restore and offline package tests.
 
-That lane must not edit CAPI/CAPC/CAPRKE2 lifecycle source. If it discovers a source defect, it reports the exact failure to the primary K8s writer.
+It does not edit lifecycle source and its results do **not** by themselves promote the full LayerSentry K8s/DBaaS stack to `LIVE_VERIFIED`. Full LayerSentry live qualification still requires the same pinned package on the LayerSentry-owned cluster path with the certified storage/network/project boundaries. Package-lane failures are handed to the primary K8s writer.
 
 ## 6. Upstream-service rule
 
-For V1 use mature upstream products instead of rewriting them:
+For V1 use mature upstream products:
 
 - OpenEverest stable v1 line for supported PostgreSQL/PXC-MySQL/MongoDB lifecycle;
 - OpenBao from supported Helm/OCI content;
 - Harbor from supported Helm/OCI content;
 - Strimzi for Kafka.
 
-Do not build replacement DB operators, backup/PITR engines, DB failover engines, Kafka operators, Harbor/OpenBao controllers or replacement upstream UIs. Rebranding upstream service UIs is out of V1 unless explicitly assigned.
+Do not build replacement DB operators, backup/PITR engines, DB failover engines, Kafka operators, Harbor/OpenBao controllers or replacement upstream UIs. Upstream service UI rebranding is out of V1 unless explicitly assigned.
 
 ## 7. VM-native Single-OS rule
 
@@ -149,20 +206,15 @@ LayerSentry UI/API
 
 Go owns authorization, validation, planning, idempotency/locking, durable state/journal, secrets, execution/result handling and recovery state. Ansible owns guest package/configuration/service/SELinux/firewalld/LVM/network/VIP/provider work.
 
-Do not implement product lifecycle as Bash/sh. Existing shell lifecycle assets are deprecated and must not be extended.
+Do not implement product lifecycle as Bash/sh. Existing runtime shell lifecycle assets are deprecated.
 
 ### Disposable lab reset optimization
 
-For V1 **test-environment reset only**, the product owner may manually reinstall/recreate a disposable Rocky Linux 9 VM after a destructive/dirty failed test.
+For V1 test-environment reset only, the owner may manually reinstall/recreate a disposable Rocky Linux 9 VM after a destructive/dirty failed test.
 
-When a dirty guest blocks further acceptance:
+Capture evidence, stop mutating the dirty guest, report `LAB_RESET_REQUIRED`, then resume the same gate on the fresh VM. Do not spend engineering/Codex effort building automatic lab reimage/snapshot rollback solely for cleanup.
 
-1. capture failure evidence;
-2. stop mutating that guest;
-3. report `LAB_RESET_REQUIRED` with required clean-host prerequisites;
-4. resume after the owner provides a fresh Rocky 9 VM.
-
-Do **not** spend engineering/Codex effort building snapshot/reimage/automatic guest-reset machinery solely to clean the acceptance lab. This shortcut does not remove product requirements for safe install, idempotency, repair, upgrade, uninstall, backup/restore or rollback behavior.
+This does not remove product requirements for safe install, idempotency, repair, upgrade, uninstall, backup/restore or recovery.
 
 ## 8. DC/DR rule
 
@@ -174,7 +226,7 @@ healthy DC/DR CloudStack
  -> OLD recovery point
  -> mutate data
  -> NEW recovery point
- -> selected `createVMFromBackup` recovery
+ -> selected createVMFromBackup recovery
  -> isolated destination network
  -> exact root/data validation
  -> negative/retry/RBAC
@@ -183,11 +235,11 @@ healthy DC/DR CloudStack
 
 Only after native recovery works should one selected provider-native low-RPO path be added. Do not build a generic LayerSentry block replication engine when CloudStack/storage providers already expose the data plane.
 
-## 9. UI and release activation rule
+## 9. UI and release activation
 
-Do not keep a UI Codex session continuously active while backend contracts are still changing. Freeze UI source except for a blocking integration defect, then run one bounded final UI acceptance/fix pass after K8s, DR and Single-OS backend contracts stabilize.
+Do not keep a UI Codex session active while backend contracts move. Freeze UI except for a blocking integration defect, then run one bounded final UI acceptance/fix pass after K8s, DR and Single-OS contracts stabilize.
 
-Release/signing/security work is milestone-gated, not a permanent parallel stream. Run it when a module has an artifact ready for promotion or when a concrete security blocker appears.
+Release/signing/security work is milestone-gated, not a permanent parallel stream. Generic release workflows/tooling are changed only by the assigned milestone owner.
 
 ## 10. Evidence, security and handoff
 
