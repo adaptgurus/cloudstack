@@ -24,6 +24,7 @@
     layersentry_pg_data: "{{ (layersentry_pg_data_root ~ '/data') if layersentry_pg_data_root else layersentry_pg_vendor_data }}"
     layersentry_pg_wal: "{{ (layersentry_pg_wal_root ~ '/wal') if layersentry_pg_wal_root else '' }}"
     layersentry_pg_logs: "{{ (layersentry_pg_log_root ~ '/logs') if layersentry_pg_log_root else '' }}"
+    layersentry_pg_external_roots: "{{ [layersentry_pg_data_root, layersentry_pg_wal_root, layersentry_pg_log_root] | reject('equalto', '') | select('match', '^/(data|srv|opt/layersentry-data)(/|$)') | list | unique }}"
 
 - name: Reject mount roots that collide with provider-owned child names
   ansible.builtin.assert:
@@ -42,43 +43,43 @@
     enablerepo: "{{ layersentry_repository_id }}"
     disable_gpg_check: false
 
-- name: Ensure PostgreSQL provider directories exist
+- name: Ensure PostgreSQL data directory exists with strict mode
   ansible.builtin.file:
-    path: "{{ item.path }}"
+    path: "{{ layersentry_pg_data }}"
     state: directory
     owner: postgres
     group: postgres
-    mode: "{{ item.mode }}"
-  loop:
-    - { path: "{{ layersentry_pg_data }}", mode: '0700' }
-    - { path: "{{ layersentry_pg_wal if layersentry_pg_wal else layersentry_pg_data }}", mode: '0700' }
-    - { path: "{{ layersentry_pg_logs if layersentry_pg_logs else layersentry_pg_data }}", mode: '0750' }
-  loop_control:
-    label: "{{ item.path }}"
+    mode: '0700'
+
+- name: Ensure external PostgreSQL WAL directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_pg_wal }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+  when: layersentry_pg_wal | length > 0
+
+- name: Ensure external PostgreSQL log directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_pg_logs }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  when: layersentry_pg_logs | length > 0
 
 - name: Persist PostgreSQL SELinux equivalence for external roots
   ansible.builtin.command:
-    argv:
-      - /usr/sbin/semanage
-      - fcontext
-      - -a
-      - -e
-      - /var/lib/pgsql
-      - "{{ item }}"
+    argv: [/usr/sbin/semanage, fcontext, -a, -e, /var/lib/pgsql, "{{ item }}"]
   register: layersentry_pg_semanage_add
   failed_when: false
   changed_when: layersentry_pg_semanage_add.rc == 0
-  loop: "{{ [layersentry_pg_data_root, layersentry_pg_wal_root, layersentry_pg_log_root] | reject('equalto', '') | list | unique }}"
+  loop: "{{ layersentry_pg_external_roots }}"
 
 - name: Reconcile existing PostgreSQL SELinux equivalence entries
   ansible.builtin.command:
-    argv:
-      - /usr/sbin/semanage
-      - fcontext
-      - -m
-      - -e
-      - /var/lib/pgsql
-      - "{{ item.item }}"
+    argv: [/usr/sbin/semanage, fcontext, -m, -e, /var/lib/pgsql, "{{ item.item }}"]
   when: item.rc != 0
   loop: "{{ layersentry_pg_semanage_add.results | default([]) }}"
   loop_control:
@@ -88,7 +89,7 @@
 - name: Apply PostgreSQL SELinux labels to external roots
   ansible.builtin.command:
     argv: [/usr/sbin/restorecon, -RF, "{{ item }}"]
-  loop: "{{ [layersentry_pg_data_root, layersentry_pg_wal_root, layersentry_pg_log_root] | reject('equalto', '') | list | unique }}"
+  loop: "{{ layersentry_pg_external_roots }}"
   changed_when: false
 
 - name: Inspect existing PostgreSQL cluster identity
@@ -189,16 +190,7 @@
 
 - name: Parse PostgreSQL configuration before service start
   ansible.builtin.command:
-    argv:
-      - /usr/sbin/runuser
-      - -u
-      - postgres
-      - --
-      - "/usr/pgsql-{{ layersentry_pg_major }}/bin/postgres"
-      - -D
-      - "{{ layersentry_pg_data }}"
-      - -C
-      - port
+    argv: [/usr/sbin/runuser, -u, postgres, --, "/usr/pgsql-{{ layersentry_pg_major }}/bin/postgres", -D, "{{ layersentry_pg_data }}", -C, port]
   register: layersentry_pg_config_check
   changed_when: false
 
