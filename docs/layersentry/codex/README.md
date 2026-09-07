@@ -2,15 +2,17 @@
 
 Execution authority: `docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`.
 
+Current Codex launcher: `docs/layersentry/LAYERSENTRY_CODEX_EXECUTION_RUNBOOK.md`.
+
 ## Minimal startup
 
 1. `/AGENTS.md`
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`
-3. `LAYERSENTRY_PROGRESS_LEDGER.md`
-4. one assigned specialist context/workstream
+3. `LAYERSENTRY_CURRENT_STATUS.md`
+4. assigned workstream/module status
 5. actual source/workflow/live state
 
-Do not load every workstream or historical handoff.
+The full Progress Ledger, specialist masters, Knowledge Graph and historical handoffs are on-demand only.
 
 ## Current activation
 
@@ -24,40 +26,20 @@ Do not load every workstream or historical handoff.
 | F — VM-native Single-OS | ChatGPT by default; Go + Ansible; manual disposable-VM reset allowed for lab cleanup |
 | Bootstrap/Hypervisor | ChatGPT by default when its lab is available |
 
-Do not restart the old broad multi-agent model.
+Do not restart the historical broad multi-agent Codex model.
 
-## Workstream E
+## Primary K8s rule
 
-One source writer only.
+One source writer only. Work the first failing gate in Workstream E/current release candidate. A separately supplied healthy RKE2 cluster may run a test-only package lane for Flux/OpenEverest/OpenBao/Harbor/Strimzi but does not write lifecycle source or certify the full LayerSentry-created cluster path.
 
-```text
-existing K8s source
- -> immutable artifacts
- -> controller deployment
- -> one real RKE2 cluster
- -> automatic join + 6443/9345
- -> one CNI
- -> CCM
- -> one safe CSI path
- -> Flux
- -> status/scale/replacement/delete/upgrade/air-gap
- -> upstream service package qualification
-```
+Use `tools/layersentry/governance/module-writer-guard.sh` from normal Git worktrees to detect same-module remote changes between meaningful batches.
 
-User K8s, DBaaS, APaaS and Streaming reuse the same RKE2 lifecycle.
+## UI rule
 
-Use OpenEverest/OpenBao/Harbor/Strimzi as upstream products. Do not write replacements.
+Do not keep an active UI Codex session while backend contracts move. Activate one final pass when real backend contracts are ready for integration/browser acceptance.
 
-A separately provided healthy RKE2 cluster may run a **test-only package lane** for Flux/OpenEverest/OpenBao/Harbor/Strimzi while the primary writer fixes CAPI/CAPC/CAPRKE2. That test lane does not write cluster lifecycle source.
+## File fences / handoff
 
-## Workstream A
+Obey `AGENTS.md` hard file fences. Foreign-module defects are handed to their owners.
 
-Do not keep an active UI Codex session while backend contracts move. Activate one final pass when backends are ready enough to validate the existing portal.
-
-## File fences
-
-Each workstream obeys the hard writable-path fence in `AGENTS.md`. A foreign-module defect is handed to its owner; it is not fixed by the discovering session.
-
-## Handoff
-
-Keep it short: exact commit/artifact, tests/live actions, first unmet gate and next action. No new master context unless architecture materially changes.
+Handoff only exact commit/artifact, tests/live actions, current gate, blocker/root cause and next exact action. Do not create another master context unless architecture materially changes.
