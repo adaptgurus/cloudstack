@@ -9,34 +9,41 @@
 
 Finish the current VM-native LayerSentry path without Kubernetes, preserve the existing Go control plane, and use Ansible for guest configuration. Do not restart from zero.
 
-## 2. Startup
+## 2. Minimal startup
 
 Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
 3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
-4. `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`;
+4. this file;
 5. `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`;
 6. current branch/source/tests.
 
-Historical handoffs are not normal startup authority.
+Read `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` only when a provider/architecture conflict cannot be resolved from this workstream, current source and `CURRENT_STATUS.md`. Historical handoffs are not normal startup authority.
 
 ## 3. Hard file fence
 
 Writable:
 
 - `tools/layersentry/single-os/**`;
-- Single-OS-specific Ansible files, including `single_os_*` playbooks, custom modules used by Single-OS and the provider roles actually invoked by the Single-OS lifecycle;
+- `tools/layersentry/ansible/playbooks/single_os_*`;
+- Single-OS provider roles/modules actually invoked by the Single-OS lifecycle;
+- `.github/workflows/layersentry-single-os-*`;
 - Single-OS tests/evidence.
+
+Current normal provider-role scope includes PostgreSQL, MySQL/MariaDB, Redis/Valkey, Nginx, HTTPD, Tomcat, Node.js/runtime, `storage_lvm`, `network_vip` and their purpose-built modules.
 
 Do not edit:
 
 - `ui/**`;
 - `tools/layersentry/k8s/**`;
 - `tools/layersentry/dr*`;
-- bootstrap/hypervisor roles unless explicitly assigned;
+- bootstrap/hypervisor roles such as `hypervisor_*`, `network_bridge`, `firewall`, `selinux` unless explicitly reassigned;
+- generic release/security workflows/tooling;
 - global authority files.
+
+Shared Ansible platform files such as `ansible.cfg`, `collections/requirements.yml` or a deliberately shared common role/module require a separately assigned shared-Ansible task. Do not silently change them while bootstrap/hypervisor work may be active.
 
 If a CloudStack/UI/DR/K8s dependency is wrong, report the exact failing contract to that workstream instead of fixing it here.
 
@@ -118,13 +125,6 @@ Do not build automatic multi-node lab provisioning merely to simulate that evide
 
 ## 10. Handoff
 
-Report only:
-
-- exact commit/files changed;
-- source/live tests actually run;
-- exact RPM/artifact identity;
-- current provider gate reached;
-- `LAB_RESET_REQUIRED` when applicable;
-- next exact provider gate.
+Report only exact commit/files changed, source/live tests actually run, exact RPM/artifact identity, current provider gate reached, `LAB_RESET_REQUIRED` when applicable and the next exact provider gate.
 
 Do not edit other modules or create broad handoff documents.
