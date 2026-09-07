@@ -19,6 +19,8 @@
       - layersentry_min_memory_mib | int > 0
       - layersentry_min_vcpus | int > 0
       - layersentry_required_storage_paths is sequence
+      - layersentry_hypervisor_bridges is sequence
+      - layersentry_hypervisor_firewall is mapping
     fail_msg: Hypervisor/bootstrap intent is incomplete or not certified for this V1 slice.
 
 - name: Require Rocky Linux 9

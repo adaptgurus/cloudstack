@@ -1,0 +1,36 @@
+---
+- name: Validate SELinux runtime before persistence changes
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.selinux.status == 'enabled'
+      - ansible_facts.selinux.mode == 'enforcing'
+    fail_msg: SELinux must already be enabled and enforcing before LayerSentry changes persistent policy.
+
+- name: Persist SELinux enforcing mode across reboot
+  ansible.builtin.lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: SELINUX=enforcing
+    create: false
+    backup: false
+
+- name: Persist targeted SELinux policy
+  ansible.builtin.lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUXTYPE='
+    line: SELINUXTYPE=targeted
+    create: false
+    backup: false
+
+- name: Read persistent SELinux configuration
+  ansible.builtin.slurp:
+    src: /etc/selinux/config
+  register: layersentry_selinux_config
+  changed_when: false
+
+- name: Verify persistent SELinux configuration
+  ansible.builtin.assert:
+    that:
+      - (layersentry_selinux_config.content | b64decode) is regex('(?m)^SELINUX=enforcing$')
+      - (layersentry_selinux_config.content | b64decode) is regex('(?m)^SELINUXTYPE=targeted$')
+    fail_msg: Persistent SELinux policy is not enforcing/targeted.

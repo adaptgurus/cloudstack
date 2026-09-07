@@ -26,8 +26,17 @@
   roles:
     - role: hypervisor_preflight
     - role: hypervisor_base
+    - role: selinux
+    - role: network_bridge
+    - role: firewall
 
   post_tasks:
+    - name: Enable and start CloudStack agent only after host security/network reconciliation
+      ansible.builtin.service:
+        name: cloudstack-agent
+        enabled: true
+        state: started
+
     - name: Refresh package facts for installation evidence
       ansible.builtin.package_facts:
         manager: auto
@@ -41,11 +50,22 @@
       loop_control:
         label: "{{ item }}"
 
+    - name: Refresh service facts after CloudStack-agent activation
+      ansible.builtin.service_facts:
+
+    - name: Require CloudStack agent running after staged host reconciliation
+      ansible.builtin.assert:
+        that:
+          - "'cloudstack-agent.service' in ansible_facts.services"
+          - ansible_facts.services['cloudstack-agent.service'].state == 'running'
+        fail_msg: CloudStack agent failed to enter running state after network/security reconciliation.
+
     - name: Capture managed configuration fingerprints
       ansible.builtin.stat:
         path: "{{ item }}"
         checksum_algorithm: sha256
       loop:
+        - /etc/selinux/config
         - /etc/libvirt/libvirtd.conf
         - /etc/cloudstack/agent/agent.properties
       register: layersentry_hypervisor_config_stats
@@ -61,6 +81,9 @@
             cloudstack_version: "{{ layersentry_cloudstack_version }}"
             host: "{{ inventory_hostname }}"
             selinux_mode: "{{ ansible_facts.selinux.mode }}"
+            management_bridge: "{{ layersentry_management_bridge }}"
+            bridges: "{{ layersentry_hypervisor_bridges | map(attribute='name') | list }}"
+            firewall_zone: "{{ layersentry_hypervisor_firewall.zone }}"
             config_fingerprints: "{{ layersentry_hypervisor_config_stats.results | map(attribute='stat') | selectattr('exists', 'defined') | list }}"
         per_host: true
         aggregate: false

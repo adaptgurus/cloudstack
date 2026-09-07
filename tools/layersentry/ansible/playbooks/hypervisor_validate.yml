@@ -23,6 +23,19 @@
           - ansible_facts.services['cloudstack-agent.service'].state == 'running'
         fail_msg: Hypervisor validation failed the SELinux/firewalld/libvirt/CloudStack-agent gate.
 
+    - name: Read persistent SELinux configuration
+      ansible.builtin.slurp:
+        src: /etc/selinux/config
+      register: layersentry_validate_selinux_config
+      changed_when: false
+
+    - name: Validate persistent SELinux enforcing configuration
+      ansible.builtin.assert:
+        that:
+          - (layersentry_validate_selinux_config.content | b64decode) is regex('(?m)^SELINUX=enforcing$')
+          - (layersentry_validate_selinux_config.content | b64decode) is regex('(?m)^SELINUXTYPE=targeted$')
+        fail_msg: SELinux runtime is enforcing but persistent boot configuration is not.
+
     - name: Verify KVM device remains available
       ansible.builtin.stat:
         path: /dev/kvm
@@ -34,6 +47,68 @@
           - layersentry_validate_kvm.stat.exists
           - layersentry_validate_kvm.stat.ischr | default(false)
         fail_msg: /dev/kvm is not available after installation.
+
+    - name: Inspect requested bridge interfaces
+      ansible.builtin.stat:
+        path: "/sys/class/net/{{ item.name }}"
+      register: layersentry_validate_bridge_stats
+      loop: "{{ layersentry_hypervisor_bridges }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Require requested bridges
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Requested LayerSentry bridge is missing: {{ item.item.name }}"
+      loop: "{{ layersentry_validate_bridge_stats.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Read requested bridge MTUs
+      ansible.builtin.slurp:
+        src: "/sys/class/net/{{ item.name }}/mtu"
+      register: layersentry_validate_bridge_mtus
+      changed_when: false
+      loop: "{{ layersentry_hypervisor_bridges }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Require requested bridge MTUs
+      ansible.builtin.assert:
+        that:
+          - (item.content | b64decode | trim | int) == (item.item.mtu | int)
+        fail_msg: "Requested LayerSentry bridge MTU drifted: {{ item.item.name }}"
+      loop: "{{ layersentry_validate_bridge_mtus.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Discover management bridge firewalld zone
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/firewall-cmd
+          - "--get-zone-of-interface={{ layersentry_management_bridge }}"
+      register: layersentry_validate_firewall_zone
+      changed_when: false
+
+    - name: Require intended management firewalld zone
+      ansible.builtin.assert:
+        that:
+          - layersentry_validate_firewall_zone.stdout | trim == layersentry_hypervisor_firewall.zone
+        fail_msg: Management bridge firewalld zone drifted from signed intent.
+
+    - name: Verify runtime CloudStack-agent allow rules
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/firewall-cmd
+          - "--zone={{ layersentry_hypervisor_firewall.zone }}"
+          - "--query-rich-rule=rule family=\"{{ 'ipv6' if ':' in item else 'ipv4' }}\" source address=\"{{ item }}\" port port=\"{{ layersentry_hypervisor_firewall.agent_port | int }}\" protocol=\"tcp\" accept"
+      register: layersentry_validate_firewall_rules
+      changed_when: false
+      failed_when: layersentry_validate_firewall_rules.rc != 0
+      loop: "{{ layersentry_hypervisor_firewall.management_cidrs }}"
+      loop_control:
+        label: "{{ item }}"
 
     - name: Validate management-plane TCP reachability when configured
       ansible.builtin.wait_for:

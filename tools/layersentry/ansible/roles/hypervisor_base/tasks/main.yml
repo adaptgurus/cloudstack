@@ -38,23 +38,15 @@
     enabled: true
     state: started
 
-- name: Ensure CloudStack agent is enabled and running
-  ansible.builtin.service:
-    name: cloudstack-agent
-    enabled: true
-    state: started
-
 - name: Refresh service state for post-install evidence
   ansible.builtin.service_facts:
 
-- name: Verify required services after installation
+- name: Verify base services and security before network mutation
   ansible.builtin.assert:
     that:
       - "'libvirtd.service' in ansible_facts.services"
       - ansible_facts.services['libvirtd.service'].state == 'running'
-      - "'cloudstack-agent.service' in ansible_facts.services"
-      - ansible_facts.services['cloudstack-agent.service'].state == 'running'
       - "'firewalld.service' in ansible_facts.services"
       - ansible_facts.services['firewalld.service'].state == 'running'
       - ansible_facts.selinux.mode == 'enforcing'
-    fail_msg: Hypervisor base installation did not satisfy the post-install security/service gate.
+    fail_msg: Hypervisor base installation did not satisfy the pre-network security/service gate.
