@@ -55,6 +55,7 @@
       become: false
 
   roles:
+    - role: control_plane_vm_runtime
     - role: control_plane_vm
       vars:
         layersentry_control_plane_vm: "{{ layersentry_db_vm }}"
