@@ -3,6 +3,7 @@
   ansible.builtin.set_fact:
     layersentry_firewall_zone: "ls-svc-{{ (layersentry_service_id | replace('-', ''))[:8] }}"
     layersentry_network_state: "{{ layersentry_network_state | default('present') }}"
+    layersentry_secondary_cidr: "{{ (layersentry_request.network.vip.address ~ '/' ~ (layersentry_request.network.vip.prefix_length | string)) if (layersentry_request.network.vip.mode | default('')) == 'secondary' else '' }}"
 
 - name: Read permanent firewalld zones
   ansible.builtin.command:
@@ -13,10 +14,7 @@
 
 - name: Create LayerSentry service firewall zone
   ansible.builtin.command:
-    argv:
-      - /usr/bin/firewall-cmd
-      - --permanent
-      - "--new-zone={{ layersentry_firewall_zone }}"
+    argv: [/usr/bin/firewall-cmd, --permanent, "--new-zone={{ layersentry_firewall_zone }}"]
   when:
     - layersentry_request.network.port | int > 0
     - layersentry_network_state == 'present'
@@ -25,27 +23,17 @@
 
 - name: Set service firewall zone default drop target
   ansible.builtin.command:
-    argv:
-      - /usr/bin/firewall-cmd
-      - --permanent
-      - "--zone={{ layersentry_firewall_zone }}"
-      - --set-target=DROP
-  register: layersentry_zone_target
-  changed_when: "'success' in (layersentry_zone_target.stdout | lower)"
+    argv: [/usr/bin/firewall-cmd, --permanent, "--zone={{ layersentry_firewall_zone }}", --set-target=DROP]
+  changed_when: false
   when:
     - layersentry_request.network.port | int > 0
     - layersentry_network_state == 'present'
 
 - name: Add explicit client CIDRs to service firewall zone
   ansible.builtin.command:
-    argv:
-      - /usr/bin/firewall-cmd
-      - --permanent
-      - "--zone={{ layersentry_firewall_zone }}"
-      - "--add-source={{ item }}"
+    argv: [/usr/bin/firewall-cmd, --permanent, "--zone={{ layersentry_firewall_zone }}", "--add-source={{ item }}"]
   loop: "{{ layersentry_request.network.allowed_cidrs | default([]) }}"
-  register: layersentry_firewall_sources
-  changed_when: "'success' in (layersentry_firewall_sources.stdout | default('') | lower)"
+  changed_when: false
   when:
     - layersentry_request.network.port | int > 0
     - layersentry_network_state == 'present'
@@ -53,13 +41,8 @@
 
 - name: Add provider TCP port to service firewall zone
   ansible.builtin.command:
-    argv:
-      - /usr/bin/firewall-cmd
-      - --permanent
-      - "--zone={{ layersentry_firewall_zone }}"
-      - "--add-port={{ layersentry_request.network.port }}/tcp"
-  register: layersentry_firewall_port
-  changed_when: "'success' in (layersentry_firewall_port.stdout | lower)"
+    argv: [/usr/bin/firewall-cmd, --permanent, "--zone={{ layersentry_firewall_zone }}", "--add-port={{ layersentry_request.network.port }}/tcp"]
+  changed_when: false
   when:
     - layersentry_request.network.port | int > 0
     - layersentry_network_state == 'present'
@@ -77,8 +60,7 @@
 
 - name: Refuse secondary VIP while nm-cloud-setup is active
   ansible.builtin.assert:
-    that:
-      - layersentry_nm_cloud_setup.rc != 0
+    that: [layersentry_nm_cloud_setup.rc != 0]
     fail_msg: nm-cloud-setup.service is active; refusing a persistent manual secondary VIP that metadata reconciliation could remove.
   when:
     - layersentry_network_state == 'present'
@@ -86,47 +68,33 @@
 
 - name: Resolve active NetworkManager connection for secondary VIP
   ansible.builtin.command:
-    argv:
-      - /usr/bin/nmcli
-      - -g
-      - GENERAL.CONNECTION
-      - device
-      - show
-      - "{{ layersentry_request.network.vip.interface }}"
+    argv: [/usr/bin/nmcli, -g, GENERAL.CONNECTION, device, show, "{{ layersentry_request.network.vip.interface }}"]
   register: layersentry_nm_connection
   changed_when: false
-  when:
-    - layersentry_network_state == 'present'
-    - layersentry_request.network.vip.mode | default('') == 'secondary'
+  when: layersentry_request.network.vip.mode | default('') == 'secondary'
+
+- name: Require a real active NetworkManager connection
+  ansible.builtin.assert:
+    that:
+      - layersentry_nm_connection.stdout | trim | length > 0
+      - layersentry_nm_connection.stdout | trim != '--'
+    fail_msg: Active NetworkManager connection could not be resolved for the requested secondary VIP.
+  when: layersentry_request.network.vip.mode | default('') == 'secondary'
 
 - name: Read existing connection IPv4 addresses
   ansible.builtin.command:
-    argv:
-      - /usr/bin/nmcli
-      - -g
-      - ipv4.addresses
-      - connection
-      - show
-      - "{{ layersentry_nm_connection.stdout | trim }}"
+    argv: [/usr/bin/nmcli, -g, ipv4.addresses, connection, show, "{{ layersentry_nm_connection.stdout | trim }}"]
   register: layersentry_nm_addresses
   changed_when: false
-  when:
-    - layersentry_network_state == 'present'
-    - layersentry_request.network.vip.mode | default('') == 'secondary'
+  when: layersentry_request.network.vip.mode | default('') == 'secondary'
 
 - name: Persist secondary VIP on the active connection
   ansible.builtin.command:
-    argv:
-      - /usr/bin/nmcli
-      - connection
-      - modify
-      - "{{ layersentry_nm_connection.stdout | trim }}"
-      - +ipv4.addresses
-      - "{{ layersentry_request.network.vip.address }}/{{ layersentry_request.network.vip.prefix_length }}"
+    argv: [/usr/bin/nmcli, connection, modify, "{{ layersentry_nm_connection.stdout | trim }}", +ipv4.addresses, "{{ layersentry_secondary_cidr }}"]
   when:
     - layersentry_network_state == 'present'
     - layersentry_request.network.vip.mode | default('') == 'secondary'
-    - (layersentry_request.network.vip.address ~ '/' ~ (layersentry_request.network.vip.prefix_length | string)) not in (layersentry_nm_addresses.stdout | default(''))
+    - layersentry_secondary_cidr not in (layersentry_nm_addresses.stdout | default(''))
   notify: reapply secondary VIP
 
 - name: Require immutable Keepalived pin for VRRP
@@ -165,14 +133,9 @@
 
 - name: Add VRRP protocol only from declared peers
   ansible.builtin.command:
-    argv:
-      - /usr/bin/firewall-cmd
-      - --permanent
-      - "--zone={{ layersentry_firewall_zone }}"
-      - "--add-rich-rule=rule family=ipv4 source address={{ item }}/32 protocol value=vrrp accept"
+    argv: [/usr/bin/firewall-cmd, --permanent, "--zone={{ layersentry_firewall_zone }}", "--add-rich-rule=rule family=ipv4 source address={{ item }}/32 protocol value=vrrp accept"]
   loop: "{{ layersentry_request.network.vip.peers | default([]) }}"
-  register: layersentry_vrrp_rules
-  changed_when: "'success' in (layersentry_vrrp_rules.stdout | default('') | lower)"
+  changed_when: false
   when:
     - layersentry_network_state == 'present'
     - layersentry_request.network.vip.mode | default('') == 'vrrp'
@@ -197,32 +160,36 @@
     - layersentry_network_state == 'absent'
     - layersentry_request.network.vip.mode | default('') == 'vrrp'
 
+- name: Remove Keepalived configuration during VRRP uninstall
+  ansible.builtin.file:
+    path: /etc/keepalived/keepalived.conf
+    state: absent
+  when:
+    - layersentry_network_state == 'absent'
+    - layersentry_request.network.vip.mode | default('') == 'vrrp'
+
+- name: Remove Keepalived package during VRRP uninstall
+  ansible.builtin.dnf:
+    name: keepalived
+    state: absent
+  when:
+    - layersentry_network_state == 'absent'
+    - layersentry_request.network.vip.mode | default('') == 'vrrp'
+
 - name: Remove secondary VIP during uninstall
   ansible.builtin.command:
-    argv:
-      - /usr/bin/nmcli
-      - connection
-      - modify
-      - "{{ layersentry_nm_connection.stdout | trim }}"
-      - -ipv4.addresses
-      - "{{ layersentry_request.network.vip.address }}/{{ layersentry_request.network.vip.prefix_length }}"
-  failed_when: false
+    argv: [/usr/bin/nmcli, connection, modify, "{{ layersentry_nm_connection.stdout | trim }}", -ipv4.addresses, "{{ layersentry_secondary_cidr }}"]
   when:
     - layersentry_network_state == 'absent'
     - layersentry_request.network.vip.mode | default('') == 'secondary'
-    - layersentry_nm_connection is defined
+    - layersentry_secondary_cidr in (layersentry_nm_addresses.stdout | default(''))
   notify: reapply secondary VIP
 
 - name: Remove LayerSentry service firewall zone
   ansible.builtin.command:
-    argv:
-      - /usr/bin/firewall-cmd
-      - --permanent
-      - "--delete-zone={{ layersentry_firewall_zone }}"
-  register: layersentry_firewall_remove
-  failed_when: false
-  changed_when: layersentry_firewall_remove.rc == 0
+    argv: [/usr/bin/firewall-cmd, --permanent, "--delete-zone={{ layersentry_firewall_zone }}"]
   when:
     - layersentry_network_state == 'absent'
     - layersentry_request.network.port | int > 0
+    - layersentry_firewall_zone in layersentry_firewalld_zones.stdout.split()
   notify: reload firewalld
