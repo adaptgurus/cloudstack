@@ -37,14 +37,65 @@ These rules reduce repeated AI/Codex spend without weakening required production
 2. **No repeated unchanged reads:** within one session, do not repeatedly reload unchanged master contexts, workstreams or large source files. Re-read only the changed section/ref or when a concurrent commit invalidates the prior view.
 3. **Targeted retrieval first:** use exact paths, code search, diffs, focused logs and evidence pointers before loading large documents or full workflow logs.
 4. **No duplicate reasoning artifacts:** do not create a new master context, handoff, architecture document, recap or audit copy when an existing canonical file can be updated or referenced.
-5. **No unchanged expensive retries:** after one confirmatory rerun, do not repeat the same failing CI/lab/E2E action unless code, configuration, artifacts, environment state or the diagnostic hypothesis changed. Record the blocker/evidence instead.
+5. **No unchanged expensive retries:** after one confirmatory rerun, do not repeat the same failing CI/lab/E2E action unless code, configuration, artifacts, environment state or the diagnostic hypothesis materially changed. Record the blocker/evidence instead. Rewording the same hypothesis is not a material change.
 6. **Progressive validation:** use the cheapest validation that can falsify the current change first (focused source/static/unit/module checks), then the required integration/live/destructive gate. This is sequencing, not permission to skip E2E or production-certification evidence.
 7. **Raw logs stay raw:** persist compact findings, identifiers, hashes, failure signatures and evidence pointers; do not paste large logs into startup/master documents.
-8. **One implementation owner:** read-only/test-only parallelism is allowed when useful, but never pay multiple writers to independently solve the same module/gate.
+8. **One implementation/diagnostic owner:** read-only/test-only parallelism is allowed when useful, but never pay multiple writers or diagnostic agents to independently solve the same module/gate/failure.
 9. **Stop at a real external blocker:** when the next step requires a foreign-module change, lab reset, missing infrastructure, unavailable credential/resource or manual operator action, persist the exact blocker instead of generating speculative replacement code.
 10. **Prefer deletion/reuse over abstraction:** a new shared framework is justified only when it removes duplicated active implementations and does not create a second authority for state, lifecycle, RBAC, quota, backup or inventory.
+11. **Current-gate only:** do not debug, build or qualify a higher gate while the first unmet prerequisite is still failing. Inspect a higher layer only when evidence is required to classify the current failure.
+12. **CI-noise filter:** inspect the module-specific workflow and the exact generic/release workflow required by the current gate. Do not spend model turns diagnosing unrelated CloudStack/UI/license/build failures merely because they ran on the same shared-branch commit.
+13. **Bounded diagnostics first:** start with the smallest time window/object set that can classify the failure. Prefer exact conditions/events, focused command output and roughly the last 100-200 relevant log lines per component before expanding. Do not default to unbounded `journalctl`, whole-cluster YAML dumps, `kubectl get all -A -o yaml`, full database logs or full workflow logs.
+14. **No unchanged rebuild/poll loops:** reuse an already verified immutable artifact when source, dependency locks/manifests, build recipe and artifact digest inputs are unchanged. Do not consume model turns repeatedly polling unchanged CI/lab state; query status when the next dependent action actually needs it.
+15. **Mechanically guard expensive retries:** after an expensive CI/lab/E2E/destructive attempt fails, use `tools/layersentry/governance/expensive_retry_guard.py` as described below before another equivalent attempt.
 
 Credit efficiency must never be used to mark an unexecuted production gate as passed.
+
+### 1.2 Expensive retry guard
+
+The retry guard stores local state only under `.git/layersentry-retry-guard/`; it does not create repository/status churn.
+
+After an expensive attempt fails, record the compact fingerprint:
+
+```bash
+python3 tools/layersentry/governance/expensive_retry_guard.py record \
+  --module <k8s|single-os|dr|bootstrap|ui> \
+  --gate <stable-gate-id> \
+  --artifact-digest <sha256-or-stable-id> \
+  --environment-fingerprint <stable-hash-or-id> \
+  --failure-signature <short-sanitized-signature> \
+  --hypothesis <stable-material-hypothesis-id> \
+  --result fail \
+  --evidence <run-or-evidence-id>
+```
+
+Before rerunning that same expensive gate:
+
+```bash
+python3 tools/layersentry/governance/expensive_retry_guard.py check \
+  --module <module> \
+  --gate <stable-gate-id> \
+  --artifact-digest <same-current-value> \
+  --environment-fingerprint <same-current-value> \
+  --failure-signature <same-current-value> \
+  --hypothesis <same-current-value>
+```
+
+The source SHA defaults to current `HEAD`. The guard allows one unchanged confirmatory retry after the first failed attempt. After two failures with the same material fingerprint it exits with `UNCHANGED_EXPENSIVE_RETRY_BLOCKED`; do not bypass it. Change source/artifact/environment or a genuinely different diagnostic hypothesis, or record the gate as blocked.
+
+After the gate succeeds, clear its local failure state:
+
+```bash
+python3 tools/layersentry/governance/expensive_retry_guard.py record \
+  --module <module> --gate <stable-gate-id> \
+  --artifact-digest <current-value> \
+  --environment-fingerprint <current-value> \
+  --failure-signature <current-value> \
+  --hypothesis <current-value> \
+  --result pass
+```
+
+Use only compact sanitized identifiers/hashes in retry-guard arguments; never put credentials, tokens, private keys, raw secrets or large logs into the local state.
 
 ## 2. Hard module file fences
 
