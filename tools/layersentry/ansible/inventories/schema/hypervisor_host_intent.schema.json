@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://layersentry.example/schemas/hypervisor-host-intent-v1.json",
+  "title": "LayerSentry Hypervisor Host Intent V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "release_id",
+    "host_profile",
+    "cloudstack_version",
+    "packages",
+    "repositories"
+  ],
+  "properties": {
+    "release_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "host_profile": {
+      "const": "layersentry-kvm-standard"
+    },
+    "cloudstack_version": {
+      "const": "4.22.1.1"
+    },
+    "packages": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9+_.:-]*-[0-9][A-Za-z0-9+_.:~-]*$"
+      },
+      "allOf": [
+        {"contains": {"pattern": "^qemu-kvm-"}},
+        {"contains": {"pattern": "^libvirt-"}},
+        {"contains": {"pattern": "^cloudstack-agent-4\\.22\\.1\\.1([.-]|$)"}}
+      ]
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "baseurl", "gpgkey", "gpg_fingerprint"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"},
+          "baseurl": {"type": "string", "pattern": "^(https|file)://[^\\s]+$"},
+          "gpgkey": {"type": "string", "pattern": "^(https|file)://[^\\s]+$"},
+          "gpg_fingerprint": {"type": "string", "pattern": "^[A-Fa-f0-9]{40,64}$"}
+        }
+      }
+    },
+    "management_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port"],
+      "properties": {
+        "host": {"type": "string", "minLength": 1, "maxLength": 253},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+      }
+    }
+  }
+}
