@@ -358,6 +358,20 @@ func (s *Server) serviceRoute(w http.ResponseWriter, r *http.Request) {
 		write(w, 200, op)
 		return
 	}
+	if action == "resume-install" {
+		var q lifecycle.ResumeInstallRequest
+		if err := decode(r, &q); err != nil {
+			bad(w, err)
+			return
+		}
+		op, err := s.Engine.ResumeInstall(r.Context(), id, q)
+		if err != nil {
+			bad(w, err)
+			return
+		}
+		write(w, 200, op)
+		return
+	}
 	switch action {
 	case "start", "stop", "restart", "upgrade", "repair", "backup", "restore", "uninstall":
 		var q lifecycle.ActionRequest

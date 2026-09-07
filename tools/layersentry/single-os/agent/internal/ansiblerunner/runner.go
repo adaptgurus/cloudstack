@@ -2,11 +2,14 @@ package ansiblerunner
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"syscall"
 
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/ansibleexec"
@@ -17,6 +20,8 @@ import (
 )
 
 const DefaultRuntimeRoot = "/run/layersentryd/ansible"
+
+var safeStorageDiagnosticRE = regexp.MustCompile(`layersentry-storage-safe:([A-Za-z0-9_-]{1,768})`)
 
 type SecretGetter interface{ Get(string) ([]byte, error) }
 type Executor interface {
@@ -35,6 +40,7 @@ type varsFile struct {
 	Provider                 string                     `json:"layersentry_provider"`
 	ServiceUnit              string                     `json:"layersentry_service_unit"`
 	PlanDigest               string                     `json:"layersentry_plan_digest"`
+	RecoveryOfOperationID    string                     `json:"layersentry_recovery_of_operation_id,omitempty"`
 	Request                  model.ServiceRequest       `json:"layersentry_request"`
 	ResolvedVersion          string                     `json:"layersentry_resolved_version"`
 	RepositoryID             string                     `json:"layersentry_repository_id"`
@@ -51,8 +57,8 @@ func New(exec ansibleexec.Client, secrets SecretGetter) *Runner {
 	return &Runner{Exec: exec, Secrets: secrets, RuntimeRoot: DefaultRuntimeRoot}
 }
 func (r *Runner) RunPlan(ctx context.Context, action string, op model.Operation, plan model.Plan) error {
-	if plan.ID != op.ID || plan.ServiceID != op.ServiceID || plan.Request.OperationID != op.ID {
-		return errors.New("Ansible plan/operation identity mismatch")
+	if err := validatePlanOperationIdentity(op, plan); err != nil {
+		return err
 	}
 	v, secretBytes, err := r.planVars(action, op, plan)
 	if err != nil {
@@ -61,6 +67,20 @@ func (r *Runner) RunPlan(ctx context.Context, action string, op model.Operation,
 	defer wipeMany(secretBytes)
 	return r.invoke(ctx, action, op.ID, v)
 }
+func validatePlanOperationIdentity(op model.Operation, plan model.Plan) error {
+	expectedPlanOperationID := op.ID
+	if op.RecoveryOfOperationID != "" {
+		expectedPlanOperationID = op.RecoveryOfOperationID
+		if op.PlanDigest == "" || op.PlanDigest != plan.Digest {
+			return errors.New("Ansible recovery operation/plan digest mismatch")
+		}
+	}
+	if plan.ID != expectedPlanOperationID || plan.ServiceID != op.ServiceID || plan.Request.OperationID != expectedPlanOperationID || plan.Request.ServiceID != op.ServiceID {
+		return errors.New("Ansible plan/operation identity mismatch")
+	}
+	return nil
+}
+
 func (r *Runner) RunState(ctx context.Context, action string, op model.Operation, st model.ServiceState, destroyData bool) error {
 	if st.ID != op.ServiceID {
 		return errors.New("Ansible state/operation identity mismatch")
@@ -96,7 +116,7 @@ func (r *Runner) planVars(action string, op model.Operation, plan model.Plan) (v
 	if err != nil {
 		return varsFile{}, nil, err
 	}
-	v := varsFile{Schema: 1, Action: action, OperationID: op.ID, ServiceID: plan.ServiceID, Provider: plan.Provider, ServiceUnit: unit, PlanDigest: plan.Digest, Request: plan.Request, ResolvedVersion: plan.ResolvedVersion, RepositoryID: plan.RepositoryID, RepositoryDigest: plan.RepositoryDigest, PlatformPackages: append([]model.PlatformPackagePin{}, plan.PlatformPackages...), Paths: paths, SecretsB64: secretsB64}
+	v := varsFile{Schema: 1, Action: action, OperationID: op.ID, ServiceID: plan.ServiceID, Provider: plan.Provider, ServiceUnit: unit, PlanDigest: plan.Digest, RecoveryOfOperationID: op.RecoveryOfOperationID, Request: plan.Request, ResolvedVersion: plan.ResolvedVersion, RepositoryID: plan.RepositoryID, RepositoryDigest: plan.RepositoryDigest, PlatformPackages: append([]model.PlatformPackagePin{}, plan.PlatformPackages...), Paths: paths, SecretsB64: secretsB64}
 	setVRRPPin(&v)
 	return v, secretBytes, nil
 }
@@ -149,9 +169,37 @@ func (r *Runner) invoke(ctx context.Context, action, operationID string, v varsF
 	defer func() { _ = os.Remove(path) }()
 	res, err := r.Exec.Run(ctx, action, path)
 	if err != nil {
+		if detail := safeAnsibleDiagnostic(res); detail != "" {
+			return fmt.Errorf("Ansible %s failed with exit=%d: %s", action, res.ExitCode, detail)
+		}
 		return fmt.Errorf("Ansible %s failed with exit=%d; raw Ansible output is intentionally excluded from durable operation errors: %w", action, res.ExitCode, err)
 	}
 	return nil
+}
+
+func safeAnsibleDiagnostic(res executor.Result) string {
+	for _, raw := range []string{res.Stdout, res.Stderr} {
+		match := safeStorageDiagnosticRE.FindStringSubmatch(raw)
+		if len(match) != 2 {
+			continue
+		}
+		decoded, err := base64.RawURLEncoding.DecodeString(match[1])
+		if err != nil {
+			continue
+		}
+		text := strings.Map(func(r rune) rune {
+			if r < 0x20 || r == 0x7f {
+				return ' '
+			}
+			return r
+		}, string(decoded))
+		text = strings.Join(strings.Fields(text), " ")
+		if len(text) > 512 {
+			text = text[:512] + "..."
+		}
+		return text
+	}
+	return ""
 }
 func ensureRuntimeRoot(root string) error {
 	if root != DefaultRuntimeRoot {

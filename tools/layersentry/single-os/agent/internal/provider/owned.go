@@ -233,6 +233,24 @@ func (p *Owned) ManagesGuestPlatform() bool {
 	return ok && tx.ManagesGuestPlatform()
 }
 
+// VerifyGuestOwnership is intentionally read-only: resume-install must prove
+// that the ownership lease created by the original transaction still belongs
+// to this service and must never create or repair that lease implicitly.
+func (p *Owned) VerifyGuestOwnership(r model.ServiceRequest) error {
+	scope, err := p.requestScope(r)
+	if err != nil {
+		return err
+	}
+	owner, exists, err := p.readOwner(scope)
+	if err != nil {
+		return err
+	}
+	if !exists || owner != r.ServiceID {
+		return fmt.Errorf("guest-global %s resource ownership missing or changed", scope)
+	}
+	return nil
+}
+
 func (p *Owned) requestScope(r model.ServiceRequest) (string, error) {
 	if p.Spec.ScopeForRequest == nil {
 		return "", errors.New("ownership request scope unavailable")

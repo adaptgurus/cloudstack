@@ -42,6 +42,13 @@ type TransactionalGuestProvider interface {
 	ManagesGuestPlatform() bool
 }
 
+// GuestOwnershipVerifier proves that an already-mutated guest-global provider
+// resource is still owned by the same LayerSentry service. Recovery paths use
+// this read-only proof before replaying an immutable transactional plan.
+type GuestOwnershipVerifier interface {
+	VerifyGuestOwnership(model.ServiceRequest) error
+}
+
 type Registry struct {
 	mu    sync.RWMutex
 	items map[string]Provider

@@ -135,16 +135,17 @@ type Plan struct {
 	Steps            []PlanStep           `json:"steps"`
 }
 type Operation struct {
-	ID             string          `json:"id"`
-	ServiceID      string          `json:"service_id"`
-	IdempotencyKey string          `json:"idempotency_key"`
-	RequestDigest  string          `json:"request_digest"`
-	PlanDigest     string          `json:"plan_digest,omitempty"`
-	Status         OperationStatus `json:"status"`
-	Stage          string          `json:"stage,omitempty"`
-	Error          string          `json:"error,omitempty"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	ID                    string          `json:"id"`
+	ServiceID             string          `json:"service_id"`
+	IdempotencyKey        string          `json:"idempotency_key"`
+	RequestDigest         string          `json:"request_digest"`
+	PlanDigest            string          `json:"plan_digest,omitempty"`
+	RecoveryOfOperationID string          `json:"recovery_of_operation_id,omitempty"`
+	Status                OperationStatus `json:"status"`
+	Stage                 string          `json:"stage,omitempty"`
+	Error                 string          `json:"error,omitempty"`
+	CreatedAt             time.Time       `json:"created_at"`
+	UpdatedAt             time.Time       `json:"updated_at"`
 }
 type ServiceState struct {
 	ID               string               `json:"id"`

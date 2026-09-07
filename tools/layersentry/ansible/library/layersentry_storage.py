@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import base64
 import os
 import re
 import stat
@@ -18,6 +19,10 @@ NAME_RE = re.compile(r"^ls_[a-z0-9_]{1,48}$")
 SIZE_RE = re.compile(r"^([1-9][0-9]*[MGT]|100%FREE)$")
 UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 SAFE_PATH_RE = re.compile(r"^/[A-Za-z0-9._:/-]+$")
+SENSITIVE_DIAGNOSTIC_RE = re.compile(
+    r"(?i)\b(password|passwd|token|secret|api[_-]?key)\s*([:=])\s*([^\s,;]+)"
+)
+SAFE_DIAGNOSTIC_PREFIX = "layersentry-storage-safe:"
 ALLOWED_PURPOSES = {
     "database-data", "database-wal", "database-logs", "database-backup",
     "application-data", "application-logs", "cache", "temporary",
@@ -32,9 +37,15 @@ ALLOWED_ROOTS = (
 
 def bounded_diagnostic(value: str, limit: int = 512) -> str:
     text = " ".join((value or "").replace("\x00", " ").split())
+    text = SENSITIVE_DIAGNOSTIC_RE.sub(lambda m: "%s%s<redacted>" % (m.group(1), m.group(2)), text)
     if len(text) > limit:
         text = text[:limit] + "..."
     return text
+
+
+def safe_diagnostic_token(value: str) -> str:
+    payload = base64.urlsafe_b64encode(value.encode("utf-8", errors="replace")).decode("ascii").rstrip("=")
+    return SAFE_DIAGNOSTIC_PREFIX + payload
 
 
 def run(argv: List[str], ok: Iterable[int] = (0,), timeout: int = 120) -> Tuple[int, str, str]:
@@ -336,7 +347,7 @@ def main() -> None:
             syslog.syslog(syslog.LOG_ERR, "layersentry_storage failure: %s" % msg)
         except Exception:
             pass
-        module.fail_json(msg=msg)
+        module.fail_json(msg="%s %s" % (safe_diagnostic_token(msg), msg))
 
 
 if __name__ == "__main__":

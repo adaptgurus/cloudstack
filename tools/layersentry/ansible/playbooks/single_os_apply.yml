@@ -24,7 +24,7 @@
           - layersentry_action == 'apply'
           - layersentry_provider in layersentry_role_map
           - layersentry_plan_digest | length == 64
-          - layersentry_operation_id == layersentry_request.operation_id
+          - (layersentry_operation_id == layersentry_request.operation_id) or ((layersentry_recovery_of_operation_id | default('')) == layersentry_request.operation_id)
           - layersentry_service_id == layersentry_request.service_id
           - layersentry_request.topology == 'standalone'
         fail_msg: Invalid, unsupported or mismatched LayerSentry apply invocation.
