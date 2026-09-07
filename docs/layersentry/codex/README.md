@@ -1,87 +1,63 @@
 # LayerSentry — Workstream Index
 
-Current execution routing is defined by:
+Execution authority: `docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`.
 
-`docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`
-
-The active Codex scopes are now:
-
-- **Workstream A — UI / Self-Service finishing**;
-- **Workstream E — RKE2 / Kubernetes / Data Services**, the primary technical stream.
-
-Do not restart the old broad multi-agent A/B/C/D/E/F model.
-
-## Minimal common startup
+## Minimal startup
 
 1. `/AGENTS.md`
-2. `docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`
-3. `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`
-4. one applicable specialist context/workstream
-5. fetch actual source/workflow/live state
+2. `LAYERSENTRY_EXECUTION_CONTRACT.md`
+3. `LAYERSENTRY_PROGRESS_LEDGER.md`
+4. one assigned specialist context/workstream
+5. actual source/workflow/live state
 
 Do not load every workstream or historical handoff.
 
-## Current routing
+## Current activation
 
-| Workstream | Current default |
+| Workstream | Default state |
 | --- | --- |
-| A — UI / Self-service | **Codex**, bounded finishing/optimization/integration only; no broad redesign |
-| B — Release / Installer | ChatGPT by default; exact K8s artifact blockers may be handled inside E |
-| C — Security / Validation | ChatGPT for shared controls; A/E own UI/K8s-specific qualification cases |
-| D — DR / HA / Upgrade | ChatGPT-led, native CloudStack recovery first |
-| E — K8s / DBaaS / APaaS / Streaming | **Primary Codex workstream** |
-| F — VM-native Single-OS | ChatGPT-led, Go + Ansible |
+| A — UI / Self-Service | **DEFERRED**; one bounded final Codex integration/browser pass after backend contracts stabilize |
+| B — Release / Installer | milestone-gated only |
+| C — Security / Validation | milestone/concrete-defect gated only |
+| D — DC/DR | ChatGPT by default; native CloudStack recovery first |
+| E — RKE2 / Kubernetes / Data Services | **ACTIVE PRIMARY CODEX WRITER** |
+| F — VM-native Single-OS | ChatGPT by default; Go + Ansible; manual disposable-VM reset allowed for lab cleanup |
+| Bootstrap/Hypervisor | ChatGPT by default when its lab is available |
 
-## Workstream A objective
+Do not restart the old broad multi-agent model.
 
-```text
-existing LayerSentry UI
- -> audit current defects
- -> optimize/wire APIs
- -> fix RBAC/routes/status/errors
- -> preserve KVM-only UX
- -> exact-artifact browser acceptance
-```
+## Workstream E
 
-Do not design a replacement UI.
-
-## Workstream E objective
+One source writer only.
 
 ```text
-existing E0/E1 source
+existing K8s source
  -> immutable artifacts
- -> deployed controller stack
- -> one real RKE2 lifecycle
- -> 6443/9345
- -> CNI/CCM/CSI/Flux
- -> status/scale/replacement/delete/upgrade
- -> air-gap/failure evidence
- -> install selected upstream services through Flux
+ -> controller deployment
+ -> one real RKE2 cluster
+ -> automatic join + 6443/9345
+ -> one CNI
+ -> CCM
+ -> one safe CSI path
+ -> Flux
+ -> status/scale/replacement/delete/upgrade/air-gap
+ -> upstream service package qualification
 ```
 
-User K8s, DBaaS, APaaS and Streaming profiles reuse the **same RKE2 lifecycle**.
+User K8s, DBaaS, APaaS and Streaming reuse the same RKE2 lifecycle.
 
-For current V1, upstream services are integrations, not rewrite projects:
+Use OpenEverest/OpenBao/Harbor/Strimzi as upstream products. Do not write replacements.
 
-- OpenEverest stable v1 line for supported PostgreSQL/PXC-MySQL/MongoDB;
-- OpenBao Helm content;
-- Harbor Helm content;
-- Strimzi for Kafka.
+A separately provided healthy RKE2 cluster may run a **test-only package lane** for Flux/OpenEverest/OpenBao/Harbor/Strimzi while the primary writer fixes CAPI/CAPC/CAPRKE2. That test lane does not write cluster lifecycle source.
 
-Do not create replacement database/Kafka/application operators or spend Codex on upstream application UI rebranding unless the owner explicitly assigns it.
+## Workstream A
 
-## V1 release carrier
+Do not keep an active UI Codex session while backend contracts move. Activate one final pass when backends are ready enough to validate the existing portal.
 
-Current execution uses one logical signed platform carrier:
+## File fences
 
-`layersentry-platform-<release>.iso`
+Each workstream obeys the hard writable-path fence in `AGENTS.md`. A foreign-module defect is handed to its owner; it is not fixed by the discovering session.
 
-It may contain both platform and optional Data Services/APaaS/Streaming artifacts. Bundled content is `AVAILABLE`; Flux installs only what the selected profile requests.
+## Handoff
 
-## Concurrency
-
-A and E may run separately only with clean file ownership. Coordinate router/config/API-contract changes. Do not run multiple overlapping E implementations against the same K8s source or live cluster.
-
-## Handoff rule
-
-Use repository/workflow/live evidence as authority. State exact commit/artifacts, vertical step reached, tests/live actions, first unmet gate and next action. Keep handoffs concise.
+Keep it short: exact commit/artifact, tests/live actions, first unmet gate and next action. No new master context unless architecture materially changes.
