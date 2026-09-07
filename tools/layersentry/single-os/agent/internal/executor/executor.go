@@ -17,7 +17,7 @@ type OSRunner struct{ Timeout time.Duration; MaxOutput int }
 func (r OSRunner)Run(ctx context.Context, exe string,args ...string)(Result,error){
  if !strings.HasPrefix(exe,"/"){return Result{},errors.New("executable must be absolute")}
  if r.Timeout<=0{r.Timeout=2*time.Minute};if r.MaxOutput<=0{r.MaxOutput=1<<20}
- cctx,cancel:=context.WithTimeout(ctx,r.Timeout);defer cancel();cmd:=exec.CommandContext(cctx,exe,args...);cmd.Env=[]string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin","LANG=C.UTF-8","LC_ALL=C.UTF-8"}
+ cctx,cancel:=context.WithTimeout(ctx,r.Timeout);defer cancel();cmd:=exec.CommandContext(cctx,exe,args...);cmd.Env=[]string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin","LANG=C.UTF-8","LC_ALL=C.UTF-8","ANSIBLE_CONFIG=/usr/lib/layersentry/ansible/ansible.cfg","ANSIBLE_NOCOLOR=1","ANSIBLE_FORCE_COLOR=0","ANSIBLE_DISPLAY_ARGS_TO_STDOUT=false"}
  var out,er bytes.Buffer;cmd.Stdout=&limitedWriter{w:&out,n:r.MaxOutput};cmd.Stderr=&limitedWriter{w:&er,n:r.MaxOutput};err:=cmd.Run();res:=Result{Stdout:out.String(),Stderr:er.String(),ExitCode:0}
  if cctx.Err()!=nil{return res,cctx.Err()};if err!=nil{var ee *exec.ExitError;if errors.As(err,&ee){res.ExitCode=ee.ExitCode()};return res,fmt.Errorf("%s failed: exit=%d",exe,res.ExitCode)};return res,nil
 }
