@@ -1,0 +1,134 @@
+name: LayerSentry Single-OS RPM Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - layersentry/4.22.1.1-ui
+    paths:
+      - 'tools/layersentry/single-os/**'
+      - 'tools/layersentry/ansible/**'
+      - '.github/workflows/layersentry-single-os-rpm.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layersentry-single-os-rpm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Go 1.23
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.23.x'
+          cache: true
+          cache-dependency-path: tools/layersentry/single-os/agent/go.sum
+
+      - name: Install Ansible validation dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ansible-core
+
+      - name: Validate exact source
+        shell: bash
+        run: tools/layersentry/single-os/validate-source.sh
+
+  build-rpm:
+    needs: validate-source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    container:
+      image: rockylinux:9
+    steps:
+      - name: Install Rocky 9 RPM build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          dnf -y install \
+            ca-certificates \
+            coreutils \
+            findutils \
+            gcc \
+            git \
+            glibc-devel \
+            gzip \
+            rpm-build \
+            systemd-rpm-macros \
+            tar
+          rpm --version
+          rpmbuild --version
+          cat /etc/rocky-release
+
+      - name: Checkout exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Go 1.23
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.23.x'
+          cache: false
+
+      - name: Build and inspect exact RPM
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          out="$GITHUB_WORKSPACE/layersentry-rpm-dist"
+          rm -rf "$out"
+          mkdir -p "$out"
+
+          tools/layersentry/single-os/packaging/build-rpm.sh "$out" | tee "$out/build.log"
+
+          mapfile -t rpms < <(find "$out" -maxdepth 1 -type f -name '*.rpm' | sort)
+          if [[ "${#rpms[@]}" -ne 1 ]]; then
+            printf 'RPM_BUILD_FAIL expected_one_rpm found=%s\n' "${#rpms[@]}" >&2
+            exit 1
+          fi
+          rpm_path="${rpms[0]}"
+          rpm_name="$(basename "$rpm_path")"
+          rpm_sha256="$(sha256sum "$rpm_path" | awk '{print $1}')"
+
+          rpm -K "$rpm_path" | tee "$out/RPM-CHECKSIG.txt"
+          rpm -qpi "$rpm_path" > "$out/RPM-INFO.txt"
+          rpm -qlp "$rpm_path" > "$out/RPM-FILES.txt"
+          rpm -qp --requires "$rpm_path" > "$out/RPM-REQUIRES.txt"
+          printf '%s  %s\n' "$rpm_sha256" "$rpm_name" > "$out/RPM-SHA256SUMS"
+
+          {
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'source_sha=%s\n' "$GITHUB_SHA"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'builder_os=%s\n' "$(cat /etc/rocky-release)"
+            printf 'builder_arch=%s\n' "$(uname -m)"
+            printf 'go_version=%s\n' "$(go version)"
+            printf 'rpm_version=%s\n' "$(rpm --version)"
+            printf 'rpm_file=%s\n' "$rpm_name"
+            printf 'rpm_sha256=%s\n' "$rpm_sha256"
+          } > "$out/BUILD-METADATA.txt"
+
+          printf 'EXACT_RPM_BUILD_OK source_sha=%s rpm=%s sha256=%s\n' "$GITHUB_SHA" "$rpm_name" "$rpm_sha256"
+
+      - name: Upload exact RPM and build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: layersentry-single-os-rpm-${{ github.run_id }}-${{ github.run_attempt }}
+          path: layersentry-rpm-dist/
+          if-no-files-found: error
+          retention-days: 30
