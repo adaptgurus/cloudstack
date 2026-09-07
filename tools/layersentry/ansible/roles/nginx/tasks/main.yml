@@ -8,6 +8,27 @@
       - layersentry_resolved_version | length > 0
     fail_msg: Nginx Ansible execution received an unsupported or incomplete plan.
 
+- name: Read existing Nginx owner marker
+  ansible.builtin.slurp:
+    src: /var/lib/layersentryd/state/nginx-owner
+  register: layersentry_nginx_owner
+  failed_when: false
+  changed_when: false
+
+- name: Refuse a foreign Nginx service owner
+  ansible.builtin.assert:
+    that:
+      - layersentry_nginx_owner.failed | default(false) or ((layersentry_nginx_owner.content | b64decode | trim) == layersentry_service_id)
+    fail_msg: nginx.service is already owned by another LayerSentry service.
+
+- name: Persist Nginx owner before mutation
+  ansible.builtin.copy:
+    content: "{{ layersentry_service_id }}\n"
+    dest: /var/lib/layersentryd/state/nginx-owner
+    owner: layersentry
+    group: layersentry
+    mode: '0600'
+
 - name: Resolve Nginx content and config paths
   ansible.builtin.set_fact:
     layersentry_app_mount_root: "{{ layersentry_paths['application-data'] | default('') }}"
