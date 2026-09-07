@@ -1,11 +1,11 @@
 # LayerSentry V1 — Super Master Context
 
-**Context schema:** 4.3  
+**Context schema:** 4.4  
 **Role:** stable product/architecture contract only  
 **Baseline:** Apache CloudStack 4.22.1.1 + LayerSentry KVM-first product layer  
 **Execution policy:** `LAYERSENTRY_EXECUTION_CONTRACT.md`
 
-This file intentionally avoids execution-routing, file-fence and current-status detail so every session does not pay to reread duplicated policy. `AGENTS.md` defines hard AI/file rules. `LAYERSENTRY_EXECUTION_CONTRACT.md` defines scheduling/ownership/lab shortcuts. `LAYERSENTRY_PROGRESS_LEDGER.md` + live evidence define current status.
+This file contains only stable product architecture and non-negotiable production invariants. `AGENTS.md` defines hard AI/file/concurrency rules. `LAYERSENTRY_EXECUTION_CONTRACT.md` defines scheduling and current workstream activation. `LAYERSENTRY_CURRENT_STATUS.md`, module-specific status/release manifests and actual Git/workflow/live evidence define current progress. `LAYERSENTRY_PROGRESS_LEDGER.md` is historical evidence, not normal startup context.
 
 ## 1. Product objective
 
@@ -17,130 +17,90 @@ Customer outcome:
 LayerSentry Portal
   -> VM / storage / network / image / bucket / backup
   -> LayerSentry-managed RKE2/Kubernetes
-  -> Kubernetes DBaaS/APaaS/Streaming
+  -> Kubernetes-backed DBaaS/APaaS/Streaming
   -> VM-native Single-OS DBaaS/APaaS
   -> Backup/Recovery/DR
   -> support/operations/evidence
 ```
 
-Normal customers should not need raw CloudStack internals, YAML/kubectl, RKE2 join tokens, provider replication commands or guest installation scripts.
-
-All product modules remain in canonical LayerSentry scope. A focused audit or execution assignment narrows only the **current work priority**; it must not delete, deprecate or silently redesign unrelated product modules.
+A focused audit or implementation assignment may narrow current work priority, but it does not silently redesign or merge unrelated product modules.
 
 ## 2. CloudStack is the IaaS authority
 
 CloudStack remains authoritative for:
 
 - KVM VM lifecycle;
-- Zones/Sites, Pods, Clusters and Hosts;
+- Sites/Zones, Pods, Clusters and Hosts;
 - networks/VPCs, IPs, firewall/ACL and native LB;
 - primary/secondary/object-storage integrations exposed by CloudStack;
 - volumes, templates, ISOs, snapshots and native Backup & Recovery;
 - account/domain/project/RBAC/quota;
 - async jobs and native resource state.
 
-LayerSentry must not create a second VM scheduler, second tenancy/RBAC authority, second quota authority, second backup catalog or conflicting copy of CloudStack-owned state.
+LayerSentry must not create a second VM scheduler, tenancy/RBAC authority, quota authority, backup catalog or conflicting CloudStack resource inventory.
 
-Implementation order:
+Implementation preference:
 
 ```text
-native CloudStack API
+native CloudStack 4.22.1.1 API
  -> supported provider/plugin/configuration
- -> ecosystem controller when it owns the lifecycle
+ -> mature ecosystem controller when it owns the lifecycle
  -> thin LayerSentry orchestration/policy/evidence
  -> narrow CloudStack core exception only when explicitly approved
 ```
 
-## 3. LayerSentry-managed RKE2/Kubernetes
+## 3. Two DBaaS/APaaS architectures remain separate
 
-Use one cluster lifecycle for user Kubernetes, Data Services, APaaS and Streaming profiles:
+### 3.1 Kubernetes-backed services
+
+Use one LayerSentry-managed RKE2 lifecycle for user Kubernetes, Kubernetes DBaaS, APaaS and Streaming:
 
 ```text
 LayerSentry UI/BFF
-      |
-      v
-     CAPI
-   /      \
- CAPC    CAPRKE2
-  |        |
-CloudStack RKE2
-      |
-      v
- CNI / CCM / CSI
-      |
-      v
- central Flux
-      |
-      +-> selected upstream packages/operators
+ -> CAPI
+    -> CAPC -> CloudStack/KVM
+    -> CAPRKE2 -> RKE2
+ -> CNI/CCM/CSI
+ -> central Flux
+ -> selected upstream packages/operators
 ```
 
 Ownership:
 
 - CloudStack: IaaS;
-- CAPI: cluster/machine desired state;
-- CAPC: CloudStack resources created for CAPI Machines;
+- CAPI/CAPC: cluster/Machine desired state and CloudStack resources created for CAPI Machines;
 - CAPRKE2: RKE2 bootstrap/control-plane lifecycle;
-- CCM: selected Kubernetes L4 LoadBalancer lifecycle;
+- CCM: qualified Kubernetes L4 LoadBalancer lifecycle;
 - CSI: workload-volume lifecycle on the selected certified path;
 - Flux: internal package reconciliation;
-- upstream operators: application/database lifecycle;
-- LayerSentry: UI/BFF, profiles, policy, compatibility, release channels, audit and composite operation state.
+- upstream operators/controllers: database/application lifecycle;
+- LayerSentry: UI/BFF, profiles, policy, compatibility, release channels, audit and composite operation status.
 
-No separate cluster engines for DBaaS/APaaS/Streaming and no competing controllers for the same resource lifecycle.
-
-The approved release fallback, if the CAPI/CAPC/CAPRKE2 path proves disproportionate to maintain, is:
+The approved release fallback, only after the formal CAPC stop-loss decision, is:
 
 ```text
-LayerSentry durable workflow
- -> native CloudStack APIs
- -> hardened QCOW2/cloud-init
- -> Ansible Runner
- -> RKE2
- -> Flux
+native CloudStack APIs -> hardened QCOW2/cloud-init -> Ansible Runner -> RKE2 -> Flux
 ```
 
-A release uses one cluster lifecycle owner.
+One release has one cluster lifecycle owner.
 
-### 3.1 Thin cross-module service-control contract
+### 3.2 VM-native Single-OS services
 
-LayerSentry needs a consistent customer-facing lifecycle across IaaS, Kubernetes, DBaaS, APaaS, Streaming, Single-OS and DR, but this is a **contract over the existing owners**, not a new orchestration engine.
-
-Reuse the existing LayerSentry durable operation/journal/reconciliation mechanisms. Do not introduce another generic workflow engine, desired-state database, resource inventory, scheduler or Kubernetes operator merely to wrap CAPI/CloudStack/Flux/upstream operators.
-
-Customer-facing resources should normalize a small lifecycle vocabulary where applicable:
+This is a separate service model and does not depend on Kubernetes:
 
 ```text
-CREATING / PROVISIONING
-READY
-DEGRADED
-UPDATING
-FAILED
-DELETING
-DELETED
-UNKNOWN
+LayerSentry UI/API
+ -> Go orchestration/control
+ -> Ansible Runner / ansible-core
+ -> versioned roles/playbooks
+ -> Rocky Linux 9 VM
 ```
 
-A thin common operation envelope should expose, where applicable:
+Go owns authorization, schema/plan, confirmation, idempotency/locking, durable state/journal, secret references, execution/results, evidence and recovery state. Ansible owns guest repositories/packages, services, files/users, SELinux, firewalld, LVM/filesystems/mounts, VIP/networking and provider configuration.
 
-```text
-resource identity + tenant/project
-operation identity + action
-lifecycle owner/provider
-requested/desired intent reference
-observed status
-started/updated/completed timestamps
-bounded retry/attempt information
-failure reason / remediation pointer
-evidence/audit correlation
-```
-
-The underlying authoritative state remains with its owner. For example, CAPI/CAPC remain authoritative for CAPI Machines, CloudStack for IaaS resources, Flux/operators for their managed objects, and provider-native DR for replication/promotion state. LayerSentry aggregates and reconciles customer-visible composite status; it does not duplicate those authorities.
-
-A new shared abstraction is justified only when at least two active modules have proven duplicated behavior that cannot be cleanly supplied by an existing owner, and the abstraction demonstrably reduces source, testing and operational complexity.
+The Kubernetes and Single-OS service models may share CloudStack APIs, identity/RBAC, release trust and UI design language, but they do not share lifecycle state machines or runtime certification evidence.
 
 ## 4. Kubernetes DBaaS/APaaS/Streaming
-
-These services run above the same RKE2/Flux substrate.
 
 Current V1 upstream-first choices:
 
@@ -151,31 +111,45 @@ Current V1 upstream-first choices:
 
 LayerSentry supplies service catalog/access, project/namespace/RBAC policy, certified storage/network/VIP choices, compatibility/release selection, local/offline artifact references, health/status/audit integration and E2E qualification.
 
-Do not replace mature upstream DB/Kafka/application lifecycle controllers merely to make the product look more custom. Upstream application UI rebranding is not a V1 requirement unless explicitly added later.
+Do not replace mature upstream DB/Kafka/application lifecycle controllers, backup/PITR engines or upstream UIs merely to make the product look custom.
 
-A catalog entry, Helm chart, operator installation or UI page is not itself a completed managed service. Promotion requires the applicable create/read/update/delete, authorization, storage/network, failure/reconciliation, backup/restore, upgrade/rollback, observability and DR acceptance evidence defined by the module contract.
-
-## 5. VM-native Single-OS
-
-This path is separate from Kubernetes services:
+A catalog entry, UI screen, API endpoint, Helm chart, CRD or operator installation is not a completed managed service. Where applicable, production evidence must trace the complete vertical path:
 
 ```text
-LayerSentry UI/API
- -> Go orchestration/control
- -> Ansible Runner / ansible-core
- -> versioned roles/playbooks
- -> Rocky Linux 9 VM
+UI -> API -> authorization -> backend/orchestrator -> reconciler/operator
+ -> Kubernetes/storage -> persistence/data safety -> failure/retry/UNKNOWN path
+ -> tests -> live evidence
 ```
 
-Go owns authorization, schema/plan, confirmation, idempotency/locking, durable state/journal, secret references, execution/results, evidence and recovery state.
+DB backup/restore/PITR remain in scope only when LayerSentry advertises those DBaaS Day-2 capabilities. They are not evidence of cross-site DR.
 
-Ansible owns guest repositories/packages, services, files/users, SELinux, firewalld, LVM/filesystems/mounts, VIP/networking and DB/application configuration.
+### Current V1 K8s DR boundary
 
-Bash/sh is not the product installation/configuration engine. Build/packaging wrappers may exist when they are not the runtime customer lifecycle.
+Cross-site DR for RKE2 applications, Kubernetes-backed DBaaS and APaaS is **not part of the current K8s/Data Services implementation or audit scope**. Do not add RKE2 application DR, database DC->DR promotion, RKE2 failover/failback, RPO/RTO, cross-site DNS/VIP switching or RKE2 DR UI as Workstream-E completion gates unless the owner explicitly reopens that scope.
+
+The independent LayerSentry DC/DR workstream remains valid for its own approved VM/CloudStack/provider-native scope.
+
+## 5. Kubernetes storage and stateful-data safety
+
+Excluding cross-site RKE2 DR does not remove normal stateful Kubernetes requirements.
+
+Production qualification must still prove, where applicable:
+
+- project/tenant isolation;
+- PVC provision/attach/mount/detach/delete;
+- snapshot/restore if offered;
+- idempotent resize/expansion if offered;
+- CAPC Machine deletion does not destroy unowned CSI workload volumes;
+- stateful Machine replacement preserves and reattaches workload PVC/data;
+- NodeDiskSet ownership for direct node-attached scratch/cache disks;
+- durable database/application data uses certified CSI/PVC storage rather than arbitrary node disks;
+- restart/reconciliation after ambiguous mutations.
+
+CSI/PVC safety is a core Kubernetes production property, not a DR feature.
 
 ## 6. DC/DR/DRaaS
 
-V1 uses native CloudStack recovery first:
+The independent V1 DC/DR path uses native CloudStack recovery first:
 
 ```text
 healthy DC/DR infrastructure
@@ -190,25 +164,9 @@ healthy DC/DR infrastructure
  -> thin LayerSentry recovery orchestration
 ```
 
-After native recovery passes, add only the provider-native low-RPO path required by the selected V1 storage profile, such as LINSTOR/DRBD, Ceph RBD mirroring or certified SAN-native replication.
+After native recovery passes, add only the provider-native low-RPO path required by the selected V1 storage profile, such as LINSTOR/DRBD, Ceph RBD mirroring or certified SAN-native replication. Planned failover/failback precedes witness/fencing/automatic failover.
 
-Planned failover/failback is qualified before witness/fencing/automatic failover. Do not build a generic host block-copy engine when a storage provider already owns safe replication/promotion.
-
-### 6.1 DR protection is composite, not VM-copy only
-
-For Kubernetes DBaaS/APaaS and other stateful services, DR qualification must distinguish the independently authoritative state planes rather than treating VM recovery as application consistency:
-
-```text
-1. CloudStack infrastructure/recovery state
-2. Kubernetes/CAPI/RKE2 control-plane state
-3. database-native data/replication state where applicable
-4. Kubernetes persistent-volume/storage-provider state
-5. APaaS/application configuration and persistent state
-6. service-access state: VIP/LB/Ingress/DNS/TLS
-7. LayerSentry operation/audit/composite-status state
-```
-
-A LayerSentry protection/recovery object may aggregate these planes for UI, policy, RPO/RTO, audit and orchestration, but it must not become a competing replication engine. Promotion/failback must preserve provider ownership, fencing/split-brain safety, recovery-point correctness, health verification and explicit failure state.
+This global DR workstream must not be interpreted as an implicit requirement to implement RKE2 application DR in Workstream E.
 
 ## 7. Bootstrap/control-plane HA
 
@@ -216,7 +174,7 @@ One temporary bootstrap server may seed initial deployment or catastrophic recov
 
 The target control-plane profile uses 3 Management VMs, 3 DB VMs and redundant LB/VIP nodes or a certified external ADC across real failure domains. Normal upgrades use the persistent management plane, not the temporary bootstrap server.
 
-## 8. V1 release model
+## 8. Release model
 
 Use one logical signed platform carrier:
 
@@ -224,15 +182,15 @@ Use one logical signed platform carrier:
 layersentry-platform-<release>.iso
 ```
 
-It may contain QCOW2, RKE2/CAPI/CAPC/CAPRKE2, CNI/CCM/CSI, Flux, OpenEverest/operators/images, OpenBao, Harbor, Strimzi/Kafka, approved security/observability/backup packages, RPM/DEB/local registry content, compatibility metadata, checksums, signatures, SBOM and provenance.
+It may contain QCOW2, RKE2/CAPI/CAPC/CAPRKE2, CNI/CCM/CSI, Flux, OpenEverest/operators/images, OpenBao, Harbor, Strimzi/Kafka, approved security/observability/backup packages, RPM/DEB/local-registry content, compatibility metadata, checksums, signatures, SBOM and provenance.
 
-Bundled means `AVAILABLE`, not installed. Flux installs selected packages. Adding an already-bundled package does not require reinstalling the ISO or cluster unless host/kernel capability changes.
+Bundled means `AVAILABLE`, not installed. Flux installs selected Kubernetes packages.
 
 ## 9. Security invariants
 
 Minimum:
 
-- server-side authorization;
+- server-side authorization and tenant/project binding;
 - strict input/schema validation;
 - safe argv/typed API/module invocation;
 - no untrusted shell interpolation/eval;
@@ -246,33 +204,27 @@ Minimum:
 
 Do not disable security controls to make tests pass.
 
-## 10. Evidence model
+## 10. Evidence and production-readiness model
 
 Valid statuses:
 
-- `DESIGN_DEFINED`
-- `SOURCE_COMPLETE`
-- `CI_VERIFIED`
-- `LIVE_VERIFIED`
-- `PRODUCTION_CERTIFIED`
-- `PARTIAL`
-- `PENDING`
-- `BLOCKED`
-- `UNKNOWN`
-- `NOT_TESTED`
+`DESIGN_DEFINED`, `SOURCE_COMPLETE`, `CI_VERIFIED`, `LIVE_VERIFIED`, `PRODUCTION_CERTIFIED`, `PARTIAL`, `PENDING`, `BLOCKED`, `UNKNOWN`, `NOT_TESTED`.
 
-Source presence is not runtime proof. Unit tests are not E2E proof. A build artifact is not deployed proof. Documentation support is not exact-combination qualification.
+Source presence is not runtime proof. Unit tests are not E2E proof. A build artifact is not deployment proof. Documentation support is not exact-combination qualification.
 
-Progress is measured by complete customer-operable vertical slices, not line/file/commit count.
+A production blocker should identify, at minimum: subsystem, severity, current status, requirement, evidence, failure scenario/impact, owning layer, required fix, validation test/live proof and implementation difficulty/dependency.
+
+Progress is measured by customer-operable vertical slices, not line/file/commit count or a single overall percentage.
 
 ## 11. Stable specialist authorities
 
-Use only when the assigned module requires them:
+Load only when the assigned module requires the detail:
 
 - Kubernetes/RKE2: `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`;
+- Kubernetes exact integration constraints: `LAYERSENTRY_K8S_DBAAS_APAAS_ARCHITECTURE_ADDENDUM.md`;
 - VM-native: `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`;
 - DR: `LAYERSENTRY_DRAAS_ARCHITECTURE.md`;
 - bootstrap/control-plane: `LAYERSENTRY_ANSIBLE_BOOTSTRAP_CONTROL_PLANE_CONTEXT.md`;
 - security details: `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`.
 
-Current source/workflow/live evidence overrides stale specialist text.
+Current source, module status/release manifests, workflow evidence and live state override stale specialist text.
