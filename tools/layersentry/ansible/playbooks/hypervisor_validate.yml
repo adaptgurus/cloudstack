@@ -1,0 +1,47 @@
+---
+- name: LayerSentry KVM hypervisor local validation
+  hosts: layersentry_hypervisors
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  serial: 1
+
+  tasks:
+    - name: Collect service state
+      ansible.builtin.service_facts:
+
+    - name: Validate security and core hypervisor services
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.selinux.status == 'enabled'
+          - ansible_facts.selinux.mode == 'enforcing'
+          - "'firewalld.service' in ansible_facts.services"
+          - ansible_facts.services['firewalld.service'].state == 'running'
+          - "'libvirtd.service' in ansible_facts.services"
+          - ansible_facts.services['libvirtd.service'].state == 'running'
+          - "'cloudstack-agent.service' in ansible_facts.services"
+          - ansible_facts.services['cloudstack-agent.service'].state == 'running'
+        fail_msg: Hypervisor validation failed the SELinux/firewalld/libvirt/CloudStack-agent gate.
+
+    - name: Verify KVM device remains available
+      ansible.builtin.stat:
+        path: /dev/kvm
+      register: layersentry_validate_kvm
+
+    - name: Fail when KVM device is not usable
+      ansible.builtin.assert:
+        that:
+          - layersentry_validate_kvm.stat.exists
+          - layersentry_validate_kvm.stat.ischr | default(false)
+        fail_msg: /dev/kvm is not available after installation.
+
+    - name: Validate management-plane TCP reachability when configured
+      ansible.builtin.wait_for:
+        host: "{{ layersentry_management_probe.host }}"
+        port: "{{ layersentry_management_probe.port }}"
+        connect_timeout: 5
+        timeout: 10
+        state: started
+      when:
+        - layersentry_management_probe.host is defined
+        - layersentry_management_probe.port is defined
