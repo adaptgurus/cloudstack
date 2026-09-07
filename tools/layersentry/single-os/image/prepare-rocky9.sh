@@ -8,13 +8,28 @@ management_cidr="${LAYERSENTRY_MANAGEMENT_CIDR:?set LAYERSENTRY_MANAGEMENT_CIDR}
 agent_rpm="${LAYERSENTRY_AGENT_RPM:?set LAYERSENTRY_AGENT_RPM to the prebuilt LayerSentry RPM}"
 [[ -f "$agent_rpm" && ! -L "$agent_rpm" ]] || { echo "LayerSentry RPM must be a regular local file" >&2; exit 1; }
 
+verify_trusted_rpm_signature() {
+  local rpm_path="$1" label="$2" verification
+  if ! verification="$(rpmkeys -Kv "$rpm_path" 2>&1)"; then
+    printf '%s\n' "$verification" >&2
+    echo "$label signature verification failed" >&2
+    return 1
+  fi
+  if grep -Eiq '(NOKEY|NOT[[:space:]]+OK|BAD|NOTTRUSTED)' <<<"$verification" || \
+     ! grep -Eiq 'Signature[^:]*:[[:space:]]+OK([[:space:]]*)$' <<<"$verification"; then
+    printf '%s\n' "$verification" >&2
+    echo "$label must carry a signature from an RPM trust-store key" >&2
+    return 1
+  fi
+}
+
 # Appliance prerequisites only. Database/application/Keepalived packages remain
 # on-demand and are intentionally absent from the reusable image. ansible-core is
 # the reviewed local execution engine; no Ansible Galaxy content is downloaded.
 dnf -y install ansible-core ca-certificates firewalld audit policycoreutils policycoreutils-python-utils openssh-server chrony python3 dnf-plugins-core xfsprogs e2fsprogs util-linux iproute lvm2 NetworkManager
 "$ROOT/rocky9-hardening" apply --management-cidr "$management_cidr"
 
-rpmkeys --checksig "$agent_rpm" | grep -Eiq 'pgp|rsa|signature' || { echo "LayerSentry RPM signature verification failed" >&2; exit 1; }
+verify_trusted_rpm_signature "$agent_rpm" "LayerSentry RPM"
 dnf -y install "$agent_rpm"
 
 # PostgreSQL vendor repository is optional at image-build time but, when supplied,
@@ -22,7 +37,7 @@ dnf -y install "$agent_rpm"
 if [[ -n "${LAYERSENTRY_PGDG_REPO_RPM:-}" ]]; then
   repo_rpm="$LAYERSENTRY_PGDG_REPO_RPM"
   [[ -f "$repo_rpm" && ! -L "$repo_rpm" ]] || { echo "PGDG repo asset must be a regular local file" >&2; exit 1; }
-  rpmkeys --checksig "$repo_rpm" | grep -Eiq 'pgp|rsa|signature' || { echo "PGDG repository RPM signature verification failed" >&2; exit 1; }
+  verify_trusted_rpm_signature "$repo_rpm" "PGDG repository RPM"
   dnf -y install "$repo_rpm"
 fi
 
