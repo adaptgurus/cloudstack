@@ -15,6 +15,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 NAME_RE = re.compile(r"^ls_[a-z0-9_]{1,48}$")
 SIZE_RE = re.compile(r"^([1-9][0-9]*[MGT]|100%FREE)$")
+UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 ALLOWED_PURPOSES = {
     "database-data", "database-wal", "database-logs", "database-backup",
     "application-data", "application-logs", "cache", "temporary",
@@ -112,8 +113,7 @@ def ensure_fstab(uuid: str, mount_point: str, filesystem: str) -> bool:
     with open(path, "r", encoding="utf-8") as handle:
         old = handle.read()
     line = "UUID=%s %s %s defaults,nofail 0 2" % (uuid, mount_point, filesystem or "auto")
-    lines = old.splitlines()
-    for existing in lines:
+    for existing in old.splitlines():
         fields = existing.split()
         if len(fields) >= 2 and fields[1] == mount_point:
             if existing.strip() == line:
@@ -145,8 +145,7 @@ def ensure_fstab(uuid: str, mount_point: str, filesystem: str) -> bool:
 def ensure_filesystem_and_mount(device: str, item: Dict, recovery_only: bool) -> bool:
     changed = False
     mount_point = clean_mount(item["mount_point"])
-    purpose = item["purpose"]
-    if purpose not in ALLOWED_PURPOSES:
+    if item["purpose"] not in ALLOWED_PURPOSES:
         raise ValueError("unsupported storage purpose")
     requested_fs = item.get("filesystem") or "xfs"
     if requested_fs not in ("xfs", "ext4"):
@@ -186,14 +185,18 @@ def pvs_vg(device: str) -> str:
     return "" if rc == 5 else out.strip()
 
 
-def vg_tags(vg: str) -> str:
+def vg_info(vg: str) -> Tuple[bool, Set[str]]:
     rc, out, _ = run(["/usr/sbin/vgs", "--noheadings", "-o", "vg_tags", vg], ok=(0, 5))
-    return "" if rc == 5 else out.strip()
+    if rc == 5:
+        return False, set()
+    return True, {x.strip() for x in out.split(",") if x.strip()}
 
 
-def lv_exists(vg: str, lv: str) -> bool:
-    rc, _, _ = run(["/usr/sbin/lvs", "--noheadings", "/dev/%s/%s" % (vg, lv)], ok=(0, 5))
-    return rc == 0
+def lv_info(vg: str, lv: str) -> Tuple[bool, Set[str]]:
+    rc, out, _ = run(["/usr/sbin/lvs", "--noheadings", "-o", "lv_tags", "/dev/%s/%s" % (vg, lv)], ok=(0, 5))
+    if rc == 5:
+        return False, set()
+    return True, {x.strip() for x in out.split(",") if x.strip()}
 
 
 def ensure_lvm(service_id: str, groups: List[Dict], root_anc: Set[str], recovery_only: bool) -> bool:
@@ -206,10 +209,10 @@ def ensure_lvm(service_id: str, groups: List[Dict], root_anc: Set[str], recovery
         devices = group.get("devices") or []
         if not devices:
             raise ValueError("LVM group requires devices")
-        real_devices = [reject_os_device(dev, root_anc) for dev in devices]
-        existing_tags = vg_tags(vg)
-        if existing_tags:
-            tags = {x.strip() for x in existing_tags.split(",") if x.strip()}
+        for dev in devices:
+            reject_os_device(dev, root_anc)
+        existed, tags = vg_info(vg)
+        if existed:
             if tag not in tags:
                 raise RuntimeError("refusing to adopt an existing non-LayerSentry volume group")
         elif recovery_only:
@@ -220,13 +223,13 @@ def ensure_lvm(service_id: str, groups: List[Dict], root_anc: Set[str], recovery
                 if not current_vg:
                     if not group.get("initialize_pvs") or not group.get("confirm_pv_initialize"):
                         raise RuntimeError("PV creation requires explicit destructive confirmation")
-                    run(["/usr/sbin/pvcreate", "--yes", "--force", dev], timeout=300)
+                    run(["/usr/sbin/pvcreate", "--yes", "--force", "--force", dev], timeout=300)
                     changed = True
                 elif current_vg != vg:
                     raise RuntimeError("PV is already assigned to another volume group")
             run(["/usr/sbin/vgcreate", "--addtag", tag, vg] + devices, timeout=300)
             changed = True
-        if existing_tags:
+        if existed:
             for dev in devices:
                 current_vg = pvs_vg(dev)
                 if current_vg == vg:
@@ -237,7 +240,7 @@ def ensure_lvm(service_id: str, groups: List[Dict], root_anc: Set[str], recovery
                     raise RuntimeError("recovery cannot add a missing PV to a volume group")
                 if not group.get("initialize_pvs") or not group.get("confirm_pv_initialize"):
                     raise RuntimeError("new PV requires explicit destructive confirmation")
-                run(["/usr/sbin/pvcreate", "--yes", "--force", dev], timeout=300)
+                run(["/usr/sbin/pvcreate", "--yes", "--force", "--force", dev], timeout=300)
                 run(["/usr/sbin/vgextend", vg, dev], timeout=300)
                 changed = True
         lvs = group.get("logical_volumes") or []
@@ -251,7 +254,10 @@ def ensure_lvm(service_id: str, groups: List[Dict], root_anc: Set[str], recovery
                 if free_seen or index != len(lvs) - 1:
                     raise ValueError("100%FREE may be used once and only by final LV")
                 free_seen = True
-            if not lv_exists(vg, name):
+            lv_existed, lv_tags = lv_info(vg, name)
+            if lv_existed and tag not in lv_tags:
+                raise RuntimeError("refusing to adopt an existing non-LayerSentry logical volume")
+            if not lv_existed:
                 if recovery_only:
                     raise RuntimeError("recovery cannot recreate a missing logical volume")
                 argv = ["/usr/sbin/lvcreate", "--addtag", tag, "-n", name]
@@ -278,8 +284,8 @@ def main() -> None:
         supports_check_mode=False,
     )
     service_id = module.params["service_id"]
-    if not re.fullmatch(r"[0-9a-fA-F-]{36}", service_id):
-        module.fail_json(msg="service_id must be canonical UUID-shaped input")
+    if not UUID_RE.fullmatch(service_id):
+        module.fail_json(msg="service_id must be a canonical UUID")
     try:
         root_anc = root_ancestry()
         changed = False
