@@ -7,16 +7,17 @@
 
 This is the primary technical Codex stream.
 
-## 1. Startup
+## 1. Minimal startup
 
 Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
 3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
-4. `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`;
-5. this file;
-6. current `tools/layersentry/k8s/release-candidate-lane-b.json`, branch/workflow/live state.
+4. this file;
+5. current `tools/layersentry/k8s/release-candidate-lane-b.json` plus actual branch/workflow/live state.
+
+Do **not** load the 50k+ Kubernetes Super Master on every session. Open `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` and/or the architecture addendum only when the current gate needs detailed storage/network/VIP/provider/version semantics or an architecture conflict must be resolved.
 
 Open historical evidence only for the exact failing gate.
 
@@ -26,17 +27,18 @@ Writable by the primary K8s writer:
 
 - `tools/layersentry/k8s/**`;
 - K8s-specific tests/evidence;
-- exact K8s artifact/build/workflow files when required by the failing gate.
+- `.github/workflows/layersentry-k8s-*` when a module-specific workflow directly closes the failing K8s gate.
 
 Do not edit:
 
 - `ui/**`;
 - `tools/layersentry/single-os/**`;
-- `tools/layersentry/ansible/**` unless the approved CAPI fallback has been formally selected for the release;
+- `tools/layersentry/ansible/**` unless the approved CAPI fallback has been formally selected and separately assigned;
 - `tools/layersentry/dr*`;
+- generic release/security workflows/tooling;
 - global authority files.
 
-When a foreign-module defect is discovered, record the exact contract/failure and hand it to that module. Do not fix it here.
+If a generic release/signing workflow blocks an immutable K8s artifact, hand the exact requirement to the milestone release owner instead of expanding this workstream.
 
 Only **one K8s source writer** is allowed at a time.
 
@@ -101,7 +103,7 @@ immutable artifacts
 
 Do not work on the next item while the current gate fails.
 
-For each failure: capture exact evidence, classify the owning layer, fix the smallest correct owner inside this file fence, add regression coverage, rebuild/redeploy the affected immutable artifact, rerun the same step.
+For each failure: capture exact evidence, classify the owning layer, fix the smallest correct owner inside this file fence, add regression coverage, rebuild/redeploy the affected immutable artifact, and rerun the same step.
 
 ## 6. CAPC/CAPRKE2 stop-loss
 
@@ -137,7 +139,11 @@ Use it to test, in parallel with the primary lifecycle work:
 - backup/restore where available;
 - local-registry/offline package behavior.
 
-This lane is **test-only/read-mostly** and must not edit CAPI/CAPC/CAPRKE2 lifecycle source. If it finds a package/manifest source defect, send the exact failure to the primary K8s writer. This prevents two Codex agents from implementing competing K8s stacks.
+This lane is **test-only/read-mostly**. It must not commit lifecycle source or create a second CAPI/CAPC/CAPRKE2 implementation.
+
+Evidence from this cluster proves only the scoped package/application behavior on that target. It does **not** by itself promote the complete LayerSentry K8s/DBaaS stack to `LIVE_VERIFIED`; the same pinned package must later pass on the LayerSentry-owned cluster path with the certified CloudStack project/storage/network boundaries.
+
+If the package lane finds a manifest/source defect, report the exact failure to the primary K8s writer.
 
 ## 8. Upstream services — no rewrites
 
@@ -157,6 +163,8 @@ LayerSentry integration is limited to Flux source/HelmRelease, namespace/RBAC/pr
 ## 9. One platform carrier
 
 Current V1 uses `layersentry-platform-<release>.iso` as one logical signed carrier. Bundled packages are `AVAILABLE`, not installed; Flux installs only selected packages.
+
+Older specialist sections describing separate K8s/Data Services carriers or mandatory OpenEverest rebranding are superseded for current V1 execution by `LAYERSENTRY_EXECUTION_CONTRACT.md`.
 
 ## 10. UI coordination
 
