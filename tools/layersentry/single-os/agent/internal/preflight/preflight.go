@@ -92,21 +92,17 @@ func validateNetwork(n model.NetworkSpec) error {
 			return errors.New("invalid listen IP")
 		}
 		deferredSecondary := n.VIP.Mode == "secondary" && n.ListenAddress == n.VIP.Address
-		wildcardVRRP := n.VIP.Mode == "vrrp" && n.ListenAddress == "0.0.0.0"
+		wildcardVRRP := n.VIP.Mode == "vrrp" && ip.IsUnspecified()
 		if !deferredSecondary && !wildcardVRRP {
-			found := false
-			ifs, _ := net.Interfaces()
-			for _, i := range ifs {
-				addrs, _ := i.Addrs()
-				for _, a := range addrs {
-					host, _, _ := net.ParseCIDR(a.String())
-					if host != nil && host.Equal(ip) {
-						found = true
-					}
-				}
-			}
-			if !found {
+			if ip.IsUnspecified() {
 				return fmt.Errorf("listen IP %s is not assigned to this guest", n.ListenAddress)
+			}
+			probe, err := net.Listen("tcp", net.JoinHostPort(n.ListenAddress, "0"))
+			if err != nil {
+				return fmt.Errorf("listen IP %s is not assigned to this guest: %w", n.ListenAddress, err)
+			}
+			if err = probe.Close(); err != nil {
+				return err
 			}
 		}
 	}
@@ -120,7 +116,7 @@ func validateNetwork(n model.NetworkSpec) error {
 		if n.VIP.Mode == "secondary" && n.ListenAddress == n.VIP.Address {
 			bind = "0.0.0.0"
 		}
-		ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", bind, n.Port))
+		ln, err := net.Listen("tcp", net.JoinHostPort(bind, strconv.Itoa(n.Port)))
 		if err != nil {
 			return fmt.Errorf("requested port unavailable: %w", err)
 		}
