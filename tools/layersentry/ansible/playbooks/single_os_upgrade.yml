@@ -1,0 +1,44 @@
+---
+- name: Upgrade LayerSentry Single-OS PostgreSQL within confirmed release line
+  hosts: layersentry_single_os
+  gather_facts: true
+  become: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require immutable upgrade invocation
+      ansible.builtin.assert:
+        that:
+          - layersentry_action == 'upgrade'
+          - layersentry_provider == 'postgresql'
+          - layersentry_plan_digest | length == 64
+          - layersentry_request.topology == 'standalone'
+        fail_msg: Invalid PostgreSQL upgrade invocation.
+
+    - name: Validate Rocky Linux and security baseline
+      ansible.builtin.include_role:
+        name: rocky9_base
+
+    - name: Observe and remount existing storage without destructive replay
+      ansible.builtin.include_role:
+        name: storage_lvm
+      vars:
+        layersentry_recovery_only: true
+
+    - name: Install exact upgraded package and reconcile configuration
+      ansible.builtin.include_role:
+        name: postgresql
+
+    - name: Reconcile firewall and optional VIP
+      ansible.builtin.include_role:
+        name: network_vip
+      vars:
+        layersentry_network_state: present
+
+    - name: Flush network handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Restart PostgreSQL after same-line upgrade
+      ansible.builtin.systemd_service:
+        name: "postgresql-{{ layersentry_request.release_line }}.service"
+        enabled: true
+        state: restarted
