@@ -1,6 +1,6 @@
 # LayerSentry Single-OS DBaaS/APaaS — Super Master Context
 
-**Schema:** 2.0  
+**Schema:** 2.1  
 **Execution owner:** ChatGPT by default  
 **Architecture:** Go orchestration + Ansible Runner  
 **Guest baseline:** Rocky Linux 9  
@@ -8,7 +8,25 @@
 
 This context governs the VM-native LayerSentry DBaaS/APaaS path. It is separate from the Kubernetes-managed service plane.
 
-Current source/runtime status belongs in `LAYERSENTRY_PROGRESS_LEDGER.md` and evidence. The presence of existing Go/provider code does not by itself imply live certification.
+Current source/runtime status belongs in `LAYERSENTRY_PROGRESS_LEDGER.md` and the module checkpoint `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`. The presence of existing Go/provider code does not by itself imply live certification, and the selected Go + Ansible architecture does not imply that the Ansible execution tree has already been implemented.
+
+## 0. Continuity and implementation-state rule
+
+A session reset must not cause implementation truth to regress to an older document state.
+
+Use these rules:
+
+- current fetched repository source is authoritative for what implementation exists;
+- `docs/layersentry/evidence/single-os/CURRENT_STATUS.md` is the concise Single-OS status pointer and is subordinate to the global Progress Ledger for project-wide status;
+- historical dated handoffs are audit/implementation history, not normal startup authority;
+- preserve the substantial existing Go control/guest source under `tools/layersentry/single-os/agent/`;
+- the Go→Ansible architecture below is a migration target until `tools/layersentry/ansible/` and the bounded Go Runner integration actually exist;
+- do not call Ansible current implementation merely because this architecture requires it;
+- do not inherit source-test/CI claims whose referenced evidence artifact is absent.
+
+The continuity reconciliation is:
+
+`docs/layersentry/evidence/single-os/2026-09-07-single-os-continuity-authority-reconciliation.md`
 
 ## 1. Product objective
 
@@ -106,9 +124,23 @@ Retain the existing Go implementation where it provides durable product control:
 
 Do not keep growing Go with large amounts of imperative package/configuration logic that Ansible handles more safely and maintainably.
 
+### 4.2 Migration boundary from the existing implementation
+
+The current branch already contains substantial imperative Go guest/provider execution. That source is implementation investment, not disposable scaffolding.
+
+For each migrated function:
+
+1. preserve Go schema/security/plan/idempotency/journal/evidence semantics;
+2. implement the equivalent idempotent Ansible role/playbook;
+3. wire Go to the approved Ansible contract;
+4. add negative/idempotency tests;
+5. remove/deprecate the duplicate imperative runtime path only after equivalent coverage exists.
+
+Do not maintain two active authorities for the same provider action and do not rewrite the Go control plane from zero.
+
 ## 5. Ansible responsibility
 
-Ansible is the approved installation/configuration engine.
+Ansible is the approved target installation/configuration engine.
 
 Target source layout:
 
@@ -157,6 +189,8 @@ Ansible owns, as applicable:
 - patch/upgrade;
 - repair/reconcile;
 - uninstall/residue cleanup.
+
+Until the target Ansible tree and Runner integration exist in current source, this section is `DESIGN_DEFINED` behavior, not evidence that Ansible currently executes the lifecycle.
 
 ## 6. No shell-script installation
 
@@ -374,6 +408,8 @@ Use repository-wide statuses.
 - actual Rocky execution may reach `LIVE_VERIFIED` for the exact tested provider/topology;
 - real multi-node HA/replication/failover remains below live certification until exercised on a real multi-node environment;
 - `PRODUCTION_CERTIFIED` requires provider-specific security, backup/recovery, upgrade/rollback, resource/performance and supported-topology evidence.
+
+The current status pointer must not promote the existing Go implementation or future Ansible implementation beyond the evidence actually present in Git/workflows/live targets.
 
 ## 18. Execution ownership
 
