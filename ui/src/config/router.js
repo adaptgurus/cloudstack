@@ -280,13 +280,19 @@ export function asyncRouterMap () {
     }
   ]
 
+  const routedPrimaryChildren = primaryChildren.filter(route => {
+    if (route.name !== 'kubernetesDataServices') return true
+    return isLayersentryKvmProfile() &&
+      vueProps.$config?.layersentry?.features?.kubernetesDataServices?.enabled === true
+  })
+
   const routerMap = [{
     path: '/',
     name: 'index',
     component: shallowRef(BasicLayout),
     meta: { icon: 'HomeOutlined' },
     redirect: '/dashboard',
-    children: applyLayersentryNavigation(primaryChildren, store.getters.userInfo, vueProps.$config, store.getters.apis)
+    children: applyLayersentryNavigation(routedPrimaryChildren, store.getters.userInfo, vueProps.$config, store.getters.apis)
   },
   {
     path: '/:catchAll(.*)', redirect: '/exception/404', hidden: true
