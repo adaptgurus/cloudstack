@@ -1,4 +1,4 @@
-name: LayerSentry Single-OS Source Validation
+name: LayerSentry Single-OS Exact Validation
 
 on:
   workflow_dispatch:
@@ -9,21 +9,21 @@ on:
       - '.github/workflows/layersentry-single-os-source-validation.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: layersentry-temp-single-os-format
+  group: layersentry-temp-single-os-validation
   cancel-in-progress: false
 
 jobs:
-  format-shared:
+  validate-shared:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
-      - name: Checkout temporary control ref
+      - name: Checkout temporary controller
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Set up Go 1.23
@@ -32,62 +32,62 @@ jobs:
           go-version: '1.23.x'
           cache: false
 
-      - name: Format newest shared Single-OS source and fast-forward push
+      - name: Install Ansible validation dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y --no-install-recommends ansible-core >/dev/null
+          go version
+          python3 --version
+          ansible-playbook --version | head -1
+
+      - name: Run exact requested validation matrix on newest shared HEAD
         shell: bash
         run: |
           set -euo pipefail
           shared='layersentry/4.22.1.1-ui'
-          out="$RUNNER_TEMP/layersentry-format"
-          mkdir -p "$out"
-
+          out="$RUNNER_TEMP/layersentry-validation"
+          mkdir -p "$out/logs" "$out/bin"
           git fetch --no-tags origin "+refs/heads/${shared}:refs/remotes/origin/${shared}"
           git checkout --detach "refs/remotes/origin/${shared}"
-          base="$(git rev-parse HEAD)"
-          printf 'base_sha=%s\n' "$base" | tee "$out/metadata.txt"
+          sha="$(git rev-parse HEAD)"
+          printf 'source_sha=%s\n' "$sha" | tee "$out/metadata.txt"
+          go version | tee -a "$out/metadata.txt"
+          python3 --version 2>&1 | tee -a "$out/metadata.txt"
+          ansible-playbook --version | head -1 | tee -a "$out/metadata.txt"
 
           agent="$GITHUB_WORKSPACE/tools/layersentry/single-os/agent"
-          mapfile -d '' gofiles < <(find "$agent" -type f -name '*.go' -print0 | sort -z)
-          if ((${#gofiles[@]} == 0)); then
-            echo 'no Go source found' >&2
-            exit 1
-          fi
+          overall=0
+          gate() {
+            name="$1"; shift
+            set +e
+            "$@" >"$out/logs/${name}.log" 2>&1
+            rc=$?
+            set -e
+            printf '%s=%d\n' "$name" "$rc" | tee -a "$out/status.txt"
+            if (( rc != 0 )); then overall=1; fi
+          }
 
-          gofmt -d "${gofiles[@]}" > "$out/gofmt.patch"
-          sha256sum "$out/gofmt.patch" | tee "$out/gofmt.patch.sha256"
-          printf '%s\0' "${gofiles[@]}" | xargs -0 gofmt -w
+          gate gofmt bash -lc 'agent="$1"; mapfile -d "" f < <(find "$agent" -type f -name "*.go" -print0 | sort -z); test ${#f[@]} -gt 0; test -z "$(gofmt -l "${f[@]}")"' _ "$agent"
+          gate go_mod_tidy_diff bash -lc 'cd "$1" && go mod tidy -diff' _ "$agent"
+          gate go_test bash -lc 'cd "$1" && go test -count=1 ./...' _ "$agent"
+          gate go_vet bash -lc 'cd "$1" && go vet ./...' _ "$agent"
+          gate build_layersentryd bash -lc 'cd "$1" && go build -o "$2" ./cmd/layersentryd' _ "$agent" "$out/bin/layersentryd"
+          gate build_layersentryctl bash -lc 'cd "$1" && go build -o "$2" ./cmd/layersentryctl' _ "$agent" "$out/bin/layersentryctl"
+          gate python_compile bash -lc 'python3 -m compileall -q "$1" "$2"' _ "$GITHUB_WORKSPACE/tools/layersentry/single-os" "$GITHUB_WORKSPACE/tools/layersentry/ansible"
+          gate ansible_syntax bash -lc 'set -euo pipefail; root="$1"; while IFS= read -r -d "" f; do ansible-playbook -i localhost, --syntax-check "$f"; done < <(find "$root" -type f \( -name "*.yml" -o -name "*.yaml" \) -path "*/playbooks/*" -print0 | sort -z)' _ "$GITHUB_WORKSPACE/tools/layersentry"
+          gate shell_syntax bash -lc 'set -euo pipefail; root="$1"; while IFS= read -r -d "" f; do bash -n "$f"; done < <(find "$root" -type f -name "*.sh" -print0 | sort -z)' _ "$GITHUB_WORKSPACE/tools/layersentry"
 
-          if git diff --quiet -- tools/layersentry/single-os/agent; then
-            echo 'No formatter changes remain on newest shared HEAD.'
-            exit 0
-          fi
+          printf 'overall=%d\n' "$overall" | tee -a "$out/status.txt"
+          cat "$out/status.txt"
+          exit "$overall"
 
-          while IFS= read -r path; do
-            case "$path" in
-              tools/layersentry/single-os/agent/*.go) ;;
-              *) echo "unexpected formatter path: $path" >&2; exit 1 ;;
-            esac
-          done < <(git diff --name-only)
-
-          git diff --check
-          git config user.name 'LayerSentry CI'
-          git config user.email 'layersentry-ci@users.noreply.github.com'
-          git add -- tools/layersentry/single-os/agent
-          git commit -m 'style(layersentry): apply Single-OS gofmt'
-          commit="$(git rev-parse HEAD)"
-          printf 'formatter_commit=%s\n' "$commit" | tee -a "$out/metadata.txt"
-
-          remote="$(git ls-remote origin "refs/heads/${shared}" | awk '{print $1}')"
-          if [[ "$remote" != "$base" ]]; then
-            echo "shared ref moved during formatting: base=$base remote=$remote" >&2
-            exit 75
-          fi
-          git push origin "HEAD:refs/heads/${shared}"
-
-      - name: Upload reconciled formatter evidence
+      - name: Upload exact validation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: layersentry-reconciled-gofmt-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/layersentry-format/
+          name: layersentry-exact-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/layersentry-validation/
           if-no-files-found: warn
           retention-days: 1
