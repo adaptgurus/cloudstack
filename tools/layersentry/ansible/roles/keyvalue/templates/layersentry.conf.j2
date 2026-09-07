@@ -1,0 +1,13 @@
+# Managed by LayerSentry. Plaintext passwords are never persisted here.
+bind {{ layersentry_request.network.listen_address }}
+protected-mode yes
+port {{ layersentry_request.network.port }}
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+supervised systemd
+daemonize no
+dir {{ layersentry_kv_vendor_data }}
+dbfilename dump.rdb
+appendonly no
+user default on resetpass #{{ (layersentry_secrets_b64.admin_password | b64decode) | hash('sha256') }} ~* &* +@all
