@@ -2,27 +2,35 @@
 
 **Status:** `SUPERSEDED_FOR_EXECUTION`
 
-This filename is retained only for compatibility with old prompts/bookmarks. It is **not** current execution authority and must not be used to start A/B/C/D/E parallel Codex workstreams.
+This filename is retained only for compatibility with old prompts/bookmarks. It is **not** current execution authority and must not be used to start historical parallel Codex workstreams.
 
-Current execution order is:
+Current startup:
 
 1. `/AGENTS.md`
 2. `docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`
-3. `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`
-4. exactly one active workstream file
+3. `docs/layersentry/LAYERSENTRY_CURRENT_STATUS.md`
+4. exactly one assigned workstream/module-status pointer
 5. actual current source/workflow/live state
 
-Current workstream activation is indexed in `docs/layersentry/codex/README.md` and the current Codex launcher is `docs/layersentry/CODEX_4_AGENT_RUNBOOK.md` despite its historical filename.
+Current Codex launcher:
+
+`docs/layersentry/LAYERSENTRY_CODEX_EXECUTION_RUNBOOK.md`
+
+Current workstream activation index:
+
+`docs/layersentry/codex/README.md`
+
+Do not load the full historical Progress Ledger, old multi-agent contexts or historical handoffs by default.
 
 Key current decisions:
 
 - one standing Codex source writer: RKE2/Kubernetes Workstream E;
-- UI Workstream A is a deferred bounded final pass;
-- B/C are milestone/concrete-defect gated, not standing Codex streams;
-- D and F are ChatGPT-led by default unless explicitly reassigned;
+- UI is a deferred bounded final pass;
+- B/C are milestone/concrete-defect gated;
+- D/F/bootstrap are separate non-overlapping streams by default;
 - one RKE2 lifecycle serves user K8s, DBaaS, APaaS and Streaming;
-- OpenEverest/OpenBao/Harbor/Strimzi are upstream integration targets, not rewrite projects;
-- current V1 uses one logical signed `layersentry-platform-<release>.iso` carrier;
-- hard module file fences in `AGENTS.md` prohibit cross-module edits.
+- OpenEverest/OpenBao/Harbor/Strimzi are upstream integration targets;
+- V1 uses one logical signed `layersentry-platform-<release>.iso` carrier;
+- hard module file fences and writer-collision detection prevent cross-module drift.
 
-Historical detail formerly stored in this file remains available in Git history. Do not copy old execution routing, two-bundle packaging assumptions or multi-agent integration ordering from historical revisions into current work.
+Historical detail formerly stored in this file remains available in Git history. Do not resurrect old execution routing, two-bundle assumptions or multi-agent integration ordering.
