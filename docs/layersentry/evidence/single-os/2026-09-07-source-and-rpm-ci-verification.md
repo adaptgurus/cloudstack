@@ -6,15 +6,15 @@ Status: `CI_VERIFIED` for source validation and exact RPM construction only
 
 This record does **not** claim `LIVE_VERIFIED`, production certification, or provider lifecycle acceptance on a real Rocky Linux 9 VM.
 
-## Source validation
+## Current certified source validation
 
 Exact verified source SHA:
 
-`1387794a4e1123746f734815c946cb58e5aea0be`
+`f2aee691867d974c2eb0b28184d92b4567100ce8`
 
 GitHub Actions workflow: `LayerSentry Single-OS Source Validation`  
-Run: `34122976977`  
-Job: `101745048201`  
+Run: `34126279393`  
+Job: `101755596059`  
 Conclusion: `success`
 
 The gate completed:
@@ -28,76 +28,72 @@ The gate completed:
 - Ansible syntax checks for all Single-OS playbooks using checkout-local CI temp/search paths while preserving production Ansible configuration;
 - shell syntax checks.
 
-Terminal success marker:
+Durable source-validation evidence artifact:
 
-`SINGLE_OS_SOURCE_VALIDATION_OK`
+- artifact ID: `10020246403`;
+- artifact name: `layersentry-single-os-source-34126279393-1`;
+- artifact ZIP SHA-256: `b0ce98514a78add677ba509f909ea5a4357f50b9c8fe949ccb8a47f43bb30735`;
+- retention expiry: `2026-10-07T13:15:51Z`.
 
-Durable evidence artifact:
-
-- artifact ID: `10018963979`;
-- artifact name: `layersentry-single-os-source-34122976977-1`;
-- artifact ZIP SHA-256: `9c259ba409c22904261c5fd70b04d116b17d6e025212ef5bd9e2c2d6f4ca5c37`;
-- retention: 30 days from creation.
-
-## Exact Rocky 9 RPM build
+## Current exact Rocky 9 RPM build
 
 Exact packaged source SHA:
 
-`5e22bed39998a93b1a9c3dca65cda2566a380ba6`
-
-The packaging SHA contains only CI workflow changes after the source gate; the RPM workflow first reran and passed the same Single-OS source validator before packaging.
+`f2aee691867d974c2eb0b28184d92b4567100ce8`
 
 GitHub Actions workflow: `LayerSentry Single-OS RPM Build`  
-Run: `34124256595`  
-Source-validation job: `101749090990` — `success`  
-Rocky RPM job: `101749349783` — `success`
+Run: `34126279307`  
+Source-validation job: `101755594909` — `success`  
+Rocky RPM job: `101755869061` — `success`
 
-Builder facts:
-
-- container image: `rockylinux:9`;
-- pulled image digest: `sha256:d7be1c094cc5845ee815d4632fe377514ee6ebcf8efaed6892889657e5ddaaa6`;
-- observed builder release: `Rocky Linux release 9.3 (Blue Onyx)`;
-- architecture: `x86_64`;
-- Go: `go1.23.12 linux/amd64`;
-- RPM/rpmbuild: `4.16.1.3`.
+The RPM workflow reran and passed the same Single-OS source validator before packaging.
 
 Canonical builder:
 
 `tools/layersentry/single-os/packaging/build-rpm.sh`
 
-Exact RPM:
+Exact RPM for the next live qualification:
 
 `layersentry-single-os-0.2.0-1.el9.x86_64.rpm`
 
 RPM SHA-256:
 
-`a47d6fce81f19a87ce7c02374551775541f0a93aadaddf44c6bb96a25bd24d45`
-
-Package inspection completed successfully:
-
-- `rpm -K` reported `digests OK`;
-- package metadata inspection passed;
-- packaged file-list inspection passed;
-- dependency inspection passed;
-- exactly one RPM was accepted by the gate.
-
-`rpmbuild` emitted non-fatal missing-build-id warnings for `layersentryd` and `layersentryctl`. These warnings did not fail the RPM build, but release hardening/signing remains a later certification gate.
+`5ddfa332d222a616f9d9749282540ab3a4acaad64b4b4cba767236a0d4b58fe1`
 
 Durable RPM artifact:
 
-- artifact ID: `10019489680`;
-- artifact name: `layersentry-single-os-rpm-34124256595-1`;
-- artifact ZIP SHA-256: `7288cbdb8e45afdab8223ee78575a1a77139d9f7058ae18383cd20b9b9c8ad1e`;
-- size: `3,181,838` bytes;
-- retention expiry: `2026-10-07T12:54:42Z`.
+- artifact ID: `10020266864`;
+- artifact name: `layersentry-single-os-rpm-34126279307-1`;
+- artifact ZIP SHA-256: `6d06d4364a589ece107415b8c5734c6388e4030eeb47f897d7871f292aeea5fb`;
+- size: `3,181,750` bytes;
+- retention expiry: `2026-10-07T13:16:23Z`.
+
+The artifact was independently downloaded after CI. Its ZIP SHA-256 matched the Actions artifact digest, and the contained RPM independently hashed to the exact RPM SHA-256 above. The embedded `BUILD-METADATA.txt` records source SHA `f2aee691867d974c2eb0b28184d92b4567100ce8`, run `34126279307`, Rocky Linux 9.3 builder, x86_64, Go 1.23.12 and RPM 4.16.1.3.
+
+## Acceptance-harness closure included in this source
+
+`tools/layersentry/single-os/acceptance/postgresql-e2e.py` now exercises the live gates that were previously documented but not directly asserted by the client:
+
+- exact successful install replay using the same operation ID, idempotency key and confirmed plan digest, requiring the same successful operation rather than a second mutation;
+- post-reboot `repair` followed by `upgrade`;
+- SQL marker integrity after repair/upgrade before uninstall;
+- existing backup/restore, reboot recovery, restart, uninstall residue and customer-data-preservation checks remain in the flow.
+
+This is source/CI evidence only. Those assertions are not `LIVE_VERIFIED` until executed on the real Rocky 9 target.
+
+## Superseded CI package
+
+The earlier CI-verification record used source SHA `5e22bed39998a93b1a9c3dca65cda2566a380ba6` and RPM SHA-256 `a47d6fce81f19a87ce7c02374551775541f0a93aadaddf44c6bb96a25bd24d45` from run `34124256595`.
+
+That package remains historical evidence but is **not** the artifact to use for the next live qualification because the acceptance source subsequently changed and a new exact package was built and certified from `f2aee691867d974c2eb0b28184d92b4567100ce8`.
 
 ## Certification boundary
 
 The following remain `NOT_TESTED` / not live-certified:
 
-- installation of the exact RPM on a fresh Rocky Linux 9 VM;
+- installation of the current exact RPM on a fresh Rocky Linux 9 VM;
 - separate non-OS data-disk inventory and destructive-operation safety proof against the live root/OS disk;
-- PostgreSQL standalone exact-artifact plan/install/health/read-write/idempotent rerun/reboot/start/stop/restart;
+- PostgreSQL standalone exact-artifact plan/install/health/read-write/idempotent replay/reboot/start/stop/restart;
 - backup/restore verification on the exact installed artifact;
 - repair/upgrade acceptance;
 - uninstall and residue audit;
@@ -109,8 +105,10 @@ The following remain `NOT_TESTED` / not live-certified:
 
 1. obtain or provision a clean disposable Rocky Linux 9 VM;
 2. attach a separate non-OS data disk;
-3. install the exact RPM identified above and verify its SHA-256 before installation;
+3. transfer `layersentry-single-os-0.2.0-1.el9.x86_64.rpm` from artifact `10020266864` and verify SHA-256 `5ddfa332d222a616f9d9749282540ab3a4acaad64b4b4cba767236a0d4b58fe1` before installation;
 4. execute `acceptance/storage-inventory.py` and `acceptance/root-disk-negative.py`;
 5. execute the PostgreSQL standalone exact-artifact acceptance flow with `acceptance/postgresql-e2e.py` and supporting preparation/install scripts;
-6. persist exact host, artifact, commands, outputs and failure/reset state;
-7. do not promote beyond `CI_VERIFIED` until those live gates pass.
+6. perform the required real VM reboot between phase 1 and phase 2;
+7. persist exact host, artifact, commands, outputs and failure/reset state;
+8. if a destructive or ambiguous failure dirties the VM, stop and report `LAB_RESET_REQUIRED` rather than continuing on an uncertain guest;
+9. do not promote beyond `CI_VERIFIED` until those live gates pass.
