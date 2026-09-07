@@ -181,7 +181,7 @@ func TestValidateAcceptsVRRPClusterSchema(t *testing.T) {
 	r.Topology = "cluster"
 	r.Network.ListenAddress = "0.0.0.0"
 	r.Cluster = model.ClusterSpec{Role: "primary", Peers: []string{"10.0.0.2"}}
-	r.Network.VIP = model.VIPSpec{Mode: "vrrp", Address: "10.0.0.50", PrefixLength: 24, Interface: "eth0", State: "MASTER", VirtualRouterID: 51, Priority: 150, Peers: []string{"10.0.0.2"}}
+	r.Network.VIP = model.VIPSpec{Mode: "vrrp", Address: "10.0.0.50", PrefixLength: 24, Interface: "eth0", SourceAddress: "10.0.0.1", State: "MASTER", VirtualRouterID: 51, Priority: 150, Peers: []string{"10.0.0.2"}}
 	if err := Validate(r); err != nil {
 		t.Fatalf("VRRP schema rejected: %v", err)
 	}
