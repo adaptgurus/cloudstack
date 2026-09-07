@@ -16,6 +16,7 @@ from ansible.module_utils.basic import AnsibleModule
 NAME_RE = re.compile(r"^ls_[a-z0-9_]{1,48}$")
 SIZE_RE = re.compile(r"^([1-9][0-9]*[MGT]|100%FREE)$")
 UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+SAFE_PATH_RE = re.compile(r"^/[A-Za-z0-9._:/-]+$")
 ALLOWED_PURPOSES = {
     "database-data", "database-wal", "database-logs", "database-backup",
     "application-data", "application-logs", "cache", "temporary",
@@ -45,16 +46,16 @@ def run(argv: List[str], ok: Iterable[int] = (0,), timeout: int = 120) -> Tuple[
 
 
 def clean_mount(path: str) -> str:
-    if not path or not os.path.isabs(path) or os.path.normpath(path) != path:
-        raise ValueError("mount point must be canonical absolute path")
+    if not path or not SAFE_PATH_RE.fullmatch(path) or not os.path.isabs(path) or os.path.normpath(path) != path:
+        raise ValueError("mount point must be canonical and contain only safe path characters")
     if not any(path == root or path.startswith(root + os.sep) for root in ALLOWED_ROOTS):
         raise ValueError("mount point is outside approved LayerSentry roots")
     return path
 
 
 def real_block(device: str, require_by_id: bool = True) -> str:
-    if require_by_id and not device.startswith("/dev/disk/by-"):
-        raise ValueError("attached device must use /dev/disk/by-* identity")
+    if require_by_id and (not device.startswith("/dev/disk/by-") or not SAFE_PATH_RE.fullmatch(device)):
+        raise ValueError("attached device must use safe /dev/disk/by-* identity")
     real = os.path.realpath(device)
     st = os.stat(real)
     if not stat.S_ISBLK(st.st_mode):
@@ -180,9 +181,14 @@ def ensure_filesystem_and_mount(device: str, item: Dict, recovery_only: bool) ->
     return changed
 
 
-def pvs_vg(device: str) -> str:
-    rc, out, _ = run(["/usr/sbin/pvs", "--noheadings", "-o", "vg_name", device], ok=(0, 5))
-    return "" if rc == 5 else out.strip()
+def pv_info(device: str) -> Tuple[bool, str]:
+    rc, out, _ = run(["/usr/sbin/pvs", "--noheadings", "--separator", "|", "-o", "pv_name,vg_name", device], ok=(0, 5))
+    if rc == 5:
+        return False, ""
+    fields = [x.strip() for x in out.split("|")]
+    if not fields or not fields[0]:
+        return False, ""
+    return True, fields[1] if len(fields) > 1 else ""
 
 
 def vg_info(vg: str) -> Tuple[bool, Set[str]]:
@@ -197,6 +203,21 @@ def lv_info(vg: str, lv: str) -> Tuple[bool, Set[str]]:
     if rc == 5:
         return False, set()
     return True, {x.strip() for x in out.split(",") if x.strip()}
+
+
+def ensure_pv(device: str, vg: str, group: Dict, recovery_only: bool) -> Tuple[bool, bool]:
+    """Return (changed, needs_vgextend). Existing unassigned PVs are non-destructive."""
+    exists, current_vg = pv_info(device)
+    if exists:
+        if current_vg and current_vg != vg:
+            raise RuntimeError("PV is already assigned to another volume group")
+        return False, current_vg == ""
+    if recovery_only:
+        raise RuntimeError("recovery cannot create a missing physical volume")
+    if not group.get("initialize_pvs") or not group.get("confirm_pv_initialize"):
+        raise RuntimeError("PV creation requires explicit destructive confirmation")
+    run(["/usr/sbin/pvcreate", "--yes", "--force", "--force", device], timeout=300)
+    return True, True
 
 
 def ensure_lvm(service_id: str, groups: List[Dict], root_anc: Set[str], recovery_only: bool) -> bool:
@@ -215,34 +236,28 @@ def ensure_lvm(service_id: str, groups: List[Dict], root_anc: Set[str], recovery
         if existed:
             if tag not in tags:
                 raise RuntimeError("refusing to adopt an existing non-LayerSentry volume group")
+            for dev in devices:
+                pv_changed, needs_extend = ensure_pv(dev, vg, group, recovery_only)
+                changed = changed or pv_changed
+                if needs_extend:
+                    if recovery_only:
+                        raise RuntimeError("recovery cannot add a missing PV membership")
+                    run(["/usr/sbin/vgextend", vg, dev], timeout=300)
+                    changed = True
         elif recovery_only:
             raise RuntimeError("recovery cannot recreate a missing volume group")
         else:
+            prepared: List[str] = []
             for dev in devices:
-                current_vg = pvs_vg(dev)
-                if not current_vg:
-                    if not group.get("initialize_pvs") or not group.get("confirm_pv_initialize"):
-                        raise RuntimeError("PV creation requires explicit destructive confirmation")
-                    run(["/usr/sbin/pvcreate", "--yes", "--force", "--force", dev], timeout=300)
-                    changed = True
-                elif current_vg != vg:
-                    raise RuntimeError("PV is already assigned to another volume group")
-            run(["/usr/sbin/vgcreate", "--addtag", tag, vg] + devices, timeout=300)
+                pv_changed, _ = ensure_pv(dev, vg, group, False)
+                changed = changed or pv_changed
+                prepared.append(dev)
+            run(["/usr/sbin/vgcreate", "--addtag", tag, vg] + prepared, timeout=300)
             changed = True
-        if existed:
-            for dev in devices:
-                current_vg = pvs_vg(dev)
-                if current_vg == vg:
-                    continue
-                if current_vg:
-                    raise RuntimeError("PV is already assigned to another volume group")
-                if recovery_only:
-                    raise RuntimeError("recovery cannot add a missing PV to a volume group")
-                if not group.get("initialize_pvs") or not group.get("confirm_pv_initialize"):
-                    raise RuntimeError("new PV requires explicit destructive confirmation")
-                run(["/usr/sbin/pvcreate", "--yes", "--force", "--force", dev], timeout=300)
-                run(["/usr/sbin/vgextend", vg, dev], timeout=300)
-                changed = True
+        for dev in devices:
+            exists, current_vg = pv_info(dev)
+            if not exists or current_vg != vg:
+                raise RuntimeError("volume group membership verification failed")
         lvs = group.get("logical_volumes") or []
         free_seen = False
         for index, lv in enumerate(lvs):
