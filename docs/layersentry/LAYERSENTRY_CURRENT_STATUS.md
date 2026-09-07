@@ -39,6 +39,8 @@ Services reuse the same RKE2 + Flux substrate:
 
 Do not build replacement DB/Kafka/application operators/controllers or upstream UIs.
 
+**Current scope boundary:** cross-site RKE2 application DR, Kubernetes-backed DBaaS/APaaS DC->DR replication/promotion/failback, RKE2 RPO/RTO and RKE2 DR UI are not current Workstream-E gates. Independent DC/DR remains separate. CSI/PVC data safety and DB backup/restore/PITR where advertised remain in scope.
+
 The separate healthy RKE2 cluster is test-only; success there does not by itself make the LayerSentry-created cluster `LIVE_VERIFIED`.
 
 ## 3. VM-native Single-OS
@@ -90,9 +92,13 @@ healthy DC/DR CloudStack -> B&R -> OLD -> mutate -> NEW
 
 Only after that qualify one required provider-native low-RPO path, then Planned Failover/Failback, then witness/fencing/Auto Failover last.
 
+This is the independent CloudStack/VM/provider-native DR workstream; it does not currently add RKE2 application DR requirements to Workstream E.
+
 ## 6. UI / release / production
 
 UI is substantial but intentionally dormant until backend contracts are stable enough for one final `ui/**` integration/browser pass. Do not redesign the portal or rebuild upstream service UIs.
+
+For K8s/DBaaS/APaaS, final production audit should trace each advertised action through UI/API/authorization/backend/reconciler-or-operator/K8s-or-storage/persistence/failure-path/test/live evidence rather than rely on one overall UI percentage.
 
 Release/security is milestone-only. One logical V1 carrier remains `layersentry-platform-<release>.iso`; bundled packages are `AVAILABLE`, not installed.
 
