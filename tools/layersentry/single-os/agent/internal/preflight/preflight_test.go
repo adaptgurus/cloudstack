@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/executor"
+	"github.com/adaptgurus/cloudstack/tools/layersentry/single-os/agent/internal/model"
 )
 
 type ancestryRunner struct {
@@ -39,6 +40,24 @@ func (r *ancestryRunner) Run(_ context.Context, path string, args ...string) (ex
 	r.path = path
 	r.args = append([]string{}, args...)
 	return r.result, r.err
+}
+
+func TestValidateNetworkAcceptsAssignedLoopbackByBinding(t *testing.T) {
+	if err := validateNetwork(model.NetworkSpec{ListenAddress: "127.0.0.1"}); err != nil {
+		t.Fatalf("assigned loopback address should pass bind-based validation: %v", err)
+	}
+}
+
+func TestValidateNetworkRejectsUnspecifiedStandaloneAddress(t *testing.T) {
+	if err := validateNetwork(model.NetworkSpec{ListenAddress: "0.0.0.0"}); err == nil {
+		t.Fatal("standalone wildcard listen address must not satisfy assigned-address validation")
+	}
+}
+
+func TestValidateNetworkRejectsUnassignedAddress(t *testing.T) {
+	if err := validateNetwork(model.NetworkSpec{ListenAddress: "192.0.2.1"}); err == nil {
+		t.Fatal("unassigned documentation address must fail bind-based validation")
+	}
 }
 
 func TestAncestryUsesFullReverseLsblkChain(t *testing.T) {
