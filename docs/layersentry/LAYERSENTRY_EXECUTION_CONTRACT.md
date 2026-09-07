@@ -1,6 +1,6 @@
 # LayerSentry V1 — Execution Contract
 
-**Contract schema:** 1.4  
+**Contract schema:** 1.5  
 **Effective date:** 2026-09-08  
 **Baseline:** Apache CloudStack 4.22.1.1 + KVM
 
@@ -37,7 +37,7 @@ Large specialist masters, security/debugging policy, Knowledge Graph and histori
 
 ### 2.1 Low-credit execution budget
 
-The default working set is the smallest set capable of resolving the first unmet gate. Apply this order:
+Use the smallest working set capable of resolving the first unmet gate:
 
 ```text
 current status + exact ref
@@ -51,16 +51,16 @@ current status + exact ref
 
 Rules:
 
-1. Do not rescan the whole repository during continuation work unless the task is explicitly a repository-level audit or new evidence shows the ownership boundary is wrong.
-2. Do not reload large unchanged masters/workstreams/logs in the same session; use exact sections, diffs, search results and evidence pointers.
-3. Do not create new recap/master/handoff documents for normal progress. Update the existing module pointer only when a material milestone changes.
-4. After one confirmatory rerun, the same expensive failing workflow/lab action requires a changed input, artifact, code/configuration, environment state or diagnostic hypothesis before another retry.
-5. Prefer one focused failing test/job over a full suite while diagnosing; run the broader required suite only after the focused failure is fixed or when the release gate itself requires it.
-6. Never run parallel source writers on the same module/gate. Test-only/read-only parallelism must have a specific question and must not independently design a competing fix.
+1. Do not rescan the whole repository during continuation work unless explicitly assigned a repository-level audit or new evidence shows the ownership boundary is wrong.
+2. Do not reload large unchanged masters/workstreams/logs in one session; use exact sections, diffs, search results and evidence pointers.
+3. Do not create new recap/master/handoff documents for normal progress. Update existing module status/evidence only when a material milestone changes.
+4. After one confirmatory rerun, the same expensive failing workflow/lab action requires changed code/config/artifact/environment or a changed diagnostic hypothesis before another retry.
+5. Prefer one focused failing test/job while diagnosing; run the broader required suite after the focused defect is fixed or when the release gate itself requires it.
+6. Never run parallel source writers on the same module/gate. Test/read-only parallelism must have a specific question and must not independently design competing fixes.
 7. Do not implement speculative fallback architecture while the selected lifecycle still has an evidence-driven next gate. Invoke fallback only through the formal stop-loss decision.
 8. Persist hashes, run/job IDs, exact failure signatures and short conclusions; keep bulk logs/artifacts out of mandatory startup context.
-9. If an external/manual blocker is reached, stop and record the exact prerequisite instead of consuming credit generating code that cannot be validated.
-10. These rules optimize sequencing only. Required security, integration, destructive, upgrade, restore, failover or production-certification evidence may not be skipped to save credit.
+9. If an external/manual blocker is reached, stop and record the exact prerequisite instead of generating code that cannot be validated.
+10. Credit efficiency never permits skipping required security, integration, destructive, upgrade, restore or production-certification evidence.
 
 ## 3. Lowest-credit V1 schedule
 
@@ -99,7 +99,7 @@ Do not activate additional writers merely because a workstream file exists.
 
 ## 4. RKE2 / Data Services execution contract
 
-One lifecycle serves user Kubernetes, DBaaS, APaaS and Streaming:
+One lifecycle serves user Kubernetes, Kubernetes-backed DBaaS, APaaS and Streaming:
 
 ```text
 LayerSentry UI/BFF
@@ -136,7 +136,24 @@ immutable artifacts
 
 Do not add service breadth while the current substrate gate fails.
 
-The customer-facing UI/API may normalize lifecycle and operation status across modules, but the implementation must reuse the existing LayerSentry journal/reconciliation path and underlying lifecycle owners. Do not add another generic service-control engine merely to wrap CAPI, CloudStack, Flux or upstream operators.
+### Current K8s scope exclusions
+
+Workstream E does **not** own or implement:
+
+- VM-native Single-OS DBaaS/APaaS;
+- cross-site RKE2 application DR;
+- Kubernetes-backed DBaaS DC->DR replication/promotion;
+- APaaS cross-site DR;
+- RKE2 failover/failback, RPO/RTO or cross-site DNS/VIP switching;
+- RKE2 DR UI.
+
+Those items must not become K8s completion blockers unless the owner explicitly reopens that scope. The independent DC/DR workstream continues separately.
+
+CSI/PVC project isolation, resize, stateful Machine replacement and data survival remain in scope because they are core stateful Kubernetes safety properties, not cross-site DR.
+
+DB backup/restore/PITR remain in scope only when those Day-2 DBaaS capabilities are advertised.
+
+The customer-facing UI/API may normalize lifecycle and operation status across modules, but implementation must reuse existing LayerSentry journal/reconciliation and underlying lifecycle owners. Do not add another generic service-control engine merely to wrap CAPI, CloudStack, Flux or upstream operators.
 
 ### CAPC stop-loss
 
@@ -152,7 +169,7 @@ One release uses one cluster lifecycle owner.
 
 Use pinned/qualified OpenEverest, OpenBao, Harbor and Strimzi. LayerSentry integration is limited to Flux/Helm/artifacts, namespace/RBAC, storage/network/VIP policy, status/audit and E2E qualification. Do not rewrite their operators/controllers, backup/PITR engines or UIs.
 
-A service does not advance because its package/UI exists. Advance only after the current applicable vertical slice proves authorization, create/ready, durable status/reconciliation and the Day-2/data-safety gates required for that service.
+A service does not advance because its package/UI exists. Advance only after the applicable vertical slice proves authorization, create/ready, durable status/reconciliation and required Day-2/data-safety gates.
 
 ## 5. VM-native Single-OS contract
 
@@ -166,7 +183,7 @@ Preserve the existing Go control plane and current Ansible roles/playbooks. Work
 
 For disposable acceptance cleanup, manually recreated/reinstalled Rocky VMs are preferred over building lab-only reimage automation. Product idempotency/repair/upgrade/uninstall/backup/restore requirements remain mandatory.
 
-## 6. DC/DR contract
+## 6. Independent DC/DR contract
 
 Use native CloudStack first:
 
@@ -185,11 +202,11 @@ healthy DC/DR infrastructure
 
 Only after native recovery passes should one selected provider-native low-RPO path required by V1 be implemented/qualified. Planned failover/failback precedes witness/fencing/automatic failover.
 
-For Kubernetes DBaaS/APaaS and other stateful services, do not equate VM recovery with application-consistent DR. Qualify the applicable CloudStack, Kubernetes/control-plane, database-native, persistent-volume/storage, application/configuration, service-access and LayerSentry composite-status planes while leaving replication/promotion ownership with the native provider/operator.
+This workstream is independent from the current RKE2 application/Data Services scope; do not infer RKE2 application DR requirements from it.
 
 ## 7. UI and release activation
 
-UI remains dormant while backend contracts are moving. Run one bounded final pass when real VM/K8s/Data Services/DR contracts are stable enough for integration and browser acceptance.
+UI remains dormant while backend contracts are moving. Run one bounded final pass when real VM/K8s/Data Services/independent DR contracts are stable enough for integration and browser acceptance.
 
 The final pass consumes stable backend contracts and common customer-facing lifecycle/operation vocabulary rather than inventing module-specific status semantics in the frontend.
 
@@ -199,9 +216,9 @@ One logical V1 carrier remains `layersentry-platform-<release>.iso`; bundled pac
 
 ## 8. Status maintenance
 
-Module writers update their **module-specific status/evidence** after meaningful evidence milestones.
+Module writers update their module-specific status/evidence after meaningful evidence milestones.
 
-`LAYERSENTRY_CURRENT_STATUS.md` is refreshed by an integration/status/governance pass when any module's status, first unmet gate or authoritative pointer materially changes. Keep it compact; do not copy historical logs into it.
+`LAYERSENTRY_CURRENT_STATUS.md` is refreshed by an integration/status/governance pass when a module status, first unmet gate or authoritative pointer materially changes. Keep it compact; do not copy historical logs into it.
 
 `LAYERSENTRY_PROGRESS_LEDGER.md` remains historical/audit evidence and is read only when older history is needed.
 
