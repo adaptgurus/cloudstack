@@ -1,7 +1,7 @@
 # LayerSentry Single-OS — Current Status
 
-**Role:** module-scoped volatile checkpoint for VM-native Single-OS DBaaS/APaaS.  
-**Global project status authority:** `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`.  
+**Role:** module-scoped volatile evidence checkpoint for VM-native Single-OS DBaaS/APaaS.  
+**Global current-status authority:** `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md` **plus current evidence**, per `LAYERSENTRY_SUPER_MASTER_CONTEXT.md`. This file is the Single-OS evidence component of that authority.  
 **Stable architecture authority:** `docs/layersentry/LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`.  
 **Execution routing:** `docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`.
 
@@ -67,4 +67,4 @@ Continuity audit:
 
 ## Continuity invariant
 
-A new ChatGPT/Codex session must treat current Git source as implementation truth and this file as the Single-OS status pointer. It must not infer that code disappeared because chat memory reset, and it must not infer that designed Ansible roles exist before the repository proves they do.
+A new ChatGPT/Codex session must treat current Git source as implementation truth and this file as the Single-OS status evidence pointer. It must not infer that code disappeared because chat memory reset, and it must not infer that designed Ansible roles exist before the repository proves they do.
