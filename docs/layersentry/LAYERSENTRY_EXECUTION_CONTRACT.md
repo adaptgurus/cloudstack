@@ -1,7 +1,7 @@
 # LayerSentry V1 — Execution Contract
 
-**Contract schema:** 1.3  
-**Effective date:** 2026-09-07  
+**Contract schema:** 1.4  
+**Effective date:** 2026-09-08  
 **Baseline:** Apache CloudStack 4.22.1.1 + KVM
 
 This file defines **who works on what and when a workstream is active**. `AGENTS.md` defines hard file/safety/concurrency rules. `LAYERSENTRY_CURRENT_STATUS.md` defines the compact current progress index. `LAYERSENTRY_SUPER_MASTER_CONTEXT.md` defines stable product architecture.
@@ -34,6 +34,33 @@ Every session reads only:
 The full `LAYERSENTRY_PROGRESS_LEDGER.md` is **not mandatory startup context**. It is read/search-on-demand for historical evidence only.
 
 Large specialist masters, security/debugging policy, Knowledge Graph and historical handoffs are also on-demand only when the current gate requires them.
+
+### 2.1 Low-credit execution budget
+
+The default working set is the smallest set capable of resolving the first unmet gate. Apply this order:
+
+```text
+current status + exact ref
+ -> first unmet gate
+ -> changed/relevant paths only
+ -> focused source/static/unit validation
+ -> focused module CI/integration validation
+ -> required live/destructive E2E gate
+ -> compact evidence/status update
+```
+
+Rules:
+
+1. Do not rescan the whole repository during continuation work unless the task is explicitly a repository-level audit or new evidence shows the ownership boundary is wrong.
+2. Do not reload large unchanged masters/workstreams/logs in the same session; use exact sections, diffs, search results and evidence pointers.
+3. Do not create new recap/master/handoff documents for normal progress. Update the existing module pointer only when a material milestone changes.
+4. After one confirmatory rerun, the same expensive failing workflow/lab action requires a changed input, artifact, code/configuration, environment state or diagnostic hypothesis before another retry.
+5. Prefer one focused failing test/job over a full suite while diagnosing; run the broader required suite only after the focused failure is fixed or when the release gate itself requires it.
+6. Never run parallel source writers on the same module/gate. Test-only/read-only parallelism must have a specific question and must not independently design a competing fix.
+7. Do not implement speculative fallback architecture while the selected lifecycle still has an evidence-driven next gate. Invoke fallback only through the formal stop-loss decision.
+8. Persist hashes, run/job IDs, exact failure signatures and short conclusions; keep bulk logs/artifacts out of mandatory startup context.
+9. If an external/manual blocker is reached, stop and record the exact prerequisite instead of consuming credit generating code that cannot be validated.
+10. These rules optimize sequencing only. Required security, integration, destructive, upgrade, restore, failover or production-certification evidence may not be skipped to save credit.
 
 ## 3. Lowest-credit V1 schedule
 
@@ -109,6 +136,8 @@ immutable artifacts
 
 Do not add service breadth while the current substrate gate fails.
 
+The customer-facing UI/API may normalize lifecycle and operation status across modules, but the implementation must reuse the existing LayerSentry journal/reconciliation path and underlying lifecycle owners. Do not add another generic service-control engine merely to wrap CAPI, CloudStack, Flux or upstream operators.
+
 ### CAPC stop-loss
 
 If a bounded qualification campaign repeatedly cannot achieve CloudStack VM creation + automatic RKE2 join + 6443/9345 + `Ready`, and evidence shows continued CAPC maintenance is disproportionate, record a release decision and assign the approved fallback:
@@ -122,6 +151,8 @@ One release uses one cluster lifecycle owner.
 ### Upstream services
 
 Use pinned/qualified OpenEverest, OpenBao, Harbor and Strimzi. LayerSentry integration is limited to Flux/Helm/artifacts, namespace/RBAC, storage/network/VIP policy, status/audit and E2E qualification. Do not rewrite their operators/controllers, backup/PITR engines or UIs.
+
+A service does not advance because its package/UI exists. Advance only after the current applicable vertical slice proves authorization, create/ready, durable status/reconciliation and the Day-2/data-safety gates required for that service.
 
 ## 5. VM-native Single-OS contract
 
@@ -154,9 +185,13 @@ healthy DC/DR infrastructure
 
 Only after native recovery passes should one selected provider-native low-RPO path required by V1 be implemented/qualified. Planned failover/failback precedes witness/fencing/automatic failover.
 
+For Kubernetes DBaaS/APaaS and other stateful services, do not equate VM recovery with application-consistent DR. Qualify the applicable CloudStack, Kubernetes/control-plane, database-native, persistent-volume/storage, application/configuration, service-access and LayerSentry composite-status planes while leaving replication/promotion ownership with the native provider/operator.
+
 ## 7. UI and release activation
 
 UI remains dormant while backend contracts are moving. Run one bounded final pass when real VM/K8s/Data Services/DR contracts are stable enough for integration and browser acceptance.
+
+The final pass consumes stable backend contracts and common customer-facing lifecycle/operation vocabulary rather than inventing module-specific status semantics in the frontend.
 
 Release/signing/security work is not a standing stream. Activate it only when an exact artifact is ready for promotion or a concrete trust/security defect blocks a vertical slice.
 
