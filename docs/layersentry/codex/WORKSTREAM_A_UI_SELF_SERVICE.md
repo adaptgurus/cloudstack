@@ -12,11 +12,11 @@ Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
-3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
+3. `LAYERSENTRY_CURRENT_STATUS.md`;
 4. this file;
 5. fetch the actual UI/backend state.
 
-Read a specialist backend context only for the exact integration being tested.
+Read a specialist backend context or historical Progress Ledger evidence only for the exact integration/failure being investigated.
 
 ## 2. Hard file fence
 
