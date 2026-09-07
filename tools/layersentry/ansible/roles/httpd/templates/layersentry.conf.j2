@@ -1,0 +1,12 @@
+<VirtualHost {{ layersentry_request.network.listen_address }}:{{ layersentry_request.network.port }}>
+    ServerName localhost
+    DocumentRoot "{{ layersentry_app_root }}"
+    ServerTokens Prod
+    ServerSignature Off
+    TraceEnable Off
+    <Directory "{{ layersentry_app_root }}">
+        Options -Indexes -ExecCGI
+        AllowOverride None
+        Require all granted
+    </Directory>
+</VirtualHost>
