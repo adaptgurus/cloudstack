@@ -10,6 +10,27 @@
     fail_msg: Redis/Valkey Ansible execution received an unsupported or incomplete plan.
   no_log: true
 
+- name: Read existing key-value owner marker
+  ansible.builtin.slurp:
+    src: "/var/lib/layersentryd/state/{{ layersentry_provider }}-owner"
+  register: layersentry_kv_owner
+  failed_when: false
+  changed_when: false
+
+- name: Refuse a foreign key-value service owner
+  ansible.builtin.assert:
+    that:
+      - layersentry_kv_owner.failed | default(false) or ((layersentry_kv_owner.content | b64decode | trim) == layersentry_service_id)
+    fail_msg: The selected key-value service is already owned by another LayerSentry service.
+
+- name: Persist key-value service owner before mutation
+  ansible.builtin.copy:
+    content: "{{ layersentry_service_id }}\n"
+    dest: "/var/lib/layersentryd/state/{{ layersentry_provider }}-owner"
+    owner: layersentry
+    group: layersentry
+    mode: '0600'
+
 - name: Resolve key-value provider contract
   ansible.builtin.set_fact:
     layersentry_kv_package: "{{ 'redis' if layersentry_provider == 'redis' else 'valkey' }}"
