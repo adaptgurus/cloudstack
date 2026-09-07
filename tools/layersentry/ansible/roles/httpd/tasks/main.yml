@@ -1,0 +1,113 @@
+---
+- name: Require supported Apache HTTPD immutable plan
+  ansible.builtin.assert:
+    that:
+      - layersentry_provider == 'apache-httpd'
+      - layersentry_request.topology == 'standalone'
+      - layersentry_repository_id == 'appstream'
+      - layersentry_resolved_version | length > 0
+    fail_msg: Apache HTTPD Ansible execution received an unsupported or incomplete plan.
+
+- name: Resolve Apache content and config paths
+  ansible.builtin.set_fact:
+    layersentry_app_mount_root: "{{ layersentry_paths['application-data'] | default('') }}"
+    layersentry_app_hash: "{{ (layersentry_service_id | hash('sha256'))[:12] }}"
+    layersentry_app_root: "{{ (layersentry_paths['application-data'] ~ '/www') if (layersentry_paths['application-data'] | default('')) else ('/var/www/html/layersentry-' ~ ((layersentry_service_id | hash('sha256'))[:12])) }}"
+    layersentry_httpd_conf: "/etc/httpd/conf.d/layersentry-{{ (layersentry_service_id | hash('sha256'))[:12] }}.conf"
+
+- name: Install exact Apache HTTPD NEVRA
+  ansible.builtin.dnf:
+    name: "{{ layersentry_resolved_version }}"
+    state: present
+    install_weak_deps: false
+    disablerepo: '*'
+    enablerepo: "{{ layersentry_repository_id }}"
+    disable_gpg_check: false
+
+- name: Read vendor Apache configuration
+  ansible.builtin.slurp:
+    src: /etc/httpd/conf/httpd.conf
+  register: layersentry_httpd_main_raw
+
+- name: Decode Apache configuration for guarded listener rewrite
+  ansible.builtin.set_fact:
+    layersentry_httpd_main_text: "{{ layersentry_httpd_main_raw.content | b64decode }}"
+
+- name: Require exactly one manageable Apache primary Listen state
+  ansible.builtin.assert:
+    that:
+      - (layersentry_httpd_main_text | regex_findall('(?m)^.*# LayerSentry managed primary Listen$') | length) <= 1
+      - ((layersentry_httpd_main_text | regex_findall('(?m)^Listen 80$') | length) == 1) or ((layersentry_httpd_main_text | regex_findall('(?m)^.*# LayerSentry managed primary Listen$') | length) == 1)
+    fail_msg: Apache HTTPD requires an unmodified Rocky primary Listen 80 or one LayerSentry-managed listener.
+
+- name: Replace only the primary Apache listener
+  ansible.builtin.replace:
+    path: /etc/httpd/conf/httpd.conf
+    regexp: '(?m)^(?:Listen 80|Listen [^\n]+ # LayerSentry managed primary Listen)$'
+    replace: "Listen {{ layersentry_request.network.listen_address }}:{{ layersentry_request.network.port }} # LayerSentry managed primary Listen"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure Apache application root exists
+  ansible.builtin.file:
+    path: "{{ layersentry_app_root }}"
+    state: directory
+    owner: root
+    group: apache
+    mode: '0755'
+
+- name: Persist HTTP content SELinux label for external Apache root
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -a, -t, httpd_sys_content_t, "{{ layersentry_app_mount_root }}(/.*)?"]
+  register: layersentry_httpd_semanage_add
+  failed_when: false
+  changed_when: layersentry_httpd_semanage_add.rc == 0
+  when:
+    - layersentry_app_mount_root | length > 0
+    - layersentry_app_mount_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Reconcile existing Apache HTTP content SELinux label
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -m, -t, httpd_sys_content_t, "{{ layersentry_app_mount_root }}(/.*)?"]
+  when:
+    - layersentry_httpd_semanage_add is defined
+    - layersentry_httpd_semanage_add.rc | default(0) != 0
+  changed_when: false
+
+- name: Apply Apache external content SELinux context
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -RF, "{{ layersentry_app_mount_root }}"]
+  changed_when: false
+  when:
+    - layersentry_app_mount_root | length > 0
+    - layersentry_app_mount_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Install Apache deterministic index content
+  ansible.builtin.copy:
+    content: "LayerSentry managed Apache HTTP service\n"
+    dest: "{{ layersentry_app_root }}/index.html"
+    owner: root
+    group: apache
+    mode: '0644'
+
+- name: Install Apache deterministic health object
+  ansible.builtin.copy:
+    content: "layersentry-ok\n"
+    dest: "{{ layersentry_app_root }}/.layersentry-health"
+    owner: root
+    group: apache
+    mode: '0644'
+
+- name: Install LayerSentry Apache virtual host
+  ansible.builtin.template:
+    src: layersentry.conf.j2
+    dest: "{{ layersentry_httpd_conf }}"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Validate Apache configuration before service start
+  ansible.builtin.command:
+    argv: [/usr/sbin/httpd, -t]
+  changed_when: false
