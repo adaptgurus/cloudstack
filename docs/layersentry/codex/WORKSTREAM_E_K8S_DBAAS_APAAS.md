@@ -17,7 +17,7 @@ Read only:
 4. this file;
 5. current `tools/layersentry/k8s/release-candidate-lane-b.json` plus actual branch/workflow/live state.
 
-Do **not** load the large Kubernetes Super Master or full Progress Ledger on every session. Open `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`, the architecture addendum or historical evidence only when the current gate needs detailed storage/network/VIP/provider/version semantics or an architecture conflict must be resolved.
+Open `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`, the compact architecture addendum or historical evidence only when the current gate needs detailed storage/network/VIP/provider/version semantics or an architecture conflict must be resolved. Do not load historical expanded masters/ledger by default.
 
 When working from a normal Git worktree, initialize/check the K8s writer guard from `tools/layersentry/governance/module-writer-guard.sh` before meaningful batches.
 
@@ -54,9 +54,23 @@ LayerSentry UI/BFF
  -> selected packages/operators
 ```
 
-The same lifecycle serves user Kubernetes, Data Services, APaaS and Streaming profiles. Profiles differ only by worker pools, placement, storage, networking, security and package selection.
+The same lifecycle serves user Kubernetes, Kubernetes-backed DBaaS, APaaS and Streaming profiles. Profiles differ by worker pools, placement, storage, networking, security and package selection.
 
 Ownership remains CloudStack -> IaaS, CAPI/CAPC -> Machines, CAPRKE2 -> RKE2 bootstrap/control plane, CCM -> L4 LB, CSI -> workload storage, Flux -> packages, upstream operators -> application/database lifecycle, LayerSentry -> UI/BFF/policy/audit/composite state.
+
+### Current scope exclusions
+
+This workstream does **not** implement or audit:
+
+- VM-native Single-OS DBaaS/APaaS;
+- cross-site RKE2 application DR;
+- Kubernetes-backed DBaaS DC->DR replication/promotion/failback;
+- APaaS cross-site DR;
+- RKE2 RPO/RTO, cross-site DNS/VIP switching or RKE2 DR UI.
+
+Do not turn those items into Workstream-E blockers unless the owner explicitly reopens scope. Independent DC/DR remains owned by Workstream D.
+
+CSI/PVC project isolation, resize, stateful Machine replacement/PVC survival and DB backup/restore/PITR where advertised remain in scope because they are normal stateful-Kubernetes/DBaaS lifecycle capabilities, not cross-site DR.
 
 ## 4. Existing source must be reused
 
@@ -103,13 +117,13 @@ immutable artifacts
 
 Do not work on the next item while the current gate fails.
 
-For each failure: capture exact evidence, classify the owning layer, fix the smallest correct owner inside this file fence, add regression coverage, rebuild/redeploy the affected immutable artifact, and rerun the same step.
+For each failure: capture exact evidence, classify the owning layer, fix the smallest correct owner inside this file fence, add regression coverage, rebuild/redeploy the affected immutable artifact and rerun the same step.
 
 ## 6. CAPC/CAPRKE2 stop-loss
 
 CAPI/CAPC/CAPRKE2 remains preferred because substantial source already exists.
 
-If a bounded qualification campaign repeatedly cannot achieve all four minimum outcomes:
+If a bounded qualification campaign repeatedly cannot achieve:
 
 1. CloudStack VM/resource creation;
 2. automatic RKE2 join;
@@ -122,13 +136,13 @@ and evidence shows continued provider maintenance is disproportionate, record a 
 native CloudStack APIs -> hardened QCOW2/cloud-init -> Ansible Runner -> RKE2 -> Flux
 ```
 
-The fallback becomes a separately assigned implementation scope. Do not quietly start editing the shared Ansible tree from this workstream before that decision.
+The fallback becomes a separately assigned implementation scope. Do not quietly start editing the shared Ansible tree before that decision.
 
 ## 7. Existing healthy RKE2 cluster — package qualification lane
 
 The owner may provide a second already-working RKE2 cluster.
 
-Use it to test, in parallel with the primary lifecycle work:
+Use it to test, in parallel with primary lifecycle work:
 
 - Flux remote/package reconciliation;
 - OpenEverest install and supported DB lifecycle;
@@ -136,14 +150,12 @@ Use it to test, in parallel with the primary lifecycle work:
 - Harbor;
 - Strimzi/Kafka;
 - package upgrade/remove/recovery;
-- backup/restore where available;
+- DB backup/restore where available/claimed;
 - local-registry/offline package behavior.
 
-This lane is **test-only/read-mostly**. It must not commit lifecycle source or create a second CAPI/CAPC/CAPRKE2 implementation.
+This lane is test-only/read-mostly. It must not commit lifecycle source or create a second CAPI/CAPC/CAPRKE2 implementation.
 
-Evidence from this cluster proves only the scoped package/application behavior on that target. It does **not** by itself promote the complete LayerSentry K8s/DBaaS stack to `LIVE_VERIFIED`; the same pinned package must later pass on the LayerSentry-owned cluster path with the certified CloudStack project/storage/network boundaries.
-
-If the package lane finds a manifest/source defect, report the exact failure to the primary K8s writer.
+Evidence from this cluster proves only scoped package/application behavior on that target. It does not by itself promote the complete LayerSentry K8s/DBaaS stack to `LIVE_VERIFIED`; the same pinned package must later pass on the LayerSentry-owned cluster path with certified CloudStack project/storage/network boundaries.
 
 ## 8. Upstream services — no rewrites
 
@@ -156,19 +168,23 @@ Use:
 - Harbor supported Helm/OCI;
 - Strimzi for Kafka.
 
-Do not implement replacement DB operators, backup/PITR engines, DB failover engines, engine-upgrade controllers, Kafka operators, OpenBao/Harbor controllers or replacement upstream UIs. V1 upstream UI rebranding is out of scope unless explicitly added later.
+Do not implement replacement DB operators, backup/PITR engines, DB failover engines, engine-upgrade controllers, Kafka operators, OpenBao/Harbor controllers or replacement upstream UIs.
 
 LayerSentry integration is limited to Flux source/HelmRelease, namespace/RBAC/project policy, certified StorageClass, network/VIP/exposure policy, local/offline artifacts, health/status/audit and E2E qualification.
 
-## 9. One platform carrier
+## 9. UI/backend traceability contract
+
+Workstream E does not edit Vue/browser source. It must expose stable backend contracts and evidence that Workstream A can consume.
+
+For every advertised K8s/DBaaS/APaaS action, the final audit should be able to trace, where applicable:
+
+`UI -> API -> AUTHORIZATION -> BACKEND -> RECONCILER/OPERATOR -> K8S/STORAGE -> PERSISTENCE -> FAILURE PATH -> TEST -> LIVE EVIDENCE`
+
+Do not report an overall UI/service percentage as production proof when individual actions have different evidence ceilings.
+
+## 10. One platform carrier
 
 Current V1 uses `layersentry-platform-<release>.iso` as one logical signed carrier. Bundled packages are `AVAILABLE`, not installed; Flux installs only selected packages.
-
-Older specialist sections describing separate K8s/Data Services carriers or mandatory OpenEverest rebranding are superseded for current V1 execution by `LAYERSENTRY_EXECUTION_CONTRACT.md`.
-
-## 10. UI coordination
-
-Workstream E does not edit Vue/browser source. It publishes/stabilizes the backend contract. The deferred UI workstream consumes that contract later. If a current UI defect blocks backend E2E, hand off the exact defect to Workstream A.
 
 ## 11. Status and handoff
 
