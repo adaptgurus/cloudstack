@@ -81,6 +81,8 @@ def main() -> None:
     fi = os.stat(root_disk)
     if not stat.S_ISBLK(fi.st_mode):
         raise RuntimeError("discovered root parent is not a block device")
+    # This request is intentionally non-mutating. Root-device rejection must occur
+    # during product preflight before any PV/filesystem confirmation is relevant.
     req = {
         "schema_version": 1,
         "request_id": str(uuid.uuid4()),
@@ -94,9 +96,9 @@ def main() -> None:
         "lvm": [{
             "name": "ls_root_negative",
             "devices": [sid],
-            "initialize_pvs": True,
-            "confirm_pv_initialize": True,
-            "logical_volumes": [{"name": "ls_root_negative", "size": "1G", "mount_point": "/data/root-negative", "purpose": "database-data", "filesystem": "xfs", "format": True, "confirm_format": True}],
+            "initialize_pvs": False,
+            "confirm_pv_initialize": False,
+            "logical_volumes": [{"name": "ls_root_negative", "size": "1G", "mount_point": "/data/root-negative", "purpose": "database-data", "filesystem": "xfs", "format": False, "confirm_format": False}],
         }],
         "network": {"listen_address": args.listen_address, "port": 5432, "allowed_cidrs": [args.allowed_cidr]},
         "maintenance": {"mode": "manual", "auto_patch": False, "release_line_locked": True},
@@ -110,11 +112,11 @@ def main() -> None:
         os.write(fd, json.dumps(req, separators=(",", ":")).encode("utf-8")); os.fsync(fd); os.close(fd); fd = -1
         proc = run(["/usr/sbin/runuser", "-u", "layersentry", "--", "/usr/bin/layersentryd", "plan-file", path])
         if proc.returncode == 0:
-            raise RuntimeError("CRITICAL: product accepted OS/root disk for destructive LVM plan")
+            raise RuntimeError("CRITICAL: product accepted OS/root disk during non-mutating LVM preflight")
         text = (proc.stdout + "\n" + proc.stderr).lower()
         if "root" not in text and "os/" not in text:
             raise RuntimeError("plan failed, but root-disk rejection was not proven: %s" % text[-1000:])
-        print("ROOT_DISK_NEGATIVE_OK stable_id=%s real=%s mutation_started=false" % (sid, root_disk))
+        print("ROOT_DISK_NEGATIVE_OK stable_id=%s real=%s mutation_requested=false mutation_started=false" % (sid, root_disk))
     finally:
         if fd >= 0:
             os.close(fd)
