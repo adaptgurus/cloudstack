@@ -28,6 +28,8 @@ on:
       - 'tools/layersentry/governance/module_path_fence.py'
       - 'tools/layersentry/governance/test_module_path_fence.py'
       - 'tools/layersentry/governance/module-writer-guard.sh'
+      - 'tools/layersentry/governance/expensive_retry_guard.py'
+      - 'tools/layersentry/governance/test_expensive_retry_guard.py'
 
 permissions:
   contents: read
@@ -52,11 +54,16 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Test module path-fence implementation
+      - name: Test governance guards
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest tools/layersentry/governance/test_module_path_fence.py
+          python3 -m py_compile \
+            tools/layersentry/governance/module_path_fence.py \
+            tools/layersentry/governance/expensive_retry_guard.py
+          python3 -m unittest \
+            tools/layersentry/governance/test_module_path_fence.py \
+            tools/layersentry/governance/test_expensive_retry_guard.py
           bash -n tools/layersentry/governance/module-writer-guard.sh
 
       - name: Enforce K8s file fence
