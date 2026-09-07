@@ -1,121 +1,88 @@
-# LayerSentry Workstream D — DR / HA / Upgrade
+# LayerSentry Workstream D — DC/DR / HA / Upgrade
 
 **Default execution owner:** ChatGPT  
-**Codex use:** only when explicitly assigned after native recovery proves a real need for new source  
+**Codex use:** only when explicitly reassigned  
 **Primary rule:** native Apache CloudStack 4.22.1.1 recovery first
 
-This filename is retained for continuity, but Workstream D is no longer a standing Codex coding stream. The current execution authority is `LAYERSENTRY_EXECUTION_CONTRACT.md`.
+## 1. Mission
 
-## Mission
+Make the existing DC/DR environment and CloudStack-native recovery path work end to end before adding provider-specific low-RPO integration. Do not build a second backup/replication platform.
 
-Make the existing DC/DR environment and supported CloudStack recovery path work end to end before adding advanced custom DR code.
-
-The objective is a simple LayerSentry recovery experience built on native CloudStack APIs and certified storage-provider primitives, not a second cloud/replication engine.
-
-## Startup
+## 2. Startup
 
 Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
 3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
-4. `LAYERSENTRY_DRAAS_ARCHITECTURE.md` when provider/recovery semantics are needed;
-5. current runner evidence for the exact lab operation;
-6. fetch actual CloudStack and runner refs/live state.
+4. `LAYERSENTRY_DRAAS_ARCHITECTURE.md` only when provider semantics are needed;
+5. current DR runner/live evidence;
+6. actual CloudStack/runner refs.
 
-Do not start by rereading historical DR handoffs.
+Do not reread historical DR handoffs by default.
 
-## Architecture boundary
+## 3. Hard file fence
 
-CloudStack remains authoritative for VM, network, volume, template, account/project/RBAC, async jobs and native Backup & Recovery lifecycle.
+Writable:
 
-LayerSentry DR may own only thin product state needed for:
+- `tools/layersentry/dr*`;
+- DR-specific tests/evidence;
+- explicitly authorized DR runner files in the runner repository.
 
-- Site pairing metadata;
-- Protection Plan presentation;
-- recovery point presentation;
-- network/IP mapping policy;
-- operation/evidence journal;
-- provider capability selection;
-- recovery workflow UX;
-- later fencing/witness eligibility.
+Do not edit:
 
-Do not create another VM scheduler or backup catalog authority.
+- `ui/**`;
+- `tools/layersentry/k8s/**`;
+- `tools/layersentry/single-os/**`;
+- unrelated Ansible application/hypervisor roles;
+- global authority files.
 
-## V1 execution order
+If DR proves a UI or CloudStack-core defect, record the exact API/job/resource evidence and hand it to the owning module. Do not cross-edit it here.
+
+## 4. Native V1 path
 
 ```text
 fix DC/DR infrastructure health
- -> prove native B&R APIs
+ -> enable/configure supported CloudStack B&R
  -> create disposable source workload
  -> Recovery Point OLD
  -> mutate root/data markers
  -> Recovery Point NEW
- -> recover OLD into isolated destination network
- -> recover NEW into isolated destination network
- -> verify exact guest data
- -> execute negative/retry/RBAC cases
- -> wire thin LayerSentry UI/API workflow
- -> add one advanced provider-native replication path only if required
- -> planned failover/failback
- -> witness/fencing/automatic failover last
+ -> recover OLD using exact selected backup UUID
+ -> recover NEW using exact selected backup UUID
+ -> isolated destination network
+ -> exact guest root/data verification
+ -> retry/idempotency/RBAC negatives
+ -> thin LayerSentry recovery state/API integration
 ```
 
-## Current priority: resolve environment errors
+Current environment faults such as Zone/storage/image-store/SystemVM/B&R provider/API/RBAC/DR KVM readiness are higher priority than new DR source.
 
-Before new advanced DR source, inspect and resolve the current real blockers, including as applicable:
+A failed API call is not proof that a resource does not exist; resolve the API/provider failure first.
 
-- Zone readiness and correct source/destination topology;
-- primary storage;
-- image/secondary storage;
-- SystemVM template readiness;
-- `backup.framework.enabled` and supported provider configuration;
-- backup offerings/repository accessibility;
-- API/RBAC failures;
-- async-job visibility/reconciliation;
-- DR KVM agent/libvirt/qemu-kvm/bridge readiness;
-- CloudStack ownership of the intended DR host;
-- Advanced destination network requirements for `createVMFromBackup`;
-- source VM fixture and attached root/data volumes.
+## 5. Native API preference
 
-Do not interpret failed API calls as absence of resources without resolving the actual failure.
+Use supported CloudStack B&R and `createVMFromBackup` behavior. Preserve explicit recovery-point identity and reconcile timed-out/ambiguous async mutations from authoritative CloudStack job/resource state before retry.
 
-## Native API preference
+`tools/layersentry/dr_state_machine.py` is a retained source foundation for product state/journal/idempotency. Do not expand it merely to increase code percentage.
 
-Prefer supported CloudStack operations such as the native Backup & Recovery APIs and selected-backup `createVMFromBackup` path.
+Until native recovery passes, do not implement:
 
-LayerSentry should call/compose the native operations, observe async jobs authoritatively and preserve selected recovery-point identity end to end.
+- a generic VM block-copy engine;
+- all LINSTOR/Ceph/SAN/libvirt adapters in parallel;
+- witness/fencing/traffic switching/auto-failover runtime;
+- another backup catalog/scheduler.
 
-A lost/timed-out mutation response must be reconciled from CloudStack job/resource state before retrying.
+## 6. Advanced DR after native proof
 
-## Existing custom DR source
+Select only the provider-native low-RPO path required by the chosen V1 profile:
 
-`tools/layersentry/dr_state_machine.py` is a source foundation, not the current critical path.
+- LINSTOR/DRBD for the selected HCI path;
+- Ceph RBD mirroring for the selected Ceph path;
+- certified array-native replication for enterprise SAN;
+- libvirt/file fallback only when no better provider-native mechanism exists.
 
-Until native recovery is live-proven:
-
-- retain it but do not expand it merely to increase code percentage;
-- do not build a generic VM block replication engine;
-- do not implement witness/fencing/traffic switching/auto-failover runtime;
-- do not duplicate native `createVMFromBackup` lifecycle;
-- do not implement all LINSTOR/Ceph/SAN/libvirt adapters in parallel.
-
-## Advanced DR after native proof
-
-After native recovery passes, select one provider-native low-RPO path for the V1 profile.
-
-Preferred principle:
-
-- LINSTOR/DRBD for the LayerSentry HCI profile where selected/certified;
-- Ceph uses native RBD mirroring when that profile is selected;
-- enterprise SAN uses certified array-native replication;
-- file-backed/libvirt fallback only where no better provider-native path exists.
-
-Do not create host-level generic block copying for storage that already owns safe replication/promotion semantics.
-
-## Planned failover before auto failover
-
-Certification sequence:
+Certification order:
 
 ```text
 Test Recovery
@@ -127,33 +94,20 @@ Test Recovery
  -> Automatic Failover
 ```
 
-Automatic failover is ineligible without independent witness/quorum and safe fencing/exclusivity.
+Do not make every provider a V1 blocker.
 
-## HA and upgrade
+## 7. Lab/time optimization
 
-Management/DB/LB/host HA and upgrade testing remains evidence-driven, but do not let broad HA/upgrade research block the native DR vertical slice.
+Use disposable workloads and manual environment preparation when that is faster than building one-off automation. If a DR test VM/guest must be recreated manually, record the required clean state and resume after reset rather than writing general reimage automation solely for the lab.
 
-Use exact supported CloudStack/Rocky/database/provider mechanisms first. Add LayerSentry code only where product coordination/evidence is missing.
+Do not weaken production recovery/fencing/data-integrity requirements because the lab is disposable.
 
-## Evidence
+## 8. Evidence
 
-Native DR becomes `LIVE_VERIFIED` only when exact OLD/NEW recovery points are recovered and guest root/data content is verified on the intended destination topology.
+Native DR is `LIVE_VERIFIED` only after exact OLD and NEW recovery points are independently restored on the intended destination topology and guest root/data contents are verified.
 
-API submission success alone is insufficient.
+Same-host nested Hyper-V can prove function but cannot certify independent-site DR/fencing.
 
-Same-host nested Hyper-V proves function only; it cannot certify independent-site production DR or hardware fencing.
+## 9. Handoff
 
-## Handoff
-
-Report only:
-
-- exact source/runner refs;
-- environment state changed;
-- native APIs/operations executed;
-- workflow/job/artifact IDs where used;
-- exact recovery-point IDs;
-- observed guest data checks;
-- blocker/root cause;
-- next unmet native-recovery gate.
-
-Avoid large architecture handoffs unless the architecture itself materially changes.
+Report exact source/runner refs, environment changes, native APIs/jobs/recovery-point IDs, guest-data results, blocker/root cause and next native-recovery gate. Do not edit another module or generate a broad architecture handoff.
