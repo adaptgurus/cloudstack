@@ -13,6 +13,12 @@
           - layersentry_request.topology == 'standalone'
         fail_msg: Invalid PostgreSQL repair invocation.
 
+    - name: Decode transient provider secrets in memory only
+      ansible.builtin.set_fact:
+        layersentry_secrets:
+          admin_password: "{{ layersentry_secrets_b64.admin_password | b64decode }}"
+      no_log: true
+
     - name: Validate Rocky Linux and security baseline
       ansible.builtin.include_role:
         name: rocky9_base
