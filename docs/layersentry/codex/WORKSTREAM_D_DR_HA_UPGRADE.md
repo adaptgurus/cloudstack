@@ -14,12 +14,12 @@ Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
-3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
-4. `LAYERSENTRY_DRAAS_ARCHITECTURE.md` only when provider semantics are needed;
+3. `LAYERSENTRY_CURRENT_STATUS.md`;
+4. this file;
 5. current DR runner/live evidence;
 6. actual CloudStack/runner refs.
 
-Do not reread historical DR handoffs by default.
+Read `LAYERSENTRY_DRAAS_ARCHITECTURE.md` or historical Progress Ledger evidence only when the current provider/failure gate requires it. Do not reread historical DR handoffs by default.
 
 ## 3. Hard file fence
 
@@ -107,6 +107,8 @@ Do not weaken production recovery/fencing/data-integrity requirements because th
 Native DR is `LIVE_VERIFIED` only after exact OLD and NEW recovery points are independently restored on the intended destination topology and guest root/data contents are verified.
 
 Same-host nested Hyper-V can prove function but cannot certify independent-site DR/fencing.
+
+At a meaningful milestone, persist focused DR evidence and let the next status reconciliation update `LAYERSENTRY_CURRENT_STATUS.md`; do not append long history to the Progress Ledger.
 
 ## 9. Handoff
 
