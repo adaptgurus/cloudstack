@@ -1,24 +1,27 @@
 ---
-- name: Uninstall LayerSentry Single-OS PostgreSQL while preserving customer data
+- name: Uninstall LayerSentry Single-OS provider while preserving customer data
   hosts: layersentry_single_os
-  gather_facts: true
+  gather_facts: false
   become: false
   any_errors_fatal: true
   tasks:
-    - name: Require data-preserving PostgreSQL uninstall
+    - name: Require data-preserving allowlisted uninstall
       ansible.builtin.assert:
         that:
           - layersentry_action == 'uninstall'
-          - layersentry_provider == 'postgresql'
+          - layersentry_provider in ['postgresql', 'mysql', 'mariadb', 'redis', 'valkey', 'nginx', 'apache-httpd', 'tomcat', 'nodejs-runtime', 'python-runtime', 'podman-runtime']
           - not (layersentry_destroy_data | default(false) | bool)
-        fail_msg: Destructive PostgreSQL data removal is not implemented by the normal uninstall path.
+          - layersentry_operation_id == layersentry_request.operation_id
+          - layersentry_service_id == layersentry_request.service_id
+        fail_msg: Destructive or unsupported Single-OS uninstall request.
 
-    - name: Stop and disable PostgreSQL
+    - name: Stop and disable provider service when one exists
       ansible.builtin.systemd_service:
-        name: "postgresql-{{ layersentry_request.release_line }}.service"
+        name: "{{ layersentry_service_unit }}"
         enabled: false
         state: stopped
       failed_when: false
+      when: layersentry_service_unit | length > 0
 
     - name: Remove service firewall and guest-local VIP state
       ansible.builtin.include_role:
@@ -29,22 +32,187 @@
     - name: Flush network cleanup handlers
       ansible.builtin.meta: flush_handlers
 
-    - name: Remove LayerSentry PGDATA systemd override
+    - name: Remove PostgreSQL PGDATA systemd override
       ansible.builtin.file:
         path: "/etc/systemd/system/postgresql-{{ layersentry_request.release_line }}.service.d/layersentry.conf"
         state: absent
       register: layersentry_pg_dropin_removed
+      when: layersentry_provider == 'postgresql'
 
-    - name: Reload systemd after override cleanup
+    - name: Reload systemd after PostgreSQL override cleanup
       ansible.builtin.systemd_service:
         daemon_reload: true
-      when: layersentry_pg_dropin_removed is changed
+      when:
+        - layersentry_provider == 'postgresql'
+        - layersentry_pg_dropin_removed is changed
 
-    - name: Remove PostgreSQL server package only
+    - name: Remove PostgreSQL server package
       ansible.builtin.dnf:
         name: "postgresql{{ layersentry_request.release_line }}-server"
         state: absent
+      when: layersentry_provider == 'postgresql'
 
-    - name: Preserve customer PostgreSQL data roots
+    - name: Remove MySQL-family managed configuration
+      ansible.builtin.file:
+        path: "/etc/my.cnf.d/99-layersentry-{{ layersentry_provider }}.cnf"
+        state: absent
+      when: layersentry_provider in ['mysql', 'mariadb']
+
+    - name: Remove MySQL-family service TLS material
+      ansible.builtin.file:
+        path: "/var/lib/mysql/layersentry-{{ layersentry_service_id }}"
+        state: absent
+      when: layersentry_provider in ['mysql', 'mariadb']
+
+    - name: Remove MySQL-family owner marker
+      ansible.builtin.file:
+        path: /var/lib/layersentryd/state/mysql-family-owner
+        state: absent
+      when: layersentry_provider in ['mysql', 'mariadb']
+
+    - name: Remove MySQL-family package
+      ansible.builtin.dnf:
+        name: "{{ 'mysql-server' if layersentry_provider == 'mysql' else 'mariadb-server' }}"
+        state: absent
+      when: layersentry_provider in ['mysql', 'mariadb']
+
+    - name: Resolve key-value uninstall paths
+      ansible.builtin.set_fact:
+        layersentry_kv_main_conf: "{{ '/etc/redis/redis.conf' if layersentry_provider == 'redis' else '/etc/valkey/valkey.conf' }}"
+        layersentry_kv_config_dir: "{{ '/etc/redis' if layersentry_provider == 'redis' else '/etc/valkey' }}"
+        layersentry_kv_data_root: "{{ '/var/lib/redis' if layersentry_provider == 'redis' else '/var/lib/valkey' }}"
+        layersentry_kv_external_root: "{{ layersentry_paths['database-data'] | default('') }}"
+      when: layersentry_provider in ['redis', 'valkey']
+
+    - name: Remove key-value managed include line
+      ansible.builtin.lineinfile:
+        path: "{{ layersentry_kv_main_conf }}"
+        line: "include {{ layersentry_kv_config_dir }}/layersentry-{{ layersentry_service_id }}.conf"
+        state: absent
+      when: layersentry_provider in ['redis', 'valkey']
+
+    - name: Remove key-value managed configuration
+      ansible.builtin.file:
+        path: "{{ layersentry_kv_config_dir }}/layersentry-{{ layersentry_service_id }}.conf"
+        state: absent
+      when: layersentry_provider in ['redis', 'valkey']
+
+    - name: Remove external key-value bind while preserving data
+      layersentry_bind_mount:
+        source: "{{ layersentry_kv_external_root }}/data"
+        target: "{{ layersentry_kv_data_root }}/layersentry-{{ layersentry_service_id }}"
+        state: absent
+      when:
+        - layersentry_provider in ['redis', 'valkey']
+        - layersentry_kv_external_root | length > 0
+
+    - name: Remove key-value owner marker
+      ansible.builtin.file:
+        path: "/var/lib/layersentryd/state/{{ layersentry_provider }}-owner"
+        state: absent
+      when: layersentry_provider in ['redis', 'valkey']
+
+    - name: Remove key-value package
+      ansible.builtin.dnf:
+        name: "{{ layersentry_provider }}"
+        state: absent
+      when: layersentry_provider in ['redis', 'valkey']
+
+    - name: Remove Nginx managed virtual host
+      ansible.builtin.file:
+        path: "/etc/nginx/conf.d/layersentry-{{ (layersentry_service_id | hash('sha256'))[:12] }}.conf"
+        state: absent
+      when: layersentry_provider == 'nginx'
+
+    - name: Remove Nginx owner marker
+      ansible.builtin.file:
+        path: /var/lib/layersentryd/state/nginx-owner
+        state: absent
+      when: layersentry_provider == 'nginx'
+
+    - name: Remove Nginx package
+      ansible.builtin.dnf:
+        name: nginx
+        state: absent
+      when: layersentry_provider == 'nginx'
+
+    - name: Restore Apache primary listener to Rocky default
+      ansible.builtin.replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '(?m)^Listen [^\n]+ # LayerSentry managed primary Listen$'
+        replace: 'Listen 80'
+      when: layersentry_provider == 'apache-httpd'
+
+    - name: Remove Apache managed virtual host
+      ansible.builtin.file:
+        path: "/etc/httpd/conf.d/layersentry-{{ (layersentry_service_id | hash('sha256'))[:12] }}.conf"
+        state: absent
+      when: layersentry_provider == 'apache-httpd'
+
+    - name: Remove Apache HTTPD package
+      ansible.builtin.dnf:
+        name: httpd
+        state: absent
+      when: layersentry_provider == 'apache-httpd'
+
+    - name: Restore original Tomcat Connector and Host state
+      layersentry_tomcat_config:
+        service_id: "{{ layersentry_service_id }}"
+        address: "{{ layersentry_request.network.listen_address }}"
+        port: "{{ layersentry_request.network.port | int }}"
+        app_base: "{{ (layersentry_paths['application-data'] ~ '/webapps') if (layersentry_paths['application-data'] | default('')) else '' }}"
+        state: absent
+      when: layersentry_provider == 'tomcat'
+
+    - name: Remove Tomcat package
+      ansible.builtin.dnf:
+        name: tomcat
+        state: absent
+      when: layersentry_provider == 'tomcat'
+
+    - name: Read Node.js module ownership marker
+      ansible.builtin.slurp:
+        src: /var/lib/layersentryd/state/nodejs-module-owner
+      register: layersentry_node_owner
+      failed_when: false
+      changed_when: false
+      when: layersentry_provider == 'nodejs-runtime'
+
+    - name: Remove Node.js exact package
+      ansible.builtin.dnf:
+        name: nodejs
+        state: absent
+      when: layersentry_provider == 'nodejs-runtime'
+
+    - name: Reset Node.js module stream only when owned by this service
+      ansible.builtin.command:
+        argv: [/usr/bin/dnf, -y, module, reset, nodejs]
+      when:
+        - layersentry_provider == 'nodejs-runtime'
+        - not (layersentry_node_owner.failed | default(true))
+        - (layersentry_node_owner.content | b64decode | trim) == layersentry_service_id
+
+    - name: Remove Node.js module ownership marker
+      ansible.builtin.file:
+        path: /var/lib/layersentryd/state/nodejs-module-owner
+        state: absent
+      when:
+        - layersentry_provider == 'nodejs-runtime'
+        - not (layersentry_node_owner.failed | default(true))
+        - (layersentry_node_owner.content | b64decode | trim) == layersentry_service_id
+
+    - name: Remove Python runtime package
+      ansible.builtin.dnf:
+        name: python3.12
+        state: absent
+      when: layersentry_provider == 'python-runtime'
+
+    - name: Remove Podman runtime package
+      ansible.builtin.dnf:
+        name: podman
+        state: absent
+      when: layersentry_provider == 'podman-runtime'
+
+    - name: Preserve customer data and mounted filesystems
       ansible.builtin.debug:
-        msg: "PostgreSQL package/config runtime removed; LayerSentry storage/data roots are intentionally preserved."
+        msg: "LayerSentry managed package/config/runtime removed; customer data roots and attached filesystems are intentionally preserved."
