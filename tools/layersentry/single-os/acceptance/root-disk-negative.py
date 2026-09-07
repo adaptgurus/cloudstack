@@ -20,18 +20,35 @@ def run(argv, **kw):
                           text=True, check=False, timeout=120, **kw)
 
 
+def block_type(device: str) -> str:
+    p = run(["/usr/bin/lsblk", "-dnro", "TYPE", device])
+    values = [line.strip() for line in p.stdout.splitlines() if line.strip()]
+    if p.returncode != 0 or len(values) != 1:
+        raise RuntimeError("cannot prove block-device type for %s" % device)
+    return values[0]
+
+
 def root_top_disk() -> str:
     p = run(["/usr/bin/findmnt", "-nro", "SOURCE", "/"])
-    if p.returncode != 0:
+    if p.returncode != 0 or not p.stdout.strip():
         raise RuntimeError("cannot discover root source")
-    cur = os.path.realpath(p.stdout.strip())
-    for _ in range(32):
-        q = run(["/usr/bin/lsblk", "-nro", "PKNAME", cur])
-        parent = q.stdout.strip()
-        if q.returncode != 0 or not parent:
-            return cur
-        cur = os.path.realpath(parent if parent.startswith("/") else "/dev/" + parent)
-    raise RuntimeError("root ancestry exceeded bound")
+    q = run(["/usr/bin/lsblk", "-s", "-nrpo", "PATH", p.stdout.strip()])
+    if q.returncode != 0:
+        raise RuntimeError("cannot prove root block-device ancestry")
+    ancestry = []
+    for raw in q.stdout.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        real = os.path.realpath(raw)
+        if real and real not in ancestry:
+            ancestry.append(real)
+    if not ancestry:
+        raise RuntimeError("root block-device ancestry is empty")
+    disks = [device for device in ancestry if block_type(device) == "disk"]
+    if len(disks) != 1:
+        raise RuntimeError("cannot uniquely prove top whole root disk: found=%d" % len(disks))
+    return disks[0]
 
 
 def stable_id_for(real: str) -> str:
