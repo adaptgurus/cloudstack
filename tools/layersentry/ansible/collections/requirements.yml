@@ -1,0 +1,6 @@
+---
+# Single-OS V1 deliberately uses ansible-core builtins plus reviewed local
+# modules under library/. This keeps the appliance air-gap friendly and avoids
+# runtime pulls from Ansible Galaxy. Add a collection here only after it is
+# pinned, mirrored, licensed and included in the immutable appliance artifact.
+collections: []
