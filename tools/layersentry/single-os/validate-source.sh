@@ -40,7 +40,16 @@ popd >/dev/null
 
 find "$ANSIBLE/library" -type f -name '*.py' -print0 | xargs -0 -r python3 -m py_compile
 
+# Production uses private /run/layersentryd and /usr/lib/layersentry paths.
+# Source validation runs unprivileged from the checkout, so override only the
+# Ansible syntax-check working/search paths and leave production config intact.
+mkdir -p "$tmp/ansible-local" "$tmp/ansible-remote"
+chmod 0700 "$tmp/ansible-local" "$tmp/ansible-remote"
 export ANSIBLE_CONFIG="$ANSIBLE/ansible.cfg"
+export ANSIBLE_LOCAL_TEMP="$tmp/ansible-local"
+export ANSIBLE_REMOTE_TEMP="$tmp/ansible-remote"
+export ANSIBLE_ROLES_PATH="$ANSIBLE/roles"
+export ANSIBLE_LIBRARY="$ANSIBLE/library"
 export ANSIBLE_NOCOLOR=1
 export ANSIBLE_FORCE_COLOR=0
 export ANSIBLE_DISPLAY_ARGS_TO_STDOUT=false
