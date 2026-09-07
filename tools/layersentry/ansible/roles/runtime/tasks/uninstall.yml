@@ -1,0 +1,15 @@
+---
+- name: Refuse destructive package-runtime uninstall
+  ansible.builtin.assert:
+    that:
+      - not (layersentry_destroy_data | default(false) | bool)
+    fail_msg: Runtime package uninstall never destroys customer application data.
+
+- name: Resolve runtime package identity
+  ansible.builtin.set_fact:
+    layersentry_runtime_package: "{{ 'python3.12' if layersentry_provider == 'python-runtime' else 'podman' }}"
+
+- name: Remove runtime package only
+  ansible.builtin.dnf:
+    name: "{{ layersentry_runtime_package }}"
+    state: absent
