@@ -10,7 +10,16 @@
       - layersentry_hypervisor_packages | length >= 4
       - layersentry_hypervisor_repositories is sequence
       - layersentry_hypervisor_repositories | length > 0
-    fail_msg: Hypervisor intent is incomplete or not certified for this V1 slice.
+      - layersentry_failure_domain is string
+      - layersentry_failure_domain is match('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')
+      - layersentry_management_bridge is string
+      - layersentry_management_bridge is match('^[A-Za-z0-9_.:-]{1,63}$')
+      - layersentry_management_mtu | int >= 1280
+      - layersentry_management_mtu | int <= 9216
+      - layersentry_min_memory_mib | int > 0
+      - layersentry_min_vcpus | int > 0
+      - layersentry_required_storage_paths is sequence
+    fail_msg: Hypervisor/bootstrap intent is incomplete or not certified for this V1 slice.
 
 - name: Require Rocky Linux 9
   ansible.builtin.assert:
@@ -36,6 +45,13 @@
       - ansible_facts.services['firewalld.service'].state == 'running'
     fail_msg: firewalld must be active before LayerSentry host mutation.
 
+- name: Require chronyd active
+  ansible.builtin.assert:
+    that:
+      - "'chronyd.service' in ansible_facts.services"
+      - ansible_facts.services['chronyd.service'].state == 'running'
+    fail_msg: chronyd must be active before bootstrap mutation.
+
 - name: Read CPU capabilities without executing a shell
   ansible.builtin.slurp:
     src: /proc/cpuinfo
@@ -60,6 +76,55 @@
       - layersentry_kvm_device.stat.ischr | default(false)
     fail_msg: /dev/kvm is missing or is not a character device.
 
+- name: Require N+1 bootstrap capacity floor
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.memtotal_mb | int >= layersentry_min_memory_mib | int
+      - ansible_facts.processor_vcpus | int >= layersentry_min_vcpus | int
+    fail_msg: Hypervisor does not meet the configured control-plane N+1 capacity floor.
+
+- name: Inspect management bridge
+  ansible.builtin.stat:
+    path: "/sys/class/net/{{ layersentry_management_bridge }}"
+  register: layersentry_management_bridge_stat
+
+- name: Require management bridge
+  ansible.builtin.assert:
+    that:
+      - layersentry_management_bridge_stat.stat.exists
+    fail_msg: "Required management bridge is missing: {{ layersentry_management_bridge }}"
+
+- name: Read management bridge MTU
+  ansible.builtin.slurp:
+    src: "/sys/class/net/{{ layersentry_management_bridge }}/mtu"
+  register: layersentry_management_bridge_mtu
+  changed_when: false
+
+- name: Require exact management MTU
+  ansible.builtin.assert:
+    that:
+      - (layersentry_management_bridge_mtu.content | b64decode | trim | int) == (layersentry_management_mtu | int)
+    fail_msg: Management bridge MTU does not match the signed bootstrap intent.
+
+- name: Validate required storage paths
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  register: layersentry_storage_path_stats
+  loop: "{{ layersentry_required_storage_paths }}"
+  loop_control:
+    label: "{{ item.path | default('invalid') }}"
+
+- name: Require storage paths to exist with expected type
+  ansible.builtin.assert:
+    that:
+      - item.item.path is match('^/[^\\x00]*$')
+      - item.stat.exists
+      - not (item.item.require_mount | default(false) | bool) or item.stat.ismnt | default(false)
+    fail_msg: "Required bootstrap storage path is absent or not mounted: {{ item.item.path }}"
+  loop: "{{ layersentry_storage_path_stats.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
 - name: Validate repository definitions
   ansible.builtin.assert:
     that:
@@ -71,6 +136,14 @@
   loop: "{{ layersentry_hypervisor_repositories }}"
   loop_control:
     label: "{{ item.id | default('invalid') }}"
+
+- name: Resolve bootstrap DNS probe when configured
+  ansible.builtin.getent:
+    database: ahosts
+    key: "{{ layersentry_dns_probe }}"
+  when:
+    - layersentry_dns_probe is defined
+    - layersentry_dns_probe | length > 0
 
 - name: Optionally prove management-plane TCP reachability before mutation
   ansible.builtin.wait_for:

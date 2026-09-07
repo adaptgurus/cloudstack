@@ -1,0 +1,39 @@
+---
+- name: LayerSentry one-time bootstrap B0 physical-host preflight
+  hosts: layersentry_hypervisors
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  serial: 1
+
+  pre_tasks:
+    - name: Require exactly three physical bootstrap failure domains
+      ansible.builtin.assert:
+        that:
+          - groups['layersentry_hypervisors'] | length == 3
+          - hostvars[groups['layersentry_hypervisors'][0]].layersentry_failure_domain is defined
+          - hostvars[groups['layersentry_hypervisors'][1]].layersentry_failure_domain is defined
+          - hostvars[groups['layersentry_hypervisors'][2]].layersentry_failure_domain is defined
+          - (groups['layersentry_hypervisors'] | map('extract', hostvars, 'layersentry_failure_domain') | list | unique | length) == 3
+        fail_msg: Bootstrap requires exactly three hypervisors in three distinct failure domains.
+      run_once: true
+      delegate_to: localhost
+      become: false
+
+  roles:
+    - role: hypervisor_preflight
+
+  post_tasks:
+    - name: Publish non-secret B0 evidence
+      ansible.builtin.set_stats:
+        data:
+          layersentry_bootstrap_b0:
+            host: "{{ inventory_hostname }}"
+            failure_domain: "{{ layersentry_failure_domain }}"
+            management_bridge: "{{ layersentry_management_bridge }}"
+            management_mtu: "{{ layersentry_management_mtu | int }}"
+            memory_mib: "{{ ansible_facts.memtotal_mb | int }}"
+            vcpus: "{{ ansible_facts.processor_vcpus | int }}"
+            selinux_mode: "{{ ansible_facts.selinux.mode }}"
+        per_host: true
+        aggregate: false

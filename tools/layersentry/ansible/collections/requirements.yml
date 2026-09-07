@@ -1,6 +1,7 @@
 ---
-# Single-OS V1 deliberately uses ansible-core builtins plus reviewed local
-# modules under library/. This keeps the appliance air-gap friendly and avoids
-# runtime pulls from Ansible Galaxy. Add a collection here only after it is
-# pinned, mirrored, licensed and included in the immutable appliance artifact.
-collections: []
+# Customer bootstrap is disconnected. Release packaging must mirror this exact
+# collection artifact and verify it against the signed release lock/manifest;
+# ansible-galaxy is not a production runtime dependency.
+collections:
+  - name: community.libvirt
+    version: 2.3.0
