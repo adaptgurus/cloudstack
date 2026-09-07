@@ -1,6 +1,6 @@
 # LayerSentry V1 — Super Master Context
 
-**Context schema:** 4.2  
+**Context schema:** 4.3  
 **Role:** stable product/architecture contract only  
 **Baseline:** Apache CloudStack 4.22.1.1 + LayerSentry KVM-first product layer  
 **Execution policy:** `LAYERSENTRY_EXECUTION_CONTRACT.md`
@@ -24,6 +24,8 @@ LayerSentry Portal
 ```
 
 Normal customers should not need raw CloudStack internals, YAML/kubectl, RKE2 join tokens, provider replication commands or guest installation scripts.
+
+All product modules remain in canonical LayerSentry scope. A focused audit or execution assignment narrows only the **current work priority**; it must not delete, deprecate or silently redesign unrelated product modules.
 
 ## 2. CloudStack is the IaaS authority
 
@@ -99,6 +101,43 @@ LayerSentry durable workflow
 
 A release uses one cluster lifecycle owner.
 
+### 3.1 Thin cross-module service-control contract
+
+LayerSentry needs a consistent customer-facing lifecycle across IaaS, Kubernetes, DBaaS, APaaS, Streaming, Single-OS and DR, but this is a **contract over the existing owners**, not a new orchestration engine.
+
+Reuse the existing LayerSentry durable operation/journal/reconciliation mechanisms. Do not introduce another generic workflow engine, desired-state database, resource inventory, scheduler or Kubernetes operator merely to wrap CAPI/CloudStack/Flux/upstream operators.
+
+Customer-facing resources should normalize a small lifecycle vocabulary where applicable:
+
+```text
+CREATING / PROVISIONING
+READY
+DEGRADED
+UPDATING
+FAILED
+DELETING
+DELETED
+UNKNOWN
+```
+
+A thin common operation envelope should expose, where applicable:
+
+```text
+resource identity + tenant/project
+operation identity + action
+lifecycle owner/provider
+requested/desired intent reference
+observed status
+started/updated/completed timestamps
+bounded retry/attempt information
+failure reason / remediation pointer
+evidence/audit correlation
+```
+
+The underlying authoritative state remains with its owner. For example, CAPI/CAPC remain authoritative for CAPI Machines, CloudStack for IaaS resources, Flux/operators for their managed objects, and provider-native DR for replication/promotion state. LayerSentry aggregates and reconciles customer-visible composite status; it does not duplicate those authorities.
+
+A new shared abstraction is justified only when at least two active modules have proven duplicated behavior that cannot be cleanly supplied by an existing owner, and the abstraction demonstrably reduces source, testing and operational complexity.
+
 ## 4. Kubernetes DBaaS/APaaS/Streaming
 
 These services run above the same RKE2/Flux substrate.
@@ -113,6 +152,8 @@ Current V1 upstream-first choices:
 LayerSentry supplies service catalog/access, project/namespace/RBAC policy, certified storage/network/VIP choices, compatibility/release selection, local/offline artifact references, health/status/audit integration and E2E qualification.
 
 Do not replace mature upstream DB/Kafka/application lifecycle controllers merely to make the product look more custom. Upstream application UI rebranding is not a V1 requirement unless explicitly added later.
+
+A catalog entry, Helm chart, operator installation or UI page is not itself a completed managed service. Promotion requires the applicable create/read/update/delete, authorization, storage/network, failure/reconciliation, backup/restore, upgrade/rollback, observability and DR acceptance evidence defined by the module contract.
 
 ## 5. VM-native Single-OS
 
@@ -152,6 +193,22 @@ healthy DC/DR infrastructure
 After native recovery passes, add only the provider-native low-RPO path required by the selected V1 storage profile, such as LINSTOR/DRBD, Ceph RBD mirroring or certified SAN-native replication.
 
 Planned failover/failback is qualified before witness/fencing/automatic failover. Do not build a generic host block-copy engine when a storage provider already owns safe replication/promotion.
+
+### 6.1 DR protection is composite, not VM-copy only
+
+For Kubernetes DBaaS/APaaS and other stateful services, DR qualification must distinguish the independently authoritative state planes rather than treating VM recovery as application consistency:
+
+```text
+1. CloudStack infrastructure/recovery state
+2. Kubernetes/CAPI/RKE2 control-plane state
+3. database-native data/replication state where applicable
+4. Kubernetes persistent-volume/storage-provider state
+5. APaaS/application configuration and persistent state
+6. service-access state: VIP/LB/Ingress/DNS/TLS
+7. LayerSentry operation/audit/composite-status state
+```
+
+A LayerSentry protection/recovery object may aggregate these planes for UI, policy, RPO/RTO, audit and orchestration, but it must not become a competing replication engine. Promotion/failback must preserve provider ownership, fencing/split-brain safety, recovery-point correctness, health verification and explicit failure state.
 
 ## 7. Bootstrap/control-plane HA
 
