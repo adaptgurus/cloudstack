@@ -15,12 +15,14 @@ Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
-3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
+3. `LAYERSENTRY_CURRENT_STATUS.md`;
 4. this file;
 5. `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`;
-6. current branch/source/tests.
+6. current branch/source/tests/workflow/live target.
 
-Read `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` only when a provider/architecture conflict cannot be resolved from this workstream, current source and `CURRENT_STATUS.md`. Historical handoffs are not normal startup authority.
+Read `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` or historical Progress Ledger evidence only when a provider/architecture/history conflict cannot be resolved from this workstream, current source and module `CURRENT_STATUS.md`.
+
+When working from a normal Git worktree, initialize/check the `single-os` writer guard from `tools/layersentry/governance/module-writer-guard.sh` before meaningful batches.
 
 ## 3. Hard file fence
 
@@ -34,16 +36,9 @@ Writable:
 
 Current normal provider-role scope includes PostgreSQL, MySQL/MariaDB, Redis/Valkey, Nginx, HTTPD, Tomcat, Node.js/runtime, `storage_lvm`, `network_vip` and their purpose-built modules.
 
-Do not edit:
+Do not edit UI, K8s, DR, bootstrap/hypervisor roles, generic release/security tooling or global authority files.
 
-- `ui/**`;
-- `tools/layersentry/k8s/**`;
-- `tools/layersentry/dr*`;
-- bootstrap/hypervisor roles such as `hypervisor_*`, `network_bridge`, `firewall`, `selinux` unless explicitly reassigned;
-- generic release/security workflows/tooling;
-- global authority files.
-
-Shared Ansible platform files such as `ansible.cfg`, `collections/requirements.yml` or a deliberately shared common role/module require a separately assigned shared-Ansible task. Do not silently change them while bootstrap/hypervisor work may be active.
+Shared Ansible platform files such as `ansible.cfg`, `collections/requirements.yml` or a deliberately shared common role/module require a separately assigned serialized shared-Ansible task.
 
 If a CloudStack/UI/DR/K8s dependency is wrong, report the exact failing contract to that workstream instead of fixing it here.
 
@@ -84,15 +79,15 @@ For acceptance testing, if a destructive or failed provider run leaves the guest
 
 Do not spend engineering/Codex effort building VM snapshot rollback, automatic OS reinstall, automatic reimage or lab-reset orchestration solely for test cleanup.
 
-This shortcut applies only to disposable **lab reset**. Product requirements for safe installation, idempotent rerun, repair, upgrade, uninstall, backup/restore and recovery remain.
+This shortcut applies only to disposable lab reset. Product requirements for safe installation, idempotent rerun, repair, upgrade, uninstall, backup/restore and recovery remain.
 
 ## 7. Current completion path
 
-PostgreSQL standalone remains first live qualification:
+The module `CURRENT_STATUS.md` contains the exact current CI/RPM identity and first live gate. PostgreSQL standalone remains first live qualification:
 
 ```text
 fresh Rocky VM
- -> exact RPM install
+ -> exact current RPM install
  -> root/OS-disk rejection proof
  -> attached non-OS disk inventory
  -> Go plan/confirmation
@@ -101,10 +96,10 @@ fresh Rocky VM
  -> SELinux/firewalld
  -> health/read-write
  -> idempotent rerun
- -> reboot recovery
  -> backup + actual restore
+ -> restart/reboot recovery
  -> repair/upgrade
- -> uninstall/residue
+ -> uninstall/residue/data preservation
 ```
 
 Then qualify MySQL/MariaDB, Redis/Valkey and representative APaaS/runtime providers using the same control-plane/Ansible boundary.
@@ -123,7 +118,9 @@ Cluster support is provider-specific. Planning/mocks do not prove HA. Real DB re
 
 Do not build automatic multi-node lab provisioning merely to simulate that evidence when the owner can provide/reinstall test VMs manually.
 
-## 10. Handoff
+## 10. Status and handoff
+
+At a meaningful evidence milestone, update `docs/layersentry/evidence/single-os/CURRENT_STATUS.md` and focused evidence. Do not append long history to the Progress Ledger. An integration/status reconciliation pass refreshes `LAYERSENTRY_CURRENT_STATUS.md` when the global summary materially changes.
 
 Report only exact commit/files changed, source/live tests actually run, exact RPM/artifact identity, current provider gate reached, `LAB_RESET_REQUIRED` when applicable and the next exact provider gate.
 
