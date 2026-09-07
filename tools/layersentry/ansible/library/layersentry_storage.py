@@ -169,7 +169,7 @@ def ensure_filesystem_and_mount(device: str, item: Dict, recovery_only: bool) ->
     uuid = fs_uuid(device)
     if ensure_fstab(uuid, mount_point, current_fs):
         changed = True
-    rc, mounted_uuid, _ = run(["/usr/bin/findmnt", "-nro", "UUID", "--target", mount_point], ok=(0, 1))
+    rc, mounted_uuid, _ = run(["/usr/bin/findmnt", "-nro", "UUID", "--mountpoint", mount_point], ok=(0, 1))
     if rc == 0 and mounted_uuid:
         if mounted_uuid.strip() != uuid:
             raise RuntimeError("mount point is mounted from a different filesystem UUID")
