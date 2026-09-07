@@ -1,22 +1,38 @@
 ---
-- name: Repair LayerSentry Single-OS PostgreSQL without destructive replay
+- name: Repair LayerSentry Single-OS provider without destructive replay
   hosts: layersentry_single_os
   gather_facts: true
   become: false
   any_errors_fatal: true
+  vars:
+    layersentry_role_map:
+      postgresql: postgresql
+      mysql: mysql_family
+      mariadb: mysql_family
+      redis: keyvalue
+      valkey: keyvalue
+      nginx: nginx
+      apache-httpd: httpd
+      tomcat: tomcat
+      nodejs-runtime: nodejs
+      python-runtime: runtime
+      podman-runtime: runtime
   tasks:
-    - name: Require repair invocation
+    - name: Require repair invocation for an allowlisted standalone provider
       ansible.builtin.assert:
         that:
           - layersentry_action == 'repair'
-          - layersentry_provider == 'postgresql'
+          - layersentry_provider in layersentry_role_map
           - layersentry_request.topology == 'standalone'
-        fail_msg: Invalid PostgreSQL repair invocation.
+          - layersentry_operation_id == layersentry_request.operation_id
+          - layersentry_service_id == layersentry_request.service_id
+        fail_msg: Invalid Single-OS repair invocation.
 
-    - name: Decode transient provider secrets in memory only
+    - name: Decode transient PostgreSQL secret in memory only
       ansible.builtin.set_fact:
         layersentry_secrets:
           admin_password: "{{ layersentry_secrets_b64.admin_password | b64decode }}"
+      when: layersentry_provider == 'postgresql'
       no_log: true
 
     - name: Validate Rocky Linux and security baseline
@@ -29,9 +45,33 @@
       vars:
         layersentry_recovery_only: true
 
-    - name: Reconcile PostgreSQL package and configuration
+    - name: Derive PostgreSQL existing cluster identity for repair
+      ansible.builtin.stat:
+        path: "{{ ((layersentry_paths['database-data'] ~ '/data') if (layersentry_paths['database-data'] | default('')) else ('/var/lib/pgsql/' ~ layersentry_request.release_line ~ '/data')) ~ '/PG_VERSION' }}"
+      register: layersentry_repair_pg_identity
+      when: layersentry_provider == 'postgresql'
+
+    - name: Refuse PostgreSQL repair when cluster identity is missing
+      ansible.builtin.assert:
+        that: [layersentry_repair_pg_identity.stat.exists]
+        fail_msg: PostgreSQL repair cannot initialize a missing data cluster; restore/recovery authorization is required.
+      when: layersentry_provider == 'postgresql'
+
+    - name: Derive MySQL-family existing system database for repair
+      ansible.builtin.stat:
+        path: "{{ ((layersentry_paths['database-data'] ~ '/data') if (layersentry_paths['database-data'] | default('')) else '/var/lib/mysql') ~ '/mysql' }}"
+      register: layersentry_repair_mysql_identity
+      when: layersentry_provider in ['mysql', 'mariadb']
+
+    - name: Refuse MySQL-family repair when system database is missing
+      ansible.builtin.assert:
+        that: [layersentry_repair_mysql_identity.stat.exists]
+        fail_msg: Database repair cannot initialize a missing system database; restore/recovery authorization is required.
+      when: layersentry_provider in ['mysql', 'mariadb']
+
+    - name: Reconcile selected provider package and configuration
       ansible.builtin.include_role:
-        name: postgresql
+        name: "{{ layersentry_role_map[layersentry_provider] }}"
 
     - name: Reconcile firewall and optional VIP
       ansible.builtin.include_role:
@@ -42,8 +82,16 @@
     - name: Flush network handlers
       ansible.builtin.meta: flush_handlers
 
-    - name: Restart PostgreSQL after repair
+    - name: Restart provider service after repair
       ansible.builtin.systemd_service:
-        name: "postgresql-{{ layersentry_request.release_line }}.service"
+        name: "{{ layersentry_service_unit }}"
         enabled: true
         state: restarted
+      when: layersentry_service_unit | length > 0
+
+    - name: Reconcile MySQL-family managed administrator after repair
+      layersentry_mysql_bootstrap:
+        provider: "{{ layersentry_provider }}"
+        password_b64: "{{ layersentry_secrets_b64.admin_password }}"
+      when: layersentry_provider in ['mysql', 'mariadb']
+      no_log: true
