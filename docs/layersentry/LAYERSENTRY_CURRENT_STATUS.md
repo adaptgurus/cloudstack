@@ -2,208 +2,112 @@
 
 **Role:** compact startup status index.  
 **Baseline:** Apache CloudStack 4.22.1.1 + KVM + Rocky Linux 9.  
-**Authority rule:** actual current source/workflow/live evidence overrides this file if newer.
+**Rule:** actual current source/workflow/live evidence overrides this file if newer. Never reset to a SHA copied from here.
 
-This file exists so a new ChatGPT/Codex session can understand what has already been achieved and what the first unmet gate is **without reading the full historical Progress Ledger**.
+## 1. Execution / module state
 
-Do not treat any recorded commit here as a reset target. Always fetch the actual shared branch first.
-
-## 1. Current execution model
-
-| Module | Default owner | Activation | Current high-level state |
+| Module | Owner / activation | Current state | First unmet gate |
 | --- | --- | --- | --- |
-| RKE2/Kubernetes/Data Services | Codex | **ACTIVE PRIMARY** | substantial source exists; live E0/E1 gates remain `PENDING` |
-| Healthy second RKE2 cluster | test-only lane | parallel when supplied | package/Flux qualification only; no lifecycle-source writing |
-| VM-native Single-OS | ChatGPT by default | active when clean Rocky lab is available | source + exact RPM are `CI_VERIFIED`; live provider qualification is next |
-| DC/DR | ChatGPT by default | active native-API/lab stream | source foundation exists; native two-point recovery remains unproven |
-| Bootstrap/Hypervisor/Control Plane | ChatGPT by default | active when 3-host lab is available | B0/B1 and H0-H2 source slices exist; live qualification remains |
-| UI/Self-Service | Codex | **DEFERRED FINAL PASS** | substantial UI exists; run one final integration/browser pass after backend contracts stabilize |
-| Release/signing/security | milestone-gated | only when artifact/trust gate requires it | source foundations exist; final production trust/certification remains pending |
+| RKE2/K8s/Data Services | **Codex / ACTIVE PRIMARY** | substantial source; release candidate `PENDING` | immutable CCM/CSI/Flux artifacts -> deploy controller -> one real cluster -> auto join -> 6443/9345 -> `Ready` |
+| Healthy second RKE2 | test-only parallel lane | package qualification only | Flux/OpenEverest/OpenBao/Harbor/Strimzi/offline tests; no lifecycle-source commits |
+| VM-native Single-OS | ChatGPT by default | source + exact RPM `CI_VERIFIED`; live provider `NOT_TESTED` | clean Rocky 9 + non-OS disk -> install exact RPM -> PostgreSQL live acceptance |
+| DC/DR | ChatGPT by default | `PARTIAL`; state/recovery source exists | healthy CloudStack/B&R -> OLD/NEW recovery points -> isolated recovery -> exact guest-data verify |
+| Bootstrap/Hypervisor | ChatGPT by default | H0-H2 + B0/B1 source slices exist; live `NOT_TESTED` | three real KVM failure domains -> live B0/B1 -> DB/control-plane progression |
+| UI/Self-Service | Codex / **DEFERRED** | substantial existing UI | one final backend integration/RBAC/build/Chrome+Firefox pass after contracts stabilize |
+| Release/Security | milestone-gated | source foundations; production trust/certification pending | exact artifact promotion/signing/security/upgrade gates when activated |
 
-One source writer per module. Foreign-module defects are handed to the owning module rather than fixed cross-scope.
+One source writer per module. Foreign-module defects are handed to their owner.
 
-## 2. RKE2 / Kubernetes / Data Services
+## 2. RKE2 / Kubernetes / services
 
-**Status:** `PENDING` for the current release candidate; source implementation is substantial but live qualification is low.
-
-Current release tuple is recorded in:
+Current machine-readable authority:
 
 `tools/layersentry/k8s/release-candidate-lane-b.json`
 
-Selected candidate:
+Candidate tuple: CloudStack `4.22.1.1`, CAPI `1.13.5`, CAPC `0.6.1` + pinned downstream overlay, CAPRKE2 `0.25.2`, RKE2 `1.36.4+rke2r1`, Kubernetes `1.36.x`, CloudStack CSI `3.0.2` downstream candidate, CloudStack CCM `1.2.0` downstream candidate, Flux package plane.
 
-- CloudStack `4.22.1.1`;
-- CAPI `1.13.5`;
-- CAPC `0.6.1` plus pinned LayerSentry downstream overlay;
-- CAPRKE2 `0.25.2`;
-- RKE2 `1.36.4+rke2r1` / Kubernetes `1.36.x`;
-- CloudStack CSI `3.0.2` plus downstream project/idempotency work;
-- CloudStack CCM `1.2.0` plus Kubernetes 1.36 downstream work;
-- Flux as central package reconciler.
+Implemented source includes BFF/auth/RBAC, durable saga/journal/reconciliation, CloudStack preflight/client, CAPI/CAPC/CAPRKE2 resources, create/status/scale/delete, 6443/9345 endpoint work, CAPC volume ownership work, CCM/CSI downstream source, NodeDiskSet, Flux and runtime wiring.
 
-Already implemented in source includes BFF/auth/RBAC, durable saga/journal/reconciliation, CloudStack preflight/client, CAPI/CAPC/CAPRKE2 resources, create/status/scale/delete executor, dual 6443/9345 endpoint work, CAPC volume-ownership work, CCM/CSI downstream source, NodeDiskSet and Flux/runtime wiring.
+The current release manifest still has all hard live gates false, including endpoints, Flux reconcile, CAPC/NodeDisk ownership, CSI project/resize, stateful replacement, air-gap, backup/restore and PITR. Do not broaden source while the current gate fails.
 
-Current hard gates remain false in the release candidate, including:
+Services reuse the same RKE2 + Flux substrate:
 
-- tuple reconciliation;
-- 6443;
-- 9345;
-- Flux remote reconcile;
-- CAPC volume ownership safety;
-- NodeDiskSet ownership;
-- CSI project scope;
-- CSI resize idempotency;
-- air-gap create/scale/repair;
-- stateful Machine replacement;
-- backup/restore;
-- PITR restore.
+- OpenEverest stable v1 -> supported PostgreSQL/PXC-MySQL/MongoDB;
+- OpenBao -> supported Helm/OCI;
+- Harbor -> supported Helm/OCI;
+- Strimzi -> Kafka.
 
-Current first unmet gate:
+Do not build replacement DB/Kafka/application operators/controllers or upstream UIs.
 
-```text
-immutable final artifacts (especially CCM / CSI / Flux catalog)
- -> deploy exact controller stack
- -> create one real cluster
- -> automatic CAPRKE2 join
- -> 6443 + 9345
- -> Ready
-```
+The separate healthy RKE2 cluster is test-only; success there does not by itself make the LayerSentry-created cluster `LIVE_VERIFIED`.
 
-Do not add service breadth before the current substrate gate passes.
+## 3. VM-native Single-OS
 
-The separately supplied healthy RKE2 cluster is **test-only** for Flux/OpenEverest/OpenBao/Harbor/Strimzi/package/offline tests. Success there does not by itself promote the full LayerSentry K8s path to `LIVE_VERIFIED`.
-
-## 3. Kubernetes DBaaS / APaaS / Streaming
-
-**Architecture:** one shared RKE2 + Flux substrate; upstream-first.
-
-V1 integration targets:
-
-- OpenEverest stable v1 line for supported PostgreSQL/PXC-MySQL/MongoDB lifecycle;
-- OpenBao from supported Helm/OCI content;
-- Harbor from supported Helm/OCI content;
-- Strimzi for Kafka.
-
-LayerSentry does not build replacement DB operators, DB backup/PITR/failover engines, Kafka operators, Harbor/OpenBao controllers or replacement upstream UIs.
-
-First meaningful service qualification begins only after the shared RKE2/CSI/CCM/Flux substrate is proven, although package behavior may be tested earlier on the separate healthy RKE2 lane.
-
-## 4. VM-native Single-OS
-
-**Status:** source and exact RPM are `CI_VERIFIED`; live Rocky provider qualification is `NOT_TESTED`.
-
-Current implementation includes:
-
-- substantial Go API/auth/plan/idempotency/journal/secrets/reconciliation/provider control plane;
-- Go -> Ansible execution boundary;
-- Rocky baseline, LVM/storage, network/VIP and provider roles/playbooks;
-- PostgreSQL, MySQL/MariaDB, Redis/Valkey, Nginx, HTTPD, Tomcat and runtime provider source;
-- exact install/signature/SHA acceptance tooling;
-- root/OS-disk destructive-plan rejection;
-- two-phase PostgreSQL live acceptance covering install/read-write/idempotent replay/backup-restore/reboot/repair/upgrade/uninstall/data preservation.
-
-Latest durable source gate:
-
-- implementation/evidence commit: `f2aee691867d974c2eb0b28184d92b4567100ce8`;
-- source-validation run `34126279393`, job `101755596059`;
-- exact RPM build run `34126279307`;
-- artifact `10020266864`;
-- RPM `layersentry-single-os-0.2.0-1.el9.x86_64.rpm`;
-- RPM SHA-256 `5ddfa332d222a616f9d9749282540ab3a4acaad64b4b4cba767236a0d4b58fe1`.
-
-Authoritative module pointer:
+Authoritative module status:
 
 `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`
 
-First unmet gate: clean disposable Rocky Linux 9 VM + separate non-OS disk, exact RPM installation, live root-disk safety proof, then PostgreSQL standalone phase 1/reboot/phase 2.
+Current durable proof:
 
-If the disposable VM becomes dirty or ambiguous, capture evidence and report `LAB_RESET_REQUIRED`; the owner may manually reinstall Rocky rather than building lab-reset automation.
+- source validation: `CI_VERIFIED` at `f2aee691867d974c2eb0b28184d92b4567100ce8`, run `34126279393`, job `101755596059`;
+- exact Rocky RPM build: run `34126279307`, artifact `10020266864`;
+- RPM `layersentry-single-os-0.2.0-1.el9.x86_64.rpm`;
+- RPM SHA-256 `5ddfa332d222a616f9d9749282540ab3a4acaad64b4b4cba767236a0d4b58fe1`.
 
-## 5. Hypervisor / Bootstrap / Control Plane
+Source already includes Go control/lifecycle + Ansible boundary, Rocky/LVM/VIP roles, PostgreSQL/MySQL-family/Redis-Valkey/Nginx/HTTPD/Tomcat/runtime providers and two-phase PostgreSQL acceptance tooling.
 
-**Status:** multiple source slices are `SOURCE_COMPLETE`; live qualification is still `NOT_TESTED`.
+Next: clean disposable Rocky 9 VM with separate data disk -> exact RPM install -> live root-disk exclusion -> PostgreSQL phase 1 -> reboot -> phase 2/repair/upgrade/uninstall/data preservation.
 
-Implemented source includes:
+If the disposable guest becomes dirty/ambiguous, record `LAB_RESET_REQUIRED`; the owner may manually reinstall the VM rather than building lab-reset automation.
 
-- H0/H1 Ansible hypervisor entrypoints;
-- H2 network/security boundary with SELinux enforcing, NetworkManager bridge handling and firewalld agent rules;
-- B0 exactly-three-host physical preflight with distinct failure domains, Rocky/KVM/time/network/storage/security checks;
-- B1 allowlisted provisioning for `LS-DB-01..03` using pinned `community.libvirt`, deterministic UUID/MAC/storage/CIDATA, authoritative observation after ambiguous create and no force recreate;
-- B1 runtime dependency fail-closed checks for `virt-install`, `python3-libvirt`, `python3-lxml` and `python3-pycdlib`.
+## 4. Hypervisor / bootstrap
 
-Evidence pointers:
+Current source evidence pointers:
 
-- `docs/layersentry/evidence/hypervisor/2026-09-07-h2-network-security-source.md`;
-- `docs/layersentry/evidence/bootstrap/2026-09-07-b0-physical-host-preflight-source.md`;
-- `docs/layersentry/evidence/bootstrap/2026-09-07-b1-db-vm-provisioning-source.md`;
-- `docs/layersentry/evidence/bootstrap/2026-09-07-b1-runtime-dependency-closure.md`.
+- `evidence/hypervisor/2026-09-07-h2-network-security-source.md`;
+- `evidence/bootstrap/2026-09-07-b0-physical-host-preflight-source.md`;
+- `evidence/bootstrap/2026-09-07-b1-db-vm-provisioning-source.md`;
+- `evidence/bootstrap/2026-09-07-b1-runtime-dependency-closure.md`.
 
-First unmet gate: live B0/B1 qualification on three real KVM failure domains with signed package intent, storage/base image, UEFI, bridge/MTU, three DB VM identities, cloud-init/SSH and later CloudStack-agent coexistence proof.
+Implemented: Rocky/KVM/security/network preflight, H2 SELinux/NetworkManager/firewalld boundary, exactly-three-failure-domain B0 checks, allowlisted deterministic B1 DB-VM libvirt provisioning and runtime dependency guards.
 
-## 6. DC / DR
+Nothing above is live-certified yet. First live gate is three real KVM failure domains with signed package intent/storage/base image/UEFI/bridge/MTU/cloud-init/SSH, then CloudStack-agent coexistence and later DB/MGMT/LB HA.
 
-**Status:** `PARTIAL`; source foundations exist, but native recovery is not `LIVE_VERIFIED`.
+## 5. DC / DR
 
-Already implemented:
+Current execution pointer:
 
-- provider-neutral DR objects/state/journal/lease/idempotency foundation;
-- explicit Test Recovery/Recovery/Planned Failover/Failback/Auto-Failover safety gates;
-- native CloudStack `createVMFromBackup` adapter for selected recovery points with bounded offline tests;
-- storage-native-first architecture for advanced low-RPO tiers.
+`docs/layersentry/codex/WORKSTREAM_D_DR_HA_UPGRADE.md`
 
-Latest known live baseline still shows the native path blocked by environment readiness such as source/destination Zone/storage/image-store/SystemVM/B&R configuration/API/RBAC/DR KVM readiness. Historical same-host nested Hyper-V evidence is functional only and cannot certify independent-site DR.
+Source foundations include provider-neutral DR objects/state/journal/lease/idempotency and the bounded native selected-recovery-point `createVMFromBackup` adapter. Native recovery is not yet `LIVE_VERIFIED`.
 
-First unmet gate:
+First gate remains environment/native recovery, not more framework source:
 
 ```text
-healthy DC/DR CloudStack
- -> native B&R enabled
- -> disposable source VM + data disk
- -> Recovery Point OLD
- -> mutate data
- -> Recovery Point NEW
- -> recover OLD and NEW into isolated destination
- -> verify exact root/data contents
+healthy DC/DR CloudStack -> B&R -> OLD -> mutate -> NEW
+ -> recover OLD + NEW to isolated destination -> exact root/data verification
 ```
 
-Do not expand advanced provider code until native recovery passes.
+Only after that qualify one required provider-native low-RPO path, then Planned Failover/Failback, then witness/fencing/Auto Failover last.
 
-## 7. UI / Self-Service
+## 6. UI / release / production
 
-**Status:** `PARTIAL` / substantial existing source; final product acceptance is deferred.
+UI is substantial but intentionally dormant until backend contracts are stable enough for one final `ui/**` integration/browser pass. Do not redesign the portal or rebuild upstream service UIs.
 
-Existing work includes LayerSentry/KVM presentation, Quick Provision and broad self-service foundations. Historical exact-artifact evidence exists for selected UI scopes, but final backend-integrated role/RBAC/browser acceptance remains.
+Release/security is milestone-only. One logical V1 carrier remains `layersentry-platform-<release>.iso`; bundled packages are `AVAILABLE`, not installed.
 
-Activation rule: keep UI dormant while K8s/DR/Single-OS contracts move; then run one bounded final pass over `ui/**` only for VM/bucket/backup, RKE2, service catalog/status, DR integration, RBAC/routes/progress/errors, production build and Chrome/Firefox acceptance.
+**Overall production certification remains `PENDING`.** Governance/source/CI progress is not runtime certification.
 
-## 8. Release / Security / Production Certification
+## 7. Status maintenance
 
-Release/security work is milestone-gated. Do not run permanent release/security streams.
+Keep this file small (target roughly 5-8 KB) and current.
 
-One logical V1 release carrier remains:
+- Module writers update their module-specific status/release manifest/focused evidence only at meaningful evidence milestones.
+- An integration/status/governance pass updates this file when a module status, first unmet gate or authoritative pointer materially changes.
+- Do not paste logs/history here. The compacted `LAYERSENTRY_PROGRESS_LEDGER.md` and Git/evidence history are read on demand only.
+- Every new session still fetches actual Git/workflow/live state; newer evidence wins if this summary is stale.
 
-`layersentry-platform-<release>.iso`
-
-Final production gates still include immutable/signature/trust/SBOM/provenance, offline artifact closure, exact installer/upgrade/rollback evidence, security negatives, HA/DR, performance/scale/soak and release-specific regression.
-
-**Overall production certification remains `PENDING`.** Source/CI progress must not be promoted to runtime certification.
-
-## 9. Status maintenance contract
-
-This file is intentionally compact and should remain **under roughly 8 KB whenever practical**.
-
-Maintenance rules:
-
-1. Module writers update their module-specific machine-readable/status/evidence pointer after a meaningful evidence milestone, not after every commit.
-2. The global `LAYERSENTRY_CURRENT_STATUS.md` is reconciled by an integration/status/governance pass when a module's status, first unmet gate or authoritative pointer materially changes.
-3. Do not copy long logs, old checkpoint narratives or full test output into this file; link/pointer to durable evidence instead.
-4. The historical `LAYERSENTRY_PROGRESS_LEDGER.md` is not startup context. Use it only when older evidence/history is actually needed.
-5. A new session always fetches current Git/workflow/live state; this status file is an orientation index, not a substitute for observation.
-6. If this file is stale, newer current source, module CURRENT_STATUS/release manifest, workflow evidence and live evidence win.
-
-## 10. New-session resume rule
-
-A new session should be able to start from:
+New-session resume path:
 
 ```text
 AGENTS.md
@@ -214,4 +118,4 @@ AGENTS.md
  -> first unmet gate
 ```
 
-Do not restart completed work merely because the previous chat is unavailable.
+Do not restart completed work because a prior chat is unavailable.
