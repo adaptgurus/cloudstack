@@ -1,95 +1,93 @@
 # LayerSentry Single-OS — Current Status
 
-**Role:** module-scoped volatile evidence checkpoint for VM-native Single-OS DBaaS/APaaS.  
-**Global current-status authority:** `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md` **plus current evidence**, per `LAYERSENTRY_SUPER_MASTER_CONTEXT.md`. This file is the Single-OS evidence component of that authority.  
-**Stable architecture authority:** `docs/layersentry/LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`.  
-**Execution routing:** `docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md`.
+**Role:** volatile evidence checkpoint for VM-native Single-OS DBaaS/APaaS  
+**Stable architecture:** `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`  
+**Execution:** `LAYERSENTRY_EXECUTION_CONTRACT.md`
 
-Always fetch the actual current branch before acting. Do not reset to a SHA copied from this file.
+Always fetch the actual current branch before acting. Source/live evidence overrides this status if newer.
 
 ## Current reconciled state — 2026-09-07
 
 | Scope | Status | Current truth |
 | --- | --- | --- |
-| Target VM-native architecture | `DESIGN_DEFINED` | Go orchestration/control + local Ansible execution + versioned roles/modules/playbooks |
-| Existing Go Single-OS engine/providers | `PARTIAL` | substantial control/lifecycle/provider source remains under `tools/layersentry/single-os/agent/`; it is preserved rather than rewritten |
-| Go→Ansible execution boundary | `PARTIAL` | typed root helper, private ephemeral vars, immutable local project root, transactional provider interface, timeout-to-UNKNOWN propagation and RPM packaging exist; fresh validation still required |
-| Ansible Single-OS execution tree | `PARTIAL` | `tools/layersentry/ansible/` now exists with Rocky baseline, LVM/storage, network/VIP and provider roles/modules/playbooks; source validation/live qualification not yet complete |
-| PostgreSQL standalone Ansible slice | `PARTIAL` | transactional install/config/init/service/repair/upgrade/uninstall path is source-written; live Rocky validation remains |
-| MySQL/MariaDB Ansible slice | `PARTIAL` | external datadir/log/TLS/init, owner marker and no-log local admin bootstrap are source-written; fresh source/live validation remains |
-| Redis/Valkey Ansible slice | `PARTIAL` | hashed ACL config, external data bind/SELinux, owner marker and data-preserving uninstall are source-written; fresh source/live validation remains |
-| Nginx/Apache/Tomcat Ansible slice | `PARTIAL` | external app roots, SELinux, listener/config handling and data-preserving cleanup are source-written; fresh source/live validation remains |
-| Node.js/Python/Podman runtime Ansible slice | `PARTIAL` | package-only runtime roles and data-preserving cleanup exist; Node.js 20 module ownership/reset logic requires source/live validation |
-| Historical September 7 Go source-validation result | `UNKNOWN` | old handoff referenced a validation file that was never committed; do not inherit that result |
-| Fresh Single-OS source validation | `PENDING` | `tools/layersentry/single-os/validate-source.sh` now defines Go test/vet/build, Python compile, Ansible syntax and shell syntax gates but has not yet been durably executed for the current branch |
-| Rocky Linux 9 provider/runtime qualification | `NOT_TESTED` | acceptance harness exists; target VM installation is still being prepared by the owner |
-| Real PostgreSQL multi-node HA/replication/failover | `NOT_TESTED` | requires real multi-node evidence |
-| Real Keepalived VRRP failover | `NOT_TESTED` | requires real multi-node evidence |
-| Production certification | `NOT_TESTED` | provider/security/backup/recovery/upgrade/performance and signed-release gates remain |
+| Architecture | `DESIGN_DEFINED` | Go orchestration/control + local Ansible execution + Rocky Linux 9 |
+| Go engine/providers | `PARTIAL` | substantial API/auth/plan/idempotency/journal/secrets/reconciliation/provider source exists and must be preserved |
+| Go→Ansible boundary | `PARTIAL` | transactional Ansible execution, private ephemeral vars, timeout/UNKNOWN handling and RPM packaging exist |
+| Ansible tree | `PARTIAL` | Rocky baseline, LVM/storage, network/VIP and DB/app/runtime provider roles/modules/playbooks exist |
+| PostgreSQL standalone | `PARTIAL` | install/config/init/service/repair/upgrade/uninstall source plus dedicated Rocky acceptance clients exist; live qualification remains |
+| MySQL/MariaDB | `PARTIAL` | external data/log/TLS/bootstrap source exists; live qualification remains |
+| Redis/Valkey | `PARTIAL` | ACL/data/SELinux/uninstall source exists; live qualification remains |
+| Nginx/HTTPD/Tomcat/runtime | `PARTIAL` | provider roles and data-preserving cleanup source exist; live qualification remains |
+| Fresh source validation | `PENDING` | current exact branch still needs durable Go test/vet/build + Python/Ansible syntax evidence |
+| Rocky 9 live provider qualification | `NOT_TESTED` | acceptance tooling is substantially prepared; a clean disposable target is required |
+| PostgreSQL multi-node HA | `NOT_TESTED` | requires real multi-node evidence |
+| Keepalived VRRP failover | `NOT_TESTED` | requires real multi-node evidence |
+| Production certification | `NOT_TESTED` | signed release, provider/security/backup/recovery/upgrade/performance gates remain |
 
-## Current implementation that must be preserved
+## Current implementation to preserve
 
-### Go control/lifecycle
+### Go
 
-`tools/layersentry/single-os/agent/` contains the active schema, API/auth, immutable plan, idempotency/locking, journal/state, encrypted secrets/backups, health/residue/provider metadata, reconciliation and support logic.
+`tools/layersentry/single-os/agent/` contains the active control plane: schema/API/auth, immutable plan, idempotency/locking, journal/state, encrypted secrets/backups, provider metadata, reconciliation, support and the Ansible execution boundary.
 
-The lifecycle engine recognizes transactional guest providers and routes confirmed mutations through one Ansible `Apply` boundary rather than executing the legacy imperative install path in parallel.
+### Ansible
 
-### Ansible execution
+`tools/layersentry/ansible/` contains the current Single-OS execution project, including:
 
-`tools/layersentry/ansible/` contains:
-
-- immutable local Ansible configuration/inventory;
-- custom safe modules for LayerSentry storage/LVM, bind mounts, Tomcat config and MySQL-family bootstrap;
-- Rocky Linux security-baseline role;
-- storage/LVM role with live root/root-parent exclusion and recovery-only mode;
-- NetworkManager/firewalld/Keepalived VIP role;
-- PostgreSQL, MySQL/MariaDB, Redis/Valkey, Nginx, HTTPD, Tomcat, Node.js and runtime roles;
+- safe storage/LVM and bind-mount modules;
+- Rocky security baseline;
+- root/root-parent destructive-storage exclusion;
+- NetworkManager/firewalld/Keepalived VIP handling;
+- PostgreSQL, MySQL/MariaDB, Redis/Valkey, Nginx, HTTPD, Tomcat, Node.js/runtime roles;
 - apply/repair/upgrade/service/uninstall playbooks.
 
-The RPM packages this project under `/usr/lib/layersentry/ansible` and depends on `ansible-core`; it does not fetch Galaxy content at runtime.
+Do not regress this implementation to `PENDING` because an older handoff predates it.
 
-### Transaction safety
+## Acceptance tooling now present
 
-- provider/plan/request identities are bound before mutation;
-- exact repository version/digest policy remains Go-owned;
-- secret refs are resolved to private ephemeral vars under `/run/layersentryd/ansible` and removed after execution;
-- password-bearing Ansible tasks/modules use `no_log` and do not place plaintext secrets in command argv;
-- LVM root-disk exclusion is re-evaluated from live `findmnt`/`lsblk` ancestry;
-- PV/filesystem creation requires explicit destructive confirmation;
-- repair/upgrade storage is observation/remount only;
-- repair/upgrade fail closed when PostgreSQL/MySQL-family authoritative database identity is missing;
-- firewall/VIP is reconciled before first network service start;
-- Ansible timeout/cancellation identity propagates to the lifecycle engine so ambiguous mutations can enter `UNKNOWN` rather than being blindly retried;
-- normal uninstall preserves customer data and attached filesystems.
+Current branch includes acceptance assets for:
 
-## Acceptance assets
+- exact RPM installation and SHA/signature checks;
+- verified local PGDG repository asset handling;
+- two-phase PostgreSQL Rocky acceptance;
+- storage inventory;
+- product-level rejection of the live OS/root disk from destructive LVM plans;
+- source validation entrypoint.
 
-Source validation:
+Recent acceptance commits before the governance optimization include:
 
-`tools/layersentry/single-os/validate-source.sh`
+- `3c92deeff713a5ad138f4c29086f35fc9c2ba324` — verified local PGDG repo asset support;
+- `d249517457e845986283ccbb9ecd2d0063bf71ff` — two-phase PostgreSQL Rocky acceptance client;
+- `ad9f0f57c7bdf6ed958a7b2e68a8a2778555083d` — live root-disk destructive-plan rejection test.
 
-Disposable Rocky 9 lab preparation and artifact acceptance:
+These are source facts, not live-pass claims.
 
-- `tools/layersentry/single-os/acceptance/prepare-rocky9-test-host.sh`
-- `tools/layersentry/single-os/acceptance/storage-inventory.py`
-- `tools/layersentry/single-os/acceptance/install-test-rpm.sh`
+## Manual disposable-VM reset policy
 
-These files contain no VM/root password. The owner's temporary Rocky root credential remains runtime-only and must never be committed/logged.
+The owner can manually reinstall/recreate Rocky Linux 9 test VMs.
+
+If a destructive or failed acceptance run leaves a guest dirty or ambiguous:
+
+1. capture the exact failure;
+2. stop mutating the guest;
+3. report `LAB_RESET_REQUIRED` with the clean-host prerequisites;
+4. resume the same gate after a fresh Rocky VM is supplied.
+
+Do not build automated lab reimage/snapshot rollback solely to clean disposable test VMs. This saves time/credits but does **not** remove product requirements for idempotency, repair, upgrade, uninstall, backup/restore and recovery.
 
 ## First unmet gates
 
-1. fetch/reconcile the actual current branch;
-2. run the fresh Single-OS source validation gate and persist exact evidence;
-3. fix every compile/syntax/unit failure before source promotion;
-4. build the exact RPM and record SHA-256/signature state;
-5. when the disposable Rocky 9 VM is ready, run host preparation and exact-artifact install;
-6. prove root/OS disk exclusion and inventory at least one separately attached non-OS data disk before any LVM destructive test;
-7. execute PostgreSQL standalone first: external data/WAL/log LVs, service health, idempotent rerun, reboot recovery, backup/restore, repair/upgrade/uninstall/residue;
-8. then qualify MySQL-family, Redis/Valkey and representative APaaS/runtime providers as resources permit;
-9. static secondary VIP may be tested on one VM if the lab network permits it;
-10. real VRRP failover and real database HA remain `NOT_TESTED` until a real multi-node environment is authorized.
+1. fetch/reconcile current source;
+2. execute/persist fresh source validation;
+3. build exact RPM and record SHA/signature state;
+4. prepare a clean disposable Rocky 9 VM with a separate non-OS data disk;
+5. install exact artifact;
+6. prove root/OS-disk exclusion;
+7. complete PostgreSQL standalone live path: storage, install, health/read-write, idempotent rerun, reboot, backup/restore, repair/upgrade, uninstall/residue;
+8. request manual OS reset whenever a dirty lab state would otherwise require reimage automation;
+9. then qualify MySQL-family, Redis/Valkey and representative APaaS/runtime providers;
+10. keep real DB HA and VRRP failover `NOT_TESTED` until a real multi-node lab is provided.
 
-## Continuity invariant
+## File fence
 
-A new ChatGPT/Codex session must inspect current Git source first and read this status pointer. It must not regress the Ansible implementation to `PENDING` merely because an older handoff predates it, and it must not promote this source to `SOURCE_COMPLETE`/`CI_VERIFIED`/`LIVE_VERIFIED` without fresh durable evidence.
+This workstream writes only `tools/layersentry/single-os/**`, Single-OS-specific `tools/layersentry/ansible/**` provider execution files and Single-OS evidence. UI, K8s, DR, bootstrap/hypervisor and global authority changes are handed to their owning workstreams.
