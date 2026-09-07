@@ -1,0 +1,50 @@
+---
+- name: Uninstall LayerSentry Single-OS PostgreSQL while preserving customer data
+  hosts: layersentry_single_os
+  gather_facts: true
+  become: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require data-preserving PostgreSQL uninstall
+      ansible.builtin.assert:
+        that:
+          - layersentry_action == 'uninstall'
+          - layersentry_provider == 'postgresql'
+          - not (layersentry_destroy_data | default(false) | bool)
+        fail_msg: Destructive PostgreSQL data removal is not implemented by the normal uninstall path.
+
+    - name: Stop and disable PostgreSQL
+      ansible.builtin.systemd_service:
+        name: "postgresql-{{ layersentry_request.release_line }}.service"
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Remove service firewall and guest-local VIP state
+      ansible.builtin.include_role:
+        name: network_vip
+      vars:
+        layersentry_network_state: absent
+
+    - name: Flush network cleanup handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Remove LayerSentry PGDATA systemd override
+      ansible.builtin.file:
+        path: "/etc/systemd/system/postgresql-{{ layersentry_request.release_line }}.service.d/layersentry.conf"
+        state: absent
+      register: layersentry_pg_dropin_removed
+
+    - name: Reload systemd after override cleanup
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: layersentry_pg_dropin_removed is changed
+
+    - name: Remove PostgreSQL server package only
+      ansible.builtin.dnf:
+        name: "postgresql{{ layersentry_request.release_line }}-server"
+        state: absent
+
+    - name: Preserve customer PostgreSQL data roots
+      ansible.builtin.debug:
+        msg: "PostgreSQL package/config runtime removed; LayerSentry storage/data roots are intentionally preserved."
