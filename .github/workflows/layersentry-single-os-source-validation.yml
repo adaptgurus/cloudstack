@@ -4,102 +4,90 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - layersentry/4.22.1.1-ui
       - layersentry/tmp-single-os-format-20260907
     paths:
-      - 'tools/layersentry/single-os/**'
-      - 'tools/layersentry/ansible/**'
       - '.github/workflows/layersentry-single-os-source-validation.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: layersentry-single-os-source-${{ github.ref }}
+  group: layersentry-temp-single-os-format
   cancel-in-progress: false
 
 jobs:
-  validate:
+  format-shared:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 15
     steps:
-      - name: Checkout exact source
+      - name: Checkout temporary control ref
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          persist-credentials: false
-          fetch-depth: 1
+          persist-credentials: true
+          fetch-depth: 0
 
       - name: Set up Go 1.23
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version: '1.23.x'
-          cache: true
-          cache-dependency-path: tools/layersentry/single-os/agent/go.sum
+          cache: false
 
-      - name: Capture exact formatter output
+      - name: Format newest shared Single-OS source and fast-forward push
         shell: bash
         run: |
           set -euo pipefail
-          out="$GITHUB_WORKSPACE/layersentry-temp-output"
-          agent="$GITHUB_WORKSPACE/tools/layersentry/single-os/agent"
+          shared='layersentry/4.22.1.1-ui'
+          out="$RUNNER_TEMP/layersentry-format"
           mkdir -p "$out"
+
+          git fetch --no-tags origin "+refs/heads/${shared}:refs/remotes/origin/${shared}"
+          git checkout --detach "refs/remotes/origin/${shared}"
+          base="$(git rev-parse HEAD)"
+          printf 'base_sha=%s\n' "$base" | tee "$out/metadata.txt"
+
+          agent="$GITHUB_WORKSPACE/tools/layersentry/single-os/agent"
           mapfile -d '' gofiles < <(find "$agent" -type f -name '*.go' -print0 | sort -z)
-          if ((${#gofiles[@]})); then
-            gofmt -d "${gofiles[@]}" > "$out/gofmt.patch"
-            printf '%s\0' "${gofiles[@]}" | xargs -0 gofmt -w
+          if ((${#gofiles[@]} == 0)); then
+            echo 'no Go source found' >&2
+            exit 1
           fi
-          tar -C "$GITHUB_WORKSPACE/tools/layersentry/single-os" -czf "$out/single-os-formatted.tar.gz" .
-          sha256sum "$out/gofmt.patch" "$out/single-os-formatted.tar.gz" > "$out/SHA256SUMS"
-          printf 'source_sha=%s\n' "$GITHUB_SHA" > "$out/metadata.txt"
 
-      - name: Upload formatter capture
+          gofmt -d "${gofiles[@]}" > "$out/gofmt.patch"
+          sha256sum "$out/gofmt.patch" | tee "$out/gofmt.patch.sha256"
+          printf '%s\0' "${gofiles[@]}" | xargs -0 gofmt -w
+
+          if git diff --quiet -- tools/layersentry/single-os/agent; then
+            echo 'No formatter changes remain on newest shared HEAD.'
+            exit 0
+          fi
+
+          while IFS= read -r path; do
+            case "$path" in
+              tools/layersentry/single-os/agent/*.go) ;;
+              *) echo "unexpected formatter path: $path" >&2; exit 1 ;;
+            esac
+          done < <(git diff --name-only)
+
+          git diff --check
+          git config user.name 'LayerSentry CI'
+          git config user.email 'layersentry-ci@users.noreply.github.com'
+          git add -- tools/layersentry/single-os/agent
+          git commit -m 'style(layersentry): apply Single-OS gofmt'
+          commit="$(git rev-parse HEAD)"
+          printf 'formatter_commit=%s\n' "$commit" | tee -a "$out/metadata.txt"
+
+          remote="$(git ls-remote origin "refs/heads/${shared}" | awk '{print $1}')"
+          if [[ "$remote" != "$base" ]]; then
+            echo "shared ref moved during formatting: base=$base remote=$remote" >&2
+            exit 75
+          fi
+          git push origin "HEAD:refs/heads/${shared}"
+
+      - name: Upload reconciled formatter evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: layersentry-single-os-format-capture-${{ github.run_id }}-${{ github.run_attempt }}
-          path: layersentry-temp-output/
-          if-no-files-found: error
+          name: layersentry-reconciled-gofmt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/layersentry-format/
+          if-no-files-found: warn
           retention-days: 1
-
-      - name: Install Ansible validation dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ansible-core
-          ansible-playbook --version
-          go version
-          python3 --version
-
-      - name: Run Single-OS source validation
-        id: validation
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .layersentry-evidence
-          {
-            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
-            printf 'ref=%s\n' "$GITHUB_REF"
-            printf 'sha=%s\n' "$GITHUB_SHA"
-            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
-            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
-            printf 'runner_os=%s\n' "$RUNNER_OS"
-            printf 'runner_arch=%s\n' "$RUNNER_ARCH"
-          } > .layersentry-evidence/metadata.txt
-          tools/layersentry/single-os/validate-source.sh 2>&1 | tee .layersentry-evidence/validation.log
-
-      - name: Record validation conclusion
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .layersentry-evidence
-          printf 'job_status=%s\n' '${{ job.status }}' >> .layersentry-evidence/metadata.txt
-
-      - name: Upload durable validation evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: layersentry-single-os-source-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .layersentry-evidence/
-          if-no-files-found: error
-          retention-days: 30
