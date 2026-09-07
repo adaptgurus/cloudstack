@@ -10,6 +10,27 @@
     fail_msg: MySQL-family Ansible execution received an unsupported or incomplete plan.
   no_log: true
 
+- name: Read existing MySQL-family owner marker
+  ansible.builtin.slurp:
+    src: /var/lib/layersentryd/state/mysql-family-owner
+  register: layersentry_mysql_owner
+  failed_when: false
+  changed_when: false
+
+- name: Refuse a foreign MySQL-family owner
+  ansible.builtin.assert:
+    that:
+      - layersentry_mysql_owner.failed | default(false) or ((layersentry_mysql_owner.content | b64decode | trim) == (layersentry_provider ~ ':' ~ layersentry_service_id))
+    fail_msg: A different MySQL-family LayerSentry service already owns this guest.
+
+- name: Persist MySQL-family owner marker before mutation
+  ansible.builtin.copy:
+    content: "{{ layersentry_provider }}:{{ layersentry_service_id }}\n"
+    dest: /var/lib/layersentryd/state/mysql-family-owner
+    owner: layersentry
+    group: layersentry
+    mode: '0600'
+
 - name: Resolve MySQL-family package and service contract
   ansible.builtin.set_fact:
     layersentry_mysql_package: "{{ 'mysql-server' if layersentry_provider == 'mysql' else 'mariadb-server' }}"
