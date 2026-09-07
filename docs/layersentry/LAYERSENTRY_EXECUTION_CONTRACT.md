@@ -1,75 +1,78 @@
 # LayerSentry V1 — Execution Contract
 
-**Contract schema:** 1.2  
+**Contract schema:** 1.3  
 **Effective date:** 2026-09-07  
 **Baseline:** Apache CloudStack 4.22.1.1 + KVM
 
-This file defines **who works on what, when a workstream is active, and how to avoid wasting Codex credits**. `AGENTS.md` defines hard safety/file-fence rules. `LAYERSENTRY_SUPER_MASTER_CONTEXT.md` defines stable product architecture.
+This file defines **who works on what and when a workstream is active**. `AGENTS.md` defines hard file/safety/concurrency rules. `LAYERSENTRY_CURRENT_STATUS.md` defines the compact current progress index. `LAYERSENTRY_SUPER_MASTER_CONTEXT.md` defines stable product architecture.
 
 ## 1. Default execution routing
 
 | Surface | Default owner | Activation |
 | --- | --- | --- |
-| RKE2/Kubernetes/Data Services | **Codex** | active primary technical stream |
-| UI/Self-Service | **Codex** | **deferred bounded final pass**; no continuous UI stream while backend contracts move |
-| VM-native Single-OS | **ChatGPT** | active as needed; Go + Ansible |
+| RKE2/Kubernetes/Data Services | **Codex** | **active primary technical stream** |
+| Healthy second RKE2 cluster | test-only | parallel package qualification when supplied |
+| UI/Self-Service | **Codex** | **deferred bounded final pass** after backend contracts stabilize |
+| VM-native Single-OS | **ChatGPT** | active when its lab is available |
 | DC/DR/DRaaS | **ChatGPT** | active native-API/lab stream |
-| Bootstrap/Hypervisor/Control-plane HA | **ChatGPT** | active only when its lab/resources are available |
-| Release/signing/security promotion | milestone-gated | activate only for an artifact/security gate, not as a permanent stream |
-| Governance/context | ChatGPT | only when stable authority actually changes |
+| Bootstrap/Hypervisor/Control-plane HA | **ChatGPT** | active when its dedicated lab/resources are available |
+| Release/signing/security | milestone-gated | activate only for an artifact/trust blocker or promotion gate |
+| Governance/status | ChatGPT | activate only when authority/current-status structure materially changes |
 
-If the owner chooses Codex for a normally ChatGPT-owned module, the same file fences and activation rules still apply.
+If the owner explicitly assigns Codex to a normally ChatGPT-owned module, all file fences, one-writer rules and stop conditions remain unchanged.
 
-## 2. Session startup and credit discipline
+## 2. Session startup
 
 Every session reads only:
 
 1. `/AGENTS.md`;
-2. this file;
-3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
-4. one specialist context/workstream;
-5. current source/workflow/live state.
+2. this Execution Contract;
+3. `LAYERSENTRY_CURRENT_STATUS.md`;
+4. its assigned workstream/module status;
+5. actual current source/workflow/live state.
 
-Do not read unrelated modules, old handoffs or full repository history without a concrete need.
+The full `LAYERSENTRY_PROGRESS_LEDGER.md` is **not mandatory startup context**. It is read/search-on-demand for historical evidence only.
 
-A module session must not edit global authority files or another module. When it finds a foreign dependency, it creates a concise handoff to the owning module instead of fixing it itself.
+Large specialist masters, security/debugging policy, Knowledge Graph and historical handoffs are also on-demand only when the current gate requires them.
 
-## 3. Active-workstream schedule
-
-The lowest-credit V1 schedule is:
+## 3. Lowest-credit V1 schedule
 
 ```text
-PRIMARY WRITER: RKE2/K8s
-  -> close E0/E1 live gates
-  -> reuse one lifecycle for user K8s/Data Services/APaaS/Streaming
+PRIMARY SOURCE WRITER
+  RKE2/K8s Codex
+  -> first failing E0/E1 gate only
 
-PARALLEL TEST-ONLY LANE: existing healthy RKE2 cluster
-  -> Flux/package qualification
-  -> OpenEverest/OpenBao/Harbor/Strimzi
-  -> no CAPI/CAPC lifecycle source edits
+PARALLEL TEST-ONLY
+  healthy existing RKE2 cluster
+  -> Flux/OpenEverest/OpenBao/Harbor/Strimzi/offline package tests
+  -> no lifecycle-source commits
 
-PARALLEL WRITER: Single-OS
-  -> current Go+Ansible vertical slice
-  -> use fresh disposable Rocky VMs for lab resets
+PARALLEL SOURCE WRITER
+  Single-OS ChatGPT
+  -> current Go+Ansible provider gate
+  -> manual disposable Rocky reset when needed
 
-PARALLEL WRITER: DR
-  -> fix CloudStack/B&R/Zone/storage/KVM environment
-  -> native OLD/NEW recovery before advanced DR source
+PARALLEL SOURCE/LAB WRITER
+  DR ChatGPT
+  -> healthy CloudStack + native B&R + OLD/NEW recovery first
 
-OPTIONAL WRITER: bootstrap/hypervisor
-  -> only when its dedicated lab is available
+OPTIONAL SOURCE/LAB WRITER
+  bootstrap/hypervisor ChatGPT
+  -> only when its three-host lab/resources are available
 
-DEFERRED: UI
-  -> one final integration/browser pass after backend contracts stabilize
+DEFERRED
+  UI Codex
+  -> one final backend integration/browser pass
 
-MILESTONE ONLY: release/signing/security promotion
+MILESTONE ONLY
+  release/signing/security
 ```
 
 Do not activate additional writers merely because a workstream file exists.
 
-## 4. RKE2/K8s execution contract
+## 4. RKE2 / Data Services execution contract
 
-One lifecycle serves user K8s, DBaaS, APaaS and Streaming:
+One lifecycle serves user Kubernetes, DBaaS, APaaS and Streaming:
 
 ```text
 LayerSentry UI/BFF
@@ -81,20 +84,21 @@ LayerSentry UI/BFF
  -> selected upstream packages/operators
 ```
 
-The branch already has substantial BFF/auth/RBAC, reconciliation, CAPI/CAPC/CAPRKE2 resources, lifecycle executor, CAPC endpoint/volume work, CCM/CSI downstream work, NodeDiskSet, Flux resources and runtime wiring.
+The current source already contains substantial BFF/auth/RBAC, durable reconciliation, CloudStack preflight/client, CAPI/CAPC/CAPRKE2 resources, lifecycle executor, dual-endpoint/volume-ownership work, CCM/CSI downstream source, NodeDiskSet, Flux and runtime wiring.
 
-Therefore the primary K8s writer proceeds strictly:
+Therefore the primary writer works strictly:
 
 ```text
 immutable artifacts
  -> controller deployment
- -> cluster create
+ -> one real cluster
  -> automatic join
- -> 6443/9345
+ -> 6443 + 9345
+ -> Ready
  -> one CNI
  -> CCM
  -> one safe CSI path
- -> Flux remote reconcile
+ -> Flux
  -> status/scale
  -> replacement + PVC survival
  -> delete
@@ -103,36 +107,23 @@ immutable artifacts
  -> air-gap proof where claimed
 ```
 
+Do not add service breadth while the current substrate gate fails.
+
 ### CAPC stop-loss
 
-If a bounded campaign repeatedly cannot achieve VM creation + automatic join + 6443/9345 + `Ready`, and evidence shows continued provider maintenance is disproportionate, select the approved release fallback:
+If a bounded qualification campaign repeatedly cannot achieve CloudStack VM creation + automatic RKE2 join + 6443/9345 + `Ready`, and evidence shows continued CAPC maintenance is disproportionate, record a release decision and assign the approved fallback:
 
 ```text
 native CloudStack APIs -> QCOW2/cloud-init -> Ansible Runner -> RKE2 -> Flux
 ```
 
-Do not maintain both lifecycle owners for the same release.
+One release uses one cluster lifecycle owner.
 
-### Existing RKE2 test cluster
+### Upstream services
 
-Use the separately provided working RKE2 cluster to qualify packages independently of CAPC. This can save time by proving Flux/OpenEverest/OpenBao/Harbor/Strimzi while the LayerSentry-created cluster path is still being fixed.
+Use pinned/qualified OpenEverest, OpenBao, Harbor and Strimzi. LayerSentry integration is limited to Flux/Helm/artifacts, namespace/RBAC, storage/network/VIP policy, status/audit and E2E qualification. Do not rewrite their operators/controllers, backup/PITR engines or UIs.
 
-The package-test lane is read/test oriented. It reports package/manifests defects to the primary K8s writer rather than creating a second K8s implementation branch.
-
-## 5. Kubernetes services
-
-Use mature upstream lifecycle implementations:
-
-- OpenEverest stable v1 for supported PostgreSQL/PXC-MySQL/MongoDB;
-- OpenBao Helm/OCI;
-- Harbor Helm/OCI;
-- Strimzi for Kafka.
-
-LayerSentry work is limited to pinned Flux/Helm integration, namespace/RBAC, StorageClass, network/VIP policy, local/offline artifact references, status/audit and E2E qualification.
-
-Do not rewrite upstream operators/controllers, backup/PITR engines or upstream UIs. Rebranding upstream service UIs is not V1 scope unless explicitly reassigned.
-
-## 6. VM-native Single-OS contract
+## 5. VM-native Single-OS contract
 
 Architecture:
 
@@ -140,19 +131,13 @@ Architecture:
 LayerSentry UI/API -> Go orchestration -> Ansible Runner -> Rocky Linux 9 guest
 ```
 
-Preserve current source. Go owns planning/state/security; Ansible owns guest configuration.
+Preserve the existing Go control plane and current Ansible roles/playbooks. Work only the current provider's first unmet gate.
 
-### Manual disposable-VM reset
+For disposable acceptance cleanup, manually recreated/reinstalled Rocky VMs are preferred over building lab-only reimage automation. Product idempotency/repair/upgrade/uninstall/backup/restore requirements remain mandatory.
 
-The product owner can manually reinstall/recreate test VMs. For V1 lab iteration, this is the default cleanup method after a destructive failed acceptance test.
+## 6. DC/DR contract
 
-An agent must not spend time building automated test-VM reimage/snapshot rollback solely to restore the lab. It records evidence, reports `LAB_RESET_REQUIRED`, waits for/uses the fresh Rocky VM, and resumes the same acceptance gate.
-
-This is a **lab-efficiency shortcut only**. It does not remove customer-facing requirements for idempotency, repair, upgrade, uninstall, backup/restore or safe rollback behavior.
-
-## 7. DC/DR contract
-
-Use CloudStack-native operations first:
+Use native CloudStack first:
 
 ```text
 healthy DC/DR infrastructure
@@ -162,49 +147,42 @@ healthy DC/DR infrastructure
  -> Recovery Point NEW
  -> selected createVMFromBackup recovery
  -> isolated destination network
- -> exact root/data verification
+ -> exact OLD/NEW root/data verification
  -> retry/RBAC/negative cases
  -> thin LayerSentry orchestration
 ```
 
-Existing provider-neutral DR state source is retained but does not justify more framework work before native recovery passes.
+Only after native recovery passes should one selected provider-native low-RPO path required by V1 be implemented/qualified. Planned failover/failback precedes witness/fencing/automatic failover.
 
-After native recovery, implement only one selected provider-native low-RPO path required by the V1 target (for example LINSTOR/DRBD, Ceph RBD or certified SAN replication). Planned failover/failback precedes witness/fencing/automatic failover.
+## 7. UI and release activation
 
-## 8. UI contract
+UI remains dormant while backend contracts are moving. Run one bounded final pass when real VM/K8s/Data Services/DR contracts are stable enough for integration and browser acceptance.
 
-The current UI is substantially implemented. Do not keep a UI writer active while K8s/DR/Single-OS backend contracts change.
+Release/signing/security work is not a standing stream. Activate it only when an exact artifact is ready for promotion or a concrete trust/security defect blocks a vertical slice.
 
-Run one bounded final UI pass when the backend APIs are stable enough to validate:
+One logical V1 carrier remains `layersentry-platform-<release>.iso`; bundled packages are `AVAILABLE`, not automatically installed.
 
-- VM/bucket/backup/self-service flows;
-- RKE2 create/status/scale/delete;
-- Data Services/APaaS/Streaming catalog/status;
-- DR recovery workflow;
-- RBAC/routes/progress/errors;
-- production build and browser acceptance.
+## 8. Status maintenance
 
-No broad redesign or upstream-service UI rewrite.
+Module writers update their **module-specific status/evidence** after meaningful evidence milestones.
 
-## 9. Release/security contract
+`LAYERSENTRY_CURRENT_STATUS.md` is refreshed by an integration/status/governance pass when any module's status, first unmet gate or authoritative pointer materially changes. Keep it compact; do not copy historical logs into it.
 
-Use one logical signed V1 carrier: `layersentry-platform-<release>.iso`. Bundled packages are `AVAILABLE`; Flux installs only selected packages.
+`LAYERSENTRY_PROGRESS_LEDGER.md` remains historical/audit evidence and is read only when older history is needed.
 
-Do not run a permanent release/security agent. Activate release/signing/security work only when an exact artifact is ready for promotion or a concrete trust-boundary defect blocks a vertical slice.
-
-## 10. Completion/stop rules
+## 9. Completion/stop rules
 
 For any module:
 
 1. work only the first unmet gate;
-2. stop adding features while that gate is failing;
-3. fix the smallest correct owner;
+2. stop adding features while that gate fails;
+3. fix the smallest correct owner inside the file fence;
 4. rerun the same gate;
-5. checkpoint only meaningful milestones;
-6. stop the session when it reaches a foreign-module dependency or needs a manual lab reset.
+5. persist only meaningful evidence milestones;
+6. stop when the next required change is foreign-module, needs a manual lab reset or requires unavailable infrastructure/resources.
 
-Progress is measured by customer-operable vertical slices, not commits, lines or documents.
+Progress is measured by customer-operable vertical slices, not commits, lines or document volume.
 
-## 11. Conflict rule
+## 10. Conflict rule
 
-This contract supersedes older execution-routing and sequencing instructions where they conflict. Detailed specialist storage/network/security/data-safety architecture remains valid.
+This contract supersedes older execution-routing, startup-read-order and sequencing instructions where they conflict. Detailed specialist storage/network/security/data-safety architecture remains valid unless explicitly superseded.
