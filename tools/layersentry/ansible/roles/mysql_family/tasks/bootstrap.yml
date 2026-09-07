@@ -1,0 +1,6 @@
+---
+- name: Bootstrap LayerSentry database administrator through local socket
+  layersentry_mysql_bootstrap:
+    provider: "{{ layersentry_provider }}"
+    password_b64: "{{ layersentry_secrets_b64.admin_password }}"
+  no_log: true
