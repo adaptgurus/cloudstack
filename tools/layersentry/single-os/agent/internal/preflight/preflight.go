@@ -104,7 +104,6 @@ func validateNetwork(n model.NetworkSpec) error {
 						found = true
 					}
 				}
-			}
 			if !found {
 				return fmt.Errorf("listen IP %s is not assigned to this guest", n.ListenAddress)
 			}
@@ -168,8 +167,14 @@ func validateStorage(ctx context.Context, runner executor.Runner, items []model.
 	if err != nil {
 		return fmt.Errorf("discover root source: %w", err)
 	}
-	rootReal, _ := filepath.EvalSymlinks(strings.TrimSpace(root.Stdout))
-	rootAnc := ancestry(ctx, runner, rootReal)
+	rootReal, err := filepath.EvalSymlinks(strings.TrimSpace(root.Stdout))
+	if err != nil {
+		return fmt.Errorf("resolve root source: %w", err)
+	}
+	rootAnc, err := ancestry(ctx, runner, rootReal)
+	if err != nil {
+		return fmt.Errorf("discover root ancestry: %w", err)
+	}
 	for _, s := range items {
 		if err := rejectRootDevice(ctx, runner, rootAnc, s.Device); err != nil {
 			return err
@@ -196,7 +201,10 @@ func rejectRootDevice(ctx context.Context, runner executor.Runner, rootAnc map[s
 	if fi.Mode()&os.ModeDevice == 0 {
 		return fmt.Errorf("%s is not a block device", device)
 	}
-	candidate := ancestry(ctx, runner, real)
+	candidate, err := ancestry(ctx, runner, real)
+	if err != nil {
+		return fmt.Errorf("discover ancestry for %s: %w", device, err)
+	}
 	for dev := range candidate {
 		if rootAnc[dev] {
 			return fmt.Errorf("refusing OS/root/root-parent device %s", device)
@@ -204,30 +212,23 @@ func rejectRootDevice(ctx context.Context, runner executor.Runner, rootAnc map[s
 	}
 	return nil
 }
-func ancestry(ctx context.Context, runner executor.Runner, dev string) map[string]bool {
+func ancestry(ctx context.Context, runner executor.Runner, dev string) (map[string]bool, error) {
 	out := map[string]bool{}
-	cur := dev
-	for i := 0; i < 16 && cur != ""; i++ {
-		real, _ := filepath.EvalSymlinks(cur)
-		if real == "" {
-			real = cur
-		}
-		if out[real] {
-			break
-		}
-		out[real] = true
-		r, err := runner.Run(ctx, "/usr/bin/lsblk", "-nro", "PKNAME", real)
-		if err != nil {
-			break
-		}
-		parent := strings.TrimSpace(r.Stdout)
-		if parent == "" {
-			break
-		}
-		if !strings.HasPrefix(parent, "/") {
-			parent = "/dev/" + parent
-		}
-		cur = parent
+	r, err := runner.Run(ctx, "/usr/bin/lsblk", "-s", "-nrpo", "PATH", dev)
+	if err != nil {
+		return nil, err
 	}
-	return out
+	for _, raw := range strings.Fields(r.Stdout) {
+		real, err := filepath.EvalSymlinks(raw)
+		if err != nil {
+			return nil, err
+		}
+		if real != "" {
+			out[real] = true
+		}
+	}
+	if len(out) == 0 {
+		return nil, errors.New("block-device ancestry is empty")
+	}
+	return out, nil
 }
