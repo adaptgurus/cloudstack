@@ -8,7 +8,7 @@
 
 | Module | Owner / activation | Current state | First unmet gate |
 | --- | --- | --- | --- |
-| RKE2/K8s/Data Services | **Codex / ACTIVE PRIMARY** | substantial source; release candidate `PENDING` | immutable CCM/CSI/Flux artifacts -> deploy controller -> one real cluster -> auto join -> 6443/9345 -> `Ready` |
+| RKE2/K8s/Data Services | **Codex / ACTIVE PRIMARY** | substantial source; source/path gate `CI_VERIFIED`; release candidate `PENDING` | immutable CCM/CSI/Flux artifacts -> deploy controller -> one real cluster -> auto join -> 6443/9345 -> `Ready` |
 | Healthy second RKE2 | test-only parallel lane | package qualification only | Flux/OpenEverest/OpenBao/Harbor/Strimzi/offline tests; no lifecycle-source commits |
 | VM-native Single-OS | ChatGPT by default | source + exact RPM `CI_VERIFIED`; live provider `NOT_TESTED` | clean Rocky 9 + non-OS disk -> install exact RPM -> PostgreSQL live acceptance |
 | DC/DR | ChatGPT by default | `PARTIAL`; state/recovery source exists | healthy CloudStack/B&R -> OLD/NEW recovery points -> isolated recovery -> exact guest-data verify |
@@ -27,6 +27,8 @@ Current machine-readable authority:
 Candidate tuple: CloudStack `4.22.1.1`, CAPI `1.13.5`, CAPC `0.6.1` + pinned downstream overlay, CAPRKE2 `0.25.2`, RKE2 `1.36.4+rke2r1`, Kubernetes `1.36.x`, CloudStack CSI `3.0.2` downstream candidate, CloudStack CCM `1.2.0` downstream candidate, Flux package plane.
 
 Implemented source includes BFF/auth/RBAC, durable saga/journal/reconciliation, CloudStack preflight/client, CAPI/CAPC/CAPRKE2 resources, create/status/scale/delete, 6443/9345 endpoint work, CAPC volume ownership work, CCM/CSI downstream source, NodeDiskSet, Flux and runtime wiring.
+
+The module-specific `LayerSentry K8s Source Validation` gate is `CI_VERIFIED` at `6f8e81001feefce50cfeea2ca3b3df907af2f09a`, run `34165534684`. It mechanically validates K8s source/unit/manifests and commit-aware K8s path ownership; local staged-path enforcement is also available through `module-writer-guard.sh precommit k8s`. This proof does not promote any live E0/E1 gate.
 
 The current release manifest still has all hard live gates false, including endpoints, Flux reconcile, CAPC/NodeDisk ownership, CSI project/resize, stateful replacement, air-gap, backup/restore and PITR. Do not broaden source while the current gate fails.
 
