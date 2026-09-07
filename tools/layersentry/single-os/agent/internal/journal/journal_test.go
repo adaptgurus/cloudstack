@@ -115,6 +115,10 @@ func TestBackupCatalogRequiresVerifiedRecord(t *testing.T) {
 	good.Verified = true
 	good.SHA256 = "abc"
 	good.SizeBytes = 128
+	good.PlaintextSHA256 = "def"
+	good.PlaintextSizeBytes = 96
+	good.Encryption = "age"
+	good.KeyID = "test-key"
 	good.CreatedAt = time.Now().UTC()
 	if err := s.SaveBackup(good); err != nil {
 		t.Fatal(err)

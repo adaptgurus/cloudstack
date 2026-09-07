@@ -157,7 +157,7 @@ func TestValidateRejectsEarlyHundredPercentFree(t *testing.T) {
 	r := validRequest()
 	r.LVM = []model.LVMVolumeGroup{{Name: "ls_pgvg", Devices: []string{"/dev/disk/by-id/scsi-data1"}, LogicalVolumes: []model.LVMLogicalVolume{{Name: "ls_one", Size: "100%FREE", MountPoint: "/data/a", Purpose: "database-data", Filesystem: "xfs"}, {Name: "ls_two", Size: "10G", MountPoint: "/data/b", Purpose: "database-wal", Filesystem: "xfs"}}}}
 	if err := Validate(r); err == nil {
-		t.Fatal("expected 100%FREE ordering rejection")
+		t.Fatal("expected 100 percent FREE ordering rejection")
 	}
 }
 func TestValidateAcceptsStaticSecondaryVIP(t *testing.T) {

@@ -190,7 +190,7 @@ func (m Manager) ensureGroup(ctx context.Context, serviceID string, g model.LVMV
 	}
 	return nil
 }
-func (m Manager) prepareLV(ctx, vg string, lv model.LVMLogicalVolume) error {
+func (m Manager) prepareLV(ctx context.Context, vg string, lv model.LVMLogicalVolume) error {
 	dev := filepath.Join("/dev", vg, lv.Name)
 	exists, err := m.lvExists(ctx, dev)
 	if err != nil {

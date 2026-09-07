@@ -165,7 +165,8 @@ func (m Manager) Remove(ctx context.Context, serviceID string, n model.NetworkSp
 		}
 	case "vrrp":
 		_, _ = m.Runner.Run(ctx, "/usr/bin/systemctl", "disable", "--now", "keepalived.service")
-		_, _ = m.Runner.Run(ctx, vipexec.VRRPFirewallRemove, serviceID, n.VIP.Peers...)
+		firewallArgs := append([]string{serviceID}, n.VIP.Peers...)
+		_, _ = m.Runner.Run(ctx, vipexec.VRRPFirewallRemove, firewallArgs...)
 		_, _ = m.Runner.Run(ctx, "/usr/bin/rm", "-f", "/etc/keepalived/keepalived.conf")
 		if _, err = m.Runner.Run(ctx, "/usr/bin/dnf", "-y", "remove", "keepalived"); err != nil {
 			return err
