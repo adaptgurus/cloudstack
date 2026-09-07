@@ -1,231 +1,217 @@
-# Codex Workstream F — Single-OS DBaaS / APaaS
+# LayerSentry Workstream F — VM-Native Single-OS DBaaS/APaaS
+
+**Default execution owner:** ChatGPT  
+**Codex use:** disabled by default for this workstream  
+**Architecture:** Go orchestration + Ansible Runner  
+**Guest baseline:** Rocky Linux 9
+
+This filename is retained for continuity. It is no longer a standing Codex workstream. The current execution authority is `LAYERSENTRY_EXECUTION_CONTRACT.md`.
 
 ## Mission
 
-Implement and validate the **VM-native Single-OS LayerSentry DBaaS/APaaS path** governed by:
+Finish the VM-native LayerSentry DBaaS/APaaS path without Kubernetes and without shell-script-based product installation.
 
-`docs/layersentry/LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`
-
-This workstream is deliberately separate from Workstream E's Kubernetes/CAPI/RKE2 DBaaS/APaaS/Streaming architecture.
-
-It owns software lifecycle **inside CloudStack-provisioned Rocky Linux 9 guests**. It does not own Kubernetes, CAPI, CAPC, CAPRKE2, RKE2, Kubernetes operators, Flux package reconciliation or the Kubernetes DBaaS/APaaS lifecycle.
+Preserve the useful existing Go control-plane investment, migrate imperative guest installation/configuration to Ansible, then prove complete provider vertical slices.
 
 ## Startup
 
-Read, in order:
+Read only:
 
-1. `/AGENTS.md`
-2. `docs/layersentry/LAYERSENTRY_SUPER_MASTER_CONTEXT.md`
-3. `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`
-4. `docs/layersentry/LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`
-5. `docs/layersentry/LAYERSENTRY_SECURE_ENGINEERING_POLICY.md`
-6. this file
-7. release/debugging/upgrade specialist documents only when needed.
+1. `/AGENTS.md`;
+2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
+3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
+4. `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`;
+5. `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md` only when needed for a trust boundary;
+6. fetch the actual branch and current source/tests.
 
-Fetch the actual current integration branch and inspect current source/runtime evidence before editing. Work in an isolated worktree/branch.
+Do not use old handoffs as source authority when the current branch is newer.
 
-## Non-overlap boundary with Workstream E
+## Non-overlap with Kubernetes services
 
-Workstream F and Workstream E may share only clean platform contracts such as:
+This path must not depend on CAPI, CAPC, CAPRKE2, RKE2, Kubernetes operators or Flux.
 
-- CloudStack native APIs;
-- tenant/project/RBAC identity;
-- common LayerSentry UI shell/design language;
-- approved secrets infrastructure;
-- audit/events/status vocabulary;
-- release signing/SBOM/provenance infrastructure;
-- common observability presentation when evidence remains distinguishable.
+CloudStack provisions VM/network/storage. The Single-OS service manages software inside that VM.
 
-They must **not** share or merge:
-
-- lifecycle controller/state machine;
-- guest engine/provider state with Kubernetes operator state;
-- topology/job state;
-- Kubernetes CAPI/CRD/operator objects;
-- package reconciliation authority;
-- runtime certification evidence from different targets.
-
-A request must explicitly resolve to one deployment model. Never silently send a Single-OS request into Kubernetes or a Kubernetes DBaaS request into the guest-engine path.
-
-## Primary ownership
-
-Expected F-owned areas include:
-
-- `layersentryd` guest lifecycle engine and service packaging;
-- schema-versioned guest configuration;
-- durable operation state/journal/idempotency locking;
-- product provider/manifests;
-- safe install/configure/upgrade/repair/uninstall lifecycle;
-- Single-OS guest hardening assets/tests;
-- provider-specific storage/mount/network preflight inside the guest;
-- secret-reference integration;
-- package/repository verification;
-- residue/cleanup audits;
-- one-VM Hyper-V acceptance automation/evidence for this workstream;
-- module-specific support bundle/diagnostics.
-
-Do not modify CloudStack Java/backend/database/KVM core merely to make a guest lifecycle workflow easier.
-
-## Current acceptance envelope
-
-Until the owner changes the Single-OS master context, the workstream's live acceptance environment is exactly:
-
-- one disposable Hyper-V Generation 2 VM;
-- 2 vCPU;
-- 2048 MB static RAM;
-- Dynamic Memory OFF;
-- Rocky Linux 9.
-
-Do not create a second VM under this workstream to fake cluster acceptance.
-
-Local processes/mocks/network namespaces can validate parsing, transaction/error and connectivity logic, but they are not proof of real multi-node HA/quorum/replication/failover.
-
-A product whose supported minimum resources exceed this envelope is `BLOCKED`/`NOT_TESTED` for live install on this lab; do not weaken the product or OS to force it through.
-
-## Security invariants
-
-- SELinux Enforcing; no `setenforce 0` workaround.
-- firewalld active/default-deny with explicit management/product rules.
-- root password SSH login disabled for production images.
-- no `curl | bash`, unverified remote install scripts, arbitrary URLs or `eval` as product execution boundary.
-- safe argv/subprocess invocation; do not interpolate untrusted configuration into shell strings.
-- canonical path/symlink safety.
-- secrets by references, never durable plaintext in config/log/evidence.
-- package/repository signature and TLS verification.
-- bounded timeouts/retries/logs/cache/concurrency.
-- operation UUID/idempotency key and exclusive lifecycle lock for mutations.
-- systemd sandboxing/least privilege as strongly as compatible with the provider.
-- rollback must not silently disable security controls.
-
-The existing `tools/layersentry/single-os/rocky9-hardening` implementation is source that must be reviewed/tested; its presence is not `LIVE_VERIFIED` evidence.
-
-## Lifecycle contract
-
-Provider operations must be deterministic and transactional:
+## Selected architecture
 
 ```text
-preflight
- -> plan
- -> exact version resolve/pin
- -> checkpoint where supported
- -> install/configure
- -> health validate
- -> commit durable state/evidence
+LayerSentry UI/API
+ -> Go orchestration service
+ -> Ansible Runner
+ -> versioned roles/playbooks
+ -> Rocky Linux 9 guest
 ```
 
-Supported operations may include:
+### Go owns
 
-- install;
-- configure;
-- provider-specific initialize/join;
-- health/status;
-- upgrade/patch;
-- repair/reconcile;
-- uninstall;
-- rollback/recover.
+- API/auth/project binding;
+- schema validation;
+- provider/version policy;
+- immutable plan/confirmation digest;
+- operation UUID/idempotency;
+- lifecycle lock;
+- durable journal/state;
+- secret references;
+- inventory/target selection;
+- allowlisted Ansible invocation;
+- result/health/evidence aggregation;
+- rollback/recovery state;
+- support diagnostics.
 
-Cluster-specific semantics remain provider-specific. Generic `master`/`replica` labels are not enough to certify a database topology.
+### Ansible owns
 
-## Required delivery order
+- OS baseline/hardening application;
+- repositories and packages;
+- users/directories/permissions;
+- service configuration;
+- systemd;
+- SELinux;
+- firewalld;
+- LVM/filesystems/mounts;
+- NetworkManager/VIP/Keepalived where selected;
+- PostgreSQL/MySQL/MariaDB/Redis/Valkey;
+- Nginx/Apache/Tomcat;
+- Node.js/Python/Podman;
+- provider-specific upgrade/repair/uninstall;
+- provider-specific cluster bootstrap/join where appropriate.
 
-### F0 — engine/security foundation
+## Shell-script prohibition
 
-- schema and validation;
-- operation state model;
-- idempotency/locking;
-- secret-reference boundary;
-- safe filesystem/subprocess utilities;
-- hardened systemd packaging;
-- repository/package verification contract;
-- unit/negative/security tests.
+Do not implement runtime/product installation/configuration as Bash/sh scripts.
 
-### F1 — one representative standalone provider
+Existing shell-based installation/configuration assets are deprecated and must not be extended. Migrate the relevant behavior to Ansible.
 
-Choose one product that fits the lab resource envelope and implement:
+Build-only developer/packaging wrappers may remain temporarily if they are not the customer/runtime installation boundary.
 
-- plan;
-- install;
-- health;
-- restart/reboot recovery;
-- same-line patch upgrade if supported;
-- injected failure/recovery;
-- uninstall/residue audit.
+Inside Ansible, prefer dedicated modules and templates. Avoid `shell`/`raw`; use argv-safe command/module semantics for unavoidable vendor CLIs.
 
-Do not claim all products supported because one provider works.
+## Target Ansible structure
 
-### F2 — storage/mount and provider matrix
+```text
+tools/layersentry/ansible/
+  ansible.cfg
+  collections/requirements.yml
+  playbooks/
+    single_os_apply.yml
+    single_os_upgrade.yml
+    single_os_repair.yml
+    single_os_uninstall.yml
+  roles/
+    rocky9_base/
+    storage_lvm/
+    network_vip/
+    postgresql/
+    mysql/
+    mariadb/
+    redis/
+    valkey/
+    nginx/
+    httpd/
+    tomcat/
+    nodejs/
+    python/
+    podman/
+```
 
-- CloudStack-provisioned disk identity/mount mapping;
-- filesystem/LVM behavior where applicable;
-- resize/reconcile policy;
-- product-specific path/ownership/permissions;
-- multiple disk/mount plans;
-- backup/recovery integration contract.
+Do not create one monolithic playbook.
 
-### F3 — cluster-provider planning
+## Migration rule for existing source
 
-With the one-VM restriction, implement/test only schema, planning, peer-validation and safe error paths using mocks/local isolation. Real cluster bootstrap/HA remains `NOT_TESTED` until a separately approved multi-VM environment exists.
+Do not discard the current Go engine and rewrite from zero.
 
-### F4 — release/upgrade/air-gap
+For each existing imperative Go/shell provider path:
 
-- signed offline package/repo contract;
-- exact version/provenance record;
-- update/rollback/residue behavior;
-- deny-all-egress test for any offline claim;
-- no arbitrary Internet dependency.
+1. identify control-plane logic that belongs in Go;
+2. identify guest configuration logic that belongs in Ansible;
+3. preserve the Go schema/state/security contract;
+4. implement the Ansible role/playbook;
+5. switch the Go provider/executor to the Ansible contract;
+6. add idempotency/negative tests;
+7. remove/deprecate the old runtime installation path after equivalent coverage exists.
 
-## Testing minimum
+Avoid maintaining two active provider implementations.
 
-Follow the Single-OS master context test matrix, including:
+## First provider vertical slice
 
-- exact VM resource proof;
-- Rocky 9 proof;
-- SELinux/firewalld/SSH hardening verification;
-- malformed/unsupported config negative tests;
-- path/symlink/shell-injection negative tests;
-- exact version resolution/pinning;
-- idempotent rerun;
-- restart/reboot recovery;
-- failure/rollback;
-- concurrent-operation lock;
-- uninstall/residue audit;
-- secret/log redaction;
-- resource/cache growth;
-- final security revalidation.
+PostgreSQL standalone is first.
 
-No live assertion is valid without exact artifact/target evidence.
+Definition of done:
 
-## Evidence/status rule
+```text
+GUI/API intent
+ -> CloudStack VM + attached volume(s)
+ -> Go preflight/plan
+ -> exact version resolved/pinned
+ -> confirmation digest
+ -> Ansible install/configure
+ -> external data/WAL/log mapping where selected
+ -> SELinux/firewalld proof
+ -> service health
+ -> idempotent rerun
+ -> VM reboot recovery
+ -> backup and actual restore proof
+ -> patch/repair where supported
+ -> uninstall/residue/security audit
+```
 
-- design text: `DESIGN_DEFINED` only;
-- completed source + source tests: `SOURCE_COMPLETE` only where actually proven;
-- reproducible automation: `CI_VERIFIED` only with CI evidence;
-- one-VM standalone behavior: `LIVE_VERIFIED` only from actual authorized target evidence;
-- real multi-node HA/replication/failover: `NOT_TESTED`/`PARTIAL` under current lab constraint;
-- `PRODUCTION_CERTIFIED` only after provider-specific security, backup/recovery, upgrade, rollback, resource/performance and supported-topology evidence.
+Only then expand aggressively to MySQL/MariaDB, Redis/Valkey and APaaS/runtime providers.
 
-## Coordination
+## Storage safety
 
-- **A:** shared UI components and explicit deployment-mode selection.
-- **B:** signed artifacts/repos/installer/update mechanics.
-- **C:** independent security/negative validation.
-- **D:** global DR/HA/upgrade proof when Single-OS workloads enter those programs.
-- **E:** no shared lifecycle implementation; coordinate only common CloudStack/UI/security/release contracts.
+CloudStack remains volume authority.
+
+Inside the guest:
+
+- stable attached-device identity;
+- root/OS-disk exclusion;
+- explicit destructive confirmation before PV/filesystem initialization;
+- managed ownership naming;
+- idempotent observation before mutation;
+- repair must not replay old destructive confirmations;
+- persistent mounts;
+- provider-specific permissions and SELinux labels.
+
+Implement these through Ansible modules plus Go plan/confirmation safety.
+
+## Cluster mode
+
+Cluster support is provider-specific.
+
+Go validates topology and peer identities; Ansible performs approved bootstrap/join/configuration; the database/application remains the consensus authority.
+
+Mocks/local isolation can test planning and errors, but real replication/quorum/failover requires real multi-node evidence.
+
+Exact current lab capacity/topology belongs in the progress ledger, not this stable workstream file.
+
+## Security
+
+- SELinux Enforcing;
+- firewalld active/default-deny;
+- no `curl | bash`, arbitrary remote scripts or `eval`;
+- no caller-controlled shell interpolation;
+- secrets by runtime reference and redacted from Ansible output with scoped `no_log` where required;
+- TLS/signature/provenance validation for package sources;
+- safe paths/symlinks;
+- bounded timeouts/retries/cache/log growth;
+- least-privilege Runner/Go service boundary;
+- rollback must not disable security controls.
+
+## Evidence
+
+Source tests can promote bounded source to `SOURCE_COMPLETE`.
+
+The provider becomes `LIVE_VERIFIED` only after the exact artifact/Ansible content runs on the intended Rocky guest and actual service/data/restart/recovery assertions pass.
+
+Do not claim cluster HA from single-node or mocked tests.
 
 ## Handoff
 
-Report:
+Keep it short:
 
-- repository/branch/base/final commit;
-- exact Single-OS provider/engine scope;
-- files changed;
-- CloudStack-core impact YES/NO;
-- source/tests actually run;
-- live target evidence if any;
-- hardening/security exceptions;
-- operation/rollback/retry state;
-- resource observations;
-- known blockers;
-- next evidence gate.
-
-Do not self-merge or edit the shared Progress Ledger unless explicitly assigned.
+- branch/commit;
+- Go boundary changed;
+- Ansible roles/playbooks changed;
+- old runtime path removed/deprecated;
+- tests executed;
+- live target/evidence if any;
+- first unmet provider vertical-slice gate.
