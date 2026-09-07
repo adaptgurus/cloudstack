@@ -9,8 +9,9 @@ agent_rpm="${LAYERSENTRY_AGENT_RPM:?set LAYERSENTRY_AGENT_RPM to the prebuilt La
 [[ -f "$agent_rpm" && ! -L "$agent_rpm" ]] || { echo "LayerSentry RPM must be a regular local file" >&2; exit 1; }
 
 # Appliance prerequisites only. Database/application/Keepalived packages remain
-# on-demand and are intentionally absent from the reusable image.
-dnf -y install ca-certificates firewalld audit policycoreutils policycoreutils-python-utils openssh-server chrony python3 dnf-plugins-core xfsprogs e2fsprogs util-linux iproute lvm2 NetworkManager
+# on-demand and are intentionally absent from the reusable image. ansible-core is
+# the reviewed local execution engine; no Ansible Galaxy content is downloaded.
+dnf -y install ansible-core ca-certificates firewalld audit policycoreutils policycoreutils-python-utils openssh-server chrony python3 dnf-plugins-core xfsprogs e2fsprogs util-linux iproute lvm2 NetworkManager
 "$ROOT/rocky9-hardening" apply --management-cidr "$management_cidr"
 
 rpmkeys --checksig "$agent_rpm" | grep -Eiq 'pgp|rsa|signature' || { echo "LayerSentry RPM signature verification failed" >&2; exit 1; }
