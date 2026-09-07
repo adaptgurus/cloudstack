@@ -21,10 +21,22 @@ Read only:
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
 3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
 4. `LAYERSENTRY_SINGLE_OS_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`;
-5. `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md` only when needed for a trust boundary;
-6. fetch the actual branch and current source/tests.
+5. `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`;
+6. `LAYERSENTRY_SECURE_ENGINEERING_POLICY.md` only when needed for a trust boundary;
+7. fetch the actual branch and current source/tests.
 
-Do not use old handoffs as source authority when the current branch is newer.
+Do not use old handoffs as source authority when the current branch is newer. Do not infer that implementation disappeared after a chat reset, and do not infer that the target Ansible tree exists before the repository proves it.
+
+## Continuity rule
+
+Current source is authoritative for what is implemented. `CURRENT_STATUS.md` is the concise Workstream-F evidence checkpoint. Dated handoffs are historical context after their durable findings have been reconciled.
+
+At any fresh-session start:
+
+- inspect `tools/layersentry/single-os/agent/` before proposing a rewrite;
+- inspect whether `tools/layersentry/ansible/` actually exists before claiming Ansible is implemented;
+- preserve existing Go schema/plan/idempotency/journal/secrets/security behavior during migration;
+- do not inherit source-test pass claims whose exact evidence artifact is absent.
 
 ## Non-overlap with Kubernetes services
 
@@ -74,6 +86,8 @@ LayerSentry UI/API
 - Node.js/Python/Podman;
 - provider-specific upgrade/repair/uninstall;
 - provider-specific cluster bootstrap/join where appropriate.
+
+This is the selected target boundary. Ansible is not current implementation evidence until the repository contains and wires the roles/playbooks/Runner contract.
 
 ## Shell-script prohibition
 
@@ -171,7 +185,7 @@ Inside the guest:
 - persistent mounts;
 - provider-specific permissions and SELinux labels.
 
-Implement these through Ansible modules plus Go plan/confirmation safety.
+Implement these through Ansible modules plus Go plan/confirmation safety while preserving any stronger guard already present in existing source.
 
 ## Cluster mode
 
@@ -181,7 +195,7 @@ Go validates topology and peer identities; Ansible performs approved bootstrap/j
 
 Mocks/local isolation can test planning and errors, but real replication/quorum/failover requires real multi-node evidence.
 
-Exact current lab capacity/topology belongs in the progress ledger, not this stable workstream file.
+Exact current lab capacity/topology belongs in the progress/evidence status, not this stable workstream file.
 
 ## Security
 
@@ -198,11 +212,11 @@ Exact current lab capacity/topology belongs in the progress ledger, not this sta
 
 ## Evidence
 
-Source tests can promote bounded source to `SOURCE_COMPLETE`.
+Source tests can promote a bounded migrated slice to `SOURCE_COMPLETE` only when the exact current architecture path and its tests are durably recorded.
 
 The provider becomes `LIVE_VERIFIED` only after the exact artifact/Ansible content runs on the intended Rocky guest and actual service/data/restart/recovery assertions pass.
 
-Do not claim cluster HA from single-node or mocked tests.
+Do not claim cluster HA from single-node or mocked tests. Do not use an absent historical validation file as evidence.
 
 ## Handoff
 
@@ -212,6 +226,6 @@ Keep it short:
 - Go boundary changed;
 - Ansible roles/playbooks changed;
 - old runtime path removed/deprecated;
-- tests executed;
+- tests executed and exact evidence path;
 - live target/evidence if any;
 - first unmet provider vertical-slice gate.
