@@ -19,18 +19,36 @@ def run(argv):
 
 
 def ancestry(device: str):
+    p = subprocess.run(
+        ["/usr/bin/lsblk", "-s", "-nrpo", "PATH", device],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    if p.returncode != 0:
+        raise RuntimeError("cannot prove block-device ancestry for %s" % device)
     out = []
-    cur = os.path.realpath(device)
-    for _ in range(32):
-        if not cur or cur in out:
-            break
-        out.append(cur)
-        p = subprocess.run(["/usr/bin/lsblk", "-nro", "PKNAME", cur], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False, timeout=10)
-        parent = p.stdout.strip()
-        if not parent:
-            break
-        cur = os.path.realpath(parent if parent.startswith("/") else "/dev/" + parent)
+    for raw in p.stdout.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        real = os.path.realpath(raw)
+        if real and real not in out:
+            out.append(real)
+    if not out:
+        raise RuntimeError("empty block-device ancestry for %s" % device)
     return out
+
+
+def device_type(device: str) -> str:
+    value = run(["/usr/bin/lsblk", "-dnro", "TYPE", device])
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if len(lines) != 1:
+        raise RuntimeError("cannot prove block-device type for %s" % device)
+    return lines[0]
 
 
 def main():
@@ -40,25 +58,28 @@ def main():
     skipped = []
     seen = set()
     byid = Path("/dev/disk/by-id")
-    if byid.is_dir():
-        for p in sorted(byid.iterdir()):
-            try:
-                real = os.path.realpath(str(p))
-                if real in seen:
-                    continue
-                st = os.stat(real)
-                if not stat.S_ISBLK(st.st_mode):
-                    continue
-                seen.add(real)
-                anc = ancestry(real)
-                item = {"stable_id": str(p), "real_device": real, "ancestry": anc}
-                if root_anc.intersection(anc):
-                    item["reason"] = "os-root-ancestry"
-                    skipped.append(item)
-                else:
-                    safe.append(item)
-            except OSError:
+    if not byid.is_dir():
+        raise RuntimeError("/dev/disk/by-id is required for stable storage acceptance")
+    for p in sorted(byid.iterdir()):
+        try:
+            real = os.path.realpath(str(p))
+            if real in seen:
                 continue
+            st = os.stat(real)
+            if not stat.S_ISBLK(st.st_mode):
+                continue
+            seen.add(real)
+            if device_type(real) != "disk":
+                continue
+            anc = ancestry(real)
+            item = {"stable_id": str(p), "real_device": real, "ancestry": anc}
+            if real in root_anc or root_anc.intersection(anc):
+                item["reason"] = "os-root-ancestry"
+                skipped.append(item)
+            else:
+                safe.append(item)
+        except OSError:
+            continue
     print(json.dumps({"root_source": root_source, "root_ancestry": sorted(root_anc), "safe_attached_devices": safe, "skipped_os_devices": skipped}, indent=2, sort_keys=True))
 
 
