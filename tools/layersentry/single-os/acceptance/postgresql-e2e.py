@@ -137,20 +137,25 @@ class API:
             fail("HTTP %d for %s: %s" % (exc.code, path, detail))
 
     def ensure_admin(self) -> None:
-        token_path = "/var/lib/layersentryd/identity/bootstrap-token"
-        if os.path.isfile(token_path):
+        def login() -> None:
+            result = self.request("POST", "/api/v1/auth/login", {"username": "acceptance", "password": self.admin_password})
+            self.csrf = result.get("csrf_token", "")
+            if len(self.csrf) < 16:
+                fail("login did not return CSRF proof")
+
+        try:
+            login()
+            return
+        except RuntimeError as login_error:
+            token_path = "/var/lib/layersentryd/identity/bootstrap-token"
+            if not os.path.isfile(token_path):
+                raise login_error
             token = Path(token_path).read_text(encoding="utf-8").strip()
-            if token:
-                try:
-                    self.request("POST", "/api/v1/auth/bootstrap", {"token": token, "username": "acceptance", "password": self.admin_password}, expected=(201,))
-                except RuntimeError as exc:
-                    # Only tolerate already-initialized state; login below remains authoritative.
-                    if "already" not in str(exc).lower() and "initialized" not in str(exc).lower():
-                        raise
-        result = self.request("POST", "/api/v1/auth/login", {"username": "acceptance", "password": self.admin_password})
-        self.csrf = result.get("csrf_token", "")
-        if len(self.csrf) < 16:
-            fail("login did not return CSRF proof")
+            if not token:
+                raise login_error
+
+        self.request("POST", "/api/v1/auth/bootstrap", {"token": token, "username": "acceptance", "password": self.admin_password}, expected=(201,))
+        login()
 
 
 def action(api: API, service_id: str, name: str, **extra):
