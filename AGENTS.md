@@ -116,7 +116,7 @@ If the current session discovers a required foreign-module change:
 3. hand it to the owning module/session;
 4. continue only work that remains inside the current fence.
 
-## 3. One writer per module + collision detection
+## 3. One writer per module + collision/path enforcement
 
 Only one source writer is permitted per module at a time:
 
@@ -134,11 +134,15 @@ When working from a normal Git worktree, use:
 tools/layersentry/governance/module-writer-guard.sh start <module>
 # before every meaningful batch
 tools/layersentry/governance/module-writer-guard.sh check <module>
+# after staging and before every module source commit
+tools/layersentry/governance/module-writer-guard.sh precommit <module>
 # after inspecting/reconciling the new shared state
 tools/layersentry/governance/module-writer-guard.sh advance <module>
 ```
 
-The guard detects same-module remote changes since the session base. It is not a distributed lock; fetch/review/reconcile is still mandatory.
+`precommit` fails closed with `FOREIGN_MODULE_EDIT` when the staged set crosses the module's writable fence. Unstage the foreign path and hand it to the owning module; do not bypass the guard. K8s commits are additionally rechecked by the module-specific CI path fence and source-validation workflow.
+
+The guard detects same-module remote changes since the session base and staged cross-module edits. It is not a distributed lock; fetch/review/reconcile is still mandatory.
 
 Serialize destructive/live operations that contend for the same lab resources even when source ownership is different.
 
