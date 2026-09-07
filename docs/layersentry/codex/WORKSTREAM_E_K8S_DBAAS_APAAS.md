@@ -13,13 +13,13 @@ Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
-3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
+3. `LAYERSENTRY_CURRENT_STATUS.md`;
 4. this file;
 5. current `tools/layersentry/k8s/release-candidate-lane-b.json` plus actual branch/workflow/live state.
 
-Do **not** load the 50k+ Kubernetes Super Master on every session. Open `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md` and/or the architecture addendum only when the current gate needs detailed storage/network/VIP/provider/version semantics or an architecture conflict must be resolved.
+Do **not** load the large Kubernetes Super Master or full Progress Ledger on every session. Open `LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`, the architecture addendum or historical evidence only when the current gate needs detailed storage/network/VIP/provider/version semantics or an architecture conflict must be resolved.
 
-Open historical evidence only for the exact failing gate.
+When working from a normal Git worktree, initialize/check the K8s writer guard from `tools/layersentry/governance/module-writer-guard.sh` before meaningful batches.
 
 ## 2. Hard file fence
 
@@ -170,7 +170,9 @@ Older specialist sections describing separate K8s/Data Services carriers or mand
 
 Workstream E does not edit Vue/browser source. It publishes/stabilizes the backend contract. The deferred UI workstream consumes that contract later. If a current UI defect blocks backend E2E, hand off the exact defect to Workstream A.
 
-## 11. Handoff
+## 11. Status and handoff
+
+At a meaningful evidence milestone, update the K8s release candidate/module evidence. Do not append long history to the Progress Ledger. An integration/status reconciliation pass refreshes `LAYERSENTRY_CURRENT_STATUS.md` when the global summary materially changes.
 
 Report only:
 
