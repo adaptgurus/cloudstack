@@ -8,6 +8,7 @@ import os
 import re
 import stat
 import subprocess
+import syslog
 import tempfile
 from typing import Dict, Iterable, List, Set, Tuple
 
@@ -29,6 +30,13 @@ ALLOWED_ROOTS = (
 )
 
 
+def bounded_diagnostic(value: str, limit: int = 512) -> str:
+    text = " ".join((value or "").replace("\x00", " ").split())
+    if len(text) > limit:
+        text = text[:limit] + "..."
+    return text
+
+
 def run(argv: List[str], ok: Iterable[int] = (0,), timeout: int = 120) -> Tuple[int, str, str]:
     proc = subprocess.run(
         argv,
@@ -41,7 +49,9 @@ def run(argv: List[str], ok: Iterable[int] = (0,), timeout: int = 120) -> Tuple[
         check=False,
     )
     if proc.returncode not in set(ok):
-        raise RuntimeError("command failed rc=%d: %s" % (proc.returncode, argv[0]))
+        detail = bounded_diagnostic(proc.stderr or proc.stdout)
+        suffix = ": %s" % detail if detail else ""
+        raise RuntimeError("command failed rc=%d: %s%s" % (proc.returncode, os.path.basename(argv[0]), suffix))
     return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
 
 
@@ -321,7 +331,12 @@ def main() -> None:
             changed = True
         module.exit_json(changed=changed, root_ancestry=sorted(root_anc))
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
-        module.fail_json(msg=str(exc))
+        msg = bounded_diagnostic(str(exc)) or "storage operation failed"
+        try:
+            syslog.syslog(syslog.LOG_ERR, "layersentry_storage failure: %s" % msg)
+        except Exception:
+            pass
+        module.fail_json(msg=msg)
 
 
 if __name__ == "__main__":
