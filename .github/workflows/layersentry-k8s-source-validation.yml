@@ -25,6 +25,9 @@ on:
       - 'tools/layersentry/k8s/**'
       - 'docs/layersentry/evidence/k8s/**'
       - '.github/workflows/layersentry-k8s-*'
+      - 'tools/layersentry/governance/module_path_fence.py'
+      - 'tools/layersentry/governance/test_module_path_fence.py'
+      - 'tools/layersentry/governance/module-writer-guard.sh'
 
 permissions:
   contents: read
@@ -54,6 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest tools/layersentry/governance/test_module_path_fence.py
+          bash -n tools/layersentry/governance/module-writer-guard.sh
 
       - name: Enforce K8s file fence
         shell: bash
