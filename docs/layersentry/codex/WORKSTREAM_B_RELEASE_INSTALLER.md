@@ -20,11 +20,11 @@ Read only:
 
 1. `/AGENTS.md`;
 2. `LAYERSENTRY_EXECUTION_CONTRACT.md`;
-3. `LAYERSENTRY_PROGRESS_LEDGER.md`;
+3. `LAYERSENTRY_CURRENT_STATUS.md`;
 4. this file;
 5. exact artifact/build/installer state being promoted.
 
-Read `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`, secure-engineering policy, or a module specialist context only when the current promotion gate requires it.
+Read `LAYERSENTRY_UPGRADE_AND_IP_PROTECTION.md`, secure-engineering policy, a module specialist context or historical Progress Ledger evidence only when the current promotion gate requires it.
 
 ## 3. File fence
 
@@ -75,6 +75,8 @@ K8s/Data Services versions come from the exact Workstream-E release candidate/co
 
 For N-1 -> N qualification, preserve exact source/artifact/DB/schema/provider compatibility, backups/checkpoints, interruption/resume, post-upgrade regression and the documented rollback boundary. Do not promise unsupported automatic downgrade after incompatible schema changes.
 
-## 7. Handoff
+## 7. Status and handoff
+
+Persist focused release evidence for the exact promotion milestone. Do not append long history to the Progress Ledger. An integration/status reconciliation pass refreshes `LAYERSENTRY_CURRENT_STATUS.md` when the global release status materially changes.
 
 Report exact source/artifact, builder/workflow identity, checks executed, trust/digest/SBOM state, installer/rollback state, unresolved promotion blocker and next gate. Do not edit unrelated modules or create another master context.
