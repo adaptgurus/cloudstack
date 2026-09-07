@@ -1,418 +1,196 @@
 # LayerSentry Single-OS DBaaS/APaaS — Super Master Context
 
-**Schema:** 2.1  
+**Role:** stable specialist architecture and production contract  
 **Execution owner:** ChatGPT by default  
 **Architecture:** Go orchestration + Ansible Runner  
 **Guest baseline:** Rocky Linux 9  
 **Kubernetes dependency:** none
 
-This context governs the VM-native LayerSentry DBaaS/APaaS path. It is separate from the Kubernetes-managed service plane.
+This context governs the VM-native LayerSentry DBaaS/APaaS path only. Current progress belongs in `LAYERSENTRY_CURRENT_STATUS.md`, `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`, focused evidence and actual Git/workflow/live state. Historical expanded narrative remains available in Git history and is not normal startup context.
 
-Current source/runtime status belongs in `LAYERSENTRY_PROGRESS_LEDGER.md` and the module checkpoint `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`. The presence of existing Go/provider code does not by itself imply live certification, and the selected Go + Ansible architecture does not imply that the Ansible execution tree has already been implemented.
+## 1. Hard separation from Kubernetes services
 
-## 0. Continuity and implementation-state rule
+Single-OS DBaaS/APaaS does **not** require:
 
-A session reset must not cause implementation truth to regress to an older document state.
-
-Use these rules:
-
-- current fetched repository source is authoritative for what implementation exists;
-- `docs/layersentry/evidence/single-os/CURRENT_STATUS.md` is the concise Single-OS status pointer and is subordinate to the global Progress Ledger for project-wide status;
-- historical dated handoffs are audit/implementation history, not normal startup authority;
-- preserve the substantial existing Go control/guest source under `tools/layersentry/single-os/agent/`;
-- the Go→Ansible architecture below is a migration target until `tools/layersentry/ansible/` and the bounded Go Runner integration actually exist;
-- do not call Ansible current implementation merely because this architecture requires it;
-- do not inherit source-test/CI claims whose referenced evidence artifact is absent.
-
-The continuity reconciliation is:
-
-`docs/layersentry/evidence/single-os/2026-09-07-single-os-continuity-authority-reconciliation.md`
-
-## 1. Product objective
-
-Provide one reusable hardened Rocky Linux 9 image and install/configure selected software after the customer chooses the product/version/topology.
-
-Normal workflow:
-
-```text
-LayerSentry GUI
- -> select VM-native deployment mode
- -> select product/version/topology
- -> select CloudStack VM/storage/network/VIP requirements
- -> CloudStack provisions infrastructure
- -> Go control service validates and builds immutable plan
- -> customer confirms
- -> Go invokes approved Ansible content
- -> health/security validation
- -> durable evidence/status
-```
-
-Do not maintain one image per application/version.
-
-## 2. Isolation from Kubernetes DBaaS/APaaS
-
-This module must not require:
-
-- Kubernetes;
-- RKE2;
+- Kubernetes/RKE2;
 - CAPI/CAPC/CAPRKE2;
 - CRDs/operators;
 - Flux.
 
-The two service models may share CloudStack APIs, identity/RBAC, secrets infrastructure, UI design language, release trust and observability presentation, but they do not share lifecycle state machines or runtime certification evidence.
+The Kubernetes and Single-OS service models may share CloudStack APIs, identity/RBAC, release trust, observability presentation and UI design language, but they do not share lifecycle state machines, provider implementations or runtime certification evidence.
 
-## 3. CloudStack ownership
+A Kubernetes audit/workstream must not modify Single-OS source, and a Single-OS workstream must not modify Kubernetes source.
 
-CloudStack remains authoritative for:
-
-- VM create/delete/start/stop;
-- volumes/disks and attachment;
-- networks/IPs exposed by CloudStack;
-- templates/images;
-- project/account/RBAC/quota;
-- infrastructure lifecycle.
-
-The guest layer manages only software and OS-local storage/network configuration inside the assigned VM.
-
-Never create a second volume scheduler or attach CloudStack volumes behind CloudStack's back.
-
-## 4. Selected architecture
+## 2. Architecture and ownership
 
 ```text
 LayerSentry UI/API
-      |
-      v
-Go control/orchestration service
-  - auth/project binding
-  - schema validation
-  - version/provider policy
-  - plan generation
-  - confirmation digest
-  - operation UUID/idempotency
-  - lifecycle lock
-  - journal/state
-  - secret references
-  - execution/result/evidence handling
-      |
-      v
-Ansible Runner / ansible-core
-      |
-      v
-Versioned roles/playbooks
-      |
-      v
-Rocky Linux 9 guest
+ -> Go control/orchestration
+ -> Ansible Runner / ansible-core
+ -> versioned roles/modules/playbooks
+ -> Rocky Linux 9 guest
 ```
 
-### 4.1 Go responsibility
+CloudStack remains authoritative for VM creation/deletion/start/stop, attached volumes, networks/IPs, templates, project/account/RBAC/quota and infrastructure lifecycle.
 
-Retain the existing Go implementation where it provides durable product control:
+### Go owns
 
-- API and authorization boundary;
-- configuration schema/model;
-- immutable plan and confirmation;
-- lifecycle/idempotency lock;
-- journal/state;
-- secret-reference handling;
-- provider capability metadata;
-- target/inventory selection;
-- invoking Ansible Runner using allowlisted playbooks/roles;
-- observing Ansible results;
-- provider health/evidence aggregation;
-- rollback/recovery decision state;
-- support diagnostics.
+- authentication/authorization and project/target binding;
+- strict schema/provider/version policy;
+- immutable execution plan and confirmation digest;
+- operation UUID/idempotency/locking;
+- durable state/journal and reconciliation decisions;
+- secret references;
+- target inventory selection;
+- allowlisted Ansible invocation/result handling;
+- health/evidence aggregation;
+- support/recovery state.
 
-Do not keep growing Go with large amounts of imperative package/configuration logic that Ansible handles more safely and maintainably.
+### Ansible owns
 
-### 4.2 Migration boundary from the existing implementation
-
-The current branch already contains substantial imperative Go guest/provider execution. That source is implementation investment, not disposable scaffolding.
-
-For each migrated function:
-
-1. preserve Go schema/security/plan/idempotency/journal/evidence semantics;
-2. implement the equivalent idempotent Ansible role/playbook;
-3. wire Go to the approved Ansible contract;
-4. add negative/idempotency tests;
-5. remove/deprecate the duplicate imperative runtime path only after equivalent coverage exists.
-
-Do not maintain two active authorities for the same provider action and do not rewrite the Go control plane from zero.
-
-## 5. Ansible responsibility
-
-Ansible is the approved target installation/configuration engine.
-
-Target source layout:
-
-```text
-tools/layersentry/ansible/
-  ansible.cfg
-  collections/requirements.yml
-  inventory/
-  playbooks/
-    single_os_apply.yml
-    single_os_upgrade.yml
-    single_os_repair.yml
-    single_os_uninstall.yml
-  roles/
-    rocky9_base/
-    storage_lvm/
-    network_vip/
-    postgresql/
-    mysql/
-    mariadb/
-    redis/
-    valkey/
-    nginx/
-    httpd/
-    tomcat/
-    nodejs/
-    python/
-    podman/
-```
-
-Exact structure may evolve, but roles must remain small, composable, versioned and idempotent.
-
-Ansible owns, as applicable:
-
-- repository configuration;
-- package install/remove/update;
-- users/groups/directories/permissions;
-- templated service configuration;
+- repositories/packages;
+- users/groups/files/directories/permissions;
+- templated configuration;
 - systemd lifecycle;
 - SELinux labels/policy application;
 - firewalld rules;
-- LVM/filesystem/mount management;
-- NetworkManager/static secondary VIP/Keepalived configuration;
-- database initialization;
-- product-specific standalone/cluster configuration;
-- patch/upgrade;
-- repair/reconcile;
-- uninstall/residue cleanup.
+- LVM/filesystems/mounts;
+- NetworkManager/static secondary VIP/Keepalived where supported;
+- database/application initialization and configuration;
+- patch/upgrade/repair/uninstall.
 
-Until the target Ansible tree and Runner integration exist in current source, this section is `DESIGN_DEFINED` behavior, not evidence that Ansible currently executes the lifecycle.
+Do not create a second provider engine and do not rewrite the Go control plane from zero.
 
-## 6. No shell-script installation
+## 3. No shell-script product lifecycle
 
-Bash/sh is not the product lifecycle engine.
+Bash/sh is not the customer/runtime installation engine.
 
-Do not implement provider installation/configuration, LVM/storage setup, database/application setup, cluster join, upgrade, repair or uninstall as shell scripts.
+Prefer dedicated Ansible modules/templates/handlers. Use fixed argv-safe command/module semantics only for unavoidable vendor CLIs. Never use `curl | bash`, `wget | sh`, `eval`, caller-controlled shell expressions or arbitrary playbook paths.
 
-Existing shell-based runtime installation/configuration assets are deprecated and must not be extended. Migrate their behavior to Ansible.
+Build/developer wrappers may exist only when they are not the production lifecycle boundary.
 
-Build/packaging developer wrappers may remain temporarily only when they are not the customer/runtime installation boundary.
+## 4. Intent, secrets and mutation safety
 
-Inside Ansible:
+The UI/API sends schema-versioned non-secret intent plus secret references. Go resolves the exact approved version and immutable plan before mutation. Customer confirmation binds to the exact plan digest when destructive/privileged work requires confirmation.
 
-- prefer dedicated modules;
-- prefer templates for configuration files;
-- use handlers for service restart/reload;
-- use `command`/purpose-built modules for unavoidable vendor CLIs;
-- avoid `shell` and `raw` except a narrowly documented exception;
-- never interpolate untrusted configuration into a shell expression.
+Secrets must not be stored in Git, browser code, normal logs, plan/journal/evidence or Ansible defaults. Use bounded runtime injection and `no_log` only around the exact Ansible tasks that can expose a secret.
 
-## 7. Declarative intent
+Every mutation must define:
 
-The UI/API sends strict schema-versioned intent containing non-secret configuration and secret references.
+- target and ownership identity;
+- idempotency semantics;
+- observation before mutation;
+- timeout/UNKNOWN handling;
+- authoritative observation before retry;
+- rollback/recovery class;
+- bounded temporary/cache cleanup.
 
-Minimum logical fields as applicable:
+Do not blindly replay a failed/unknown destructive operation.
 
-- schema version;
-- operation UUID/idempotency key;
-- project/VM target identity;
-- product/provider identifier;
-- release line/version policy;
-- exact resolved version after planning;
-- standalone/cluster topology;
-- node/role identity;
-- peer endpoints;
-- storage/volume/mount purpose;
-- network/listener/VIP requirements;
-- feature flags;
-- secret references;
-- maintenance/upgrade policy;
-- expected health assertions.
+## 5. Storage and LVM
 
-The Go service validates intent and generates an immutable execution plan before Ansible mutation begins.
+CloudStack creates/attaches infrastructure volumes. Inside the guest, LayerSentry may manage only approved attached devices.
 
-Customer confirmation must bind to the exact plan digest.
-
-## 8. Secret handling
-
-Secrets must not be persisted in plaintext in:
-
-- intent files committed to Git;
-- plan/state/journal;
-- browser code;
-- Ansible role defaults/vars;
-- normal Ansible logs;
-- evidence bundles.
-
-Use approved runtime secret references/injection.
-
-Where Ansible receives a secret value, apply `no_log: true` to the exact task/result scope that could expose it while preserving useful non-secret evidence separately.
-
-## 9. Storage and LVM
-
-CloudStack creates/attaches infrastructure volumes. Inside the guest, Ansible may manage LayerSentry-owned LVM/filesystems/mounts only after the Go plan identifies the approved attached devices and destructive confirmations.
-
-Safety requirements:
+Required safeguards:
 
 - stable device identity such as `/dev/disk/by-*` where feasible;
-- explicit root/OS-disk exclusion;
-- explicit confirmation before PV initialization or filesystem formatting;
-- `ls_` or another reserved LayerSentry ownership naming convention for managed VG/LV objects;
+- live root/OS-disk and root-parent exclusion;
+- explicit destructive confirmation before PV/filesystem initialization;
+- reserved LayerSentry ownership naming for managed VG/LV/filesystem objects;
 - idempotent observation before mutation;
-- repair does not replay destructive initialization from old confirmations;
-- persistent mount definitions;
-- product-specific ownership/permissions/SELinux labels.
+- repair never replays stale destructive initialization;
+- persistent mounts;
+- provider-specific owner/permission/SELinux labels.
 
-## 10. Network and VIP
+A plan that can target the live OS/root disk must fail closed before mutation.
 
-CloudStack remains authoritative for cloud network/IP resources.
+## 6. Network/VIP
 
-Inside the guest Ansible may configure, when explicitly selected and supported:
+CloudStack remains authoritative for cloud-side network/IP resources.
 
-- provider listener addresses;
-- persistent secondary IP through NetworkManager;
-- Keepalived/VRRP for a guest-local floating VIP;
-- provider-specific firewalld rules.
+Guest-local configuration may include provider listeners, persistent secondary IP, Keepalived/VRRP and provider firewalld rules when explicitly supported.
 
-Do not invent a cloud-side VIP behind CloudStack's back.
+Do not create a cloud-side VIP behind CloudStack's back. Real VRRP/failover claims require real multi-node live evidence.
 
-Real VRRP failover requires a real multi-node test environment before live/production claims.
+## 7. Provider model and current priorities
 
-## 11. Provider model
+Provider definitions describe supported versions/topologies, package source policy, Ansible content, storage purposes, ports/VIP behavior, health checks, backup/restore, patch/upgrade, uninstall and recovery semantics.
 
-Provider definitions should describe:
+Current execution priority remains:
 
-- supported release lines;
-- package/repository source policy;
-- Ansible role/playbook identity;
-- supported standalone/cluster topologies;
-- required storage purposes/mounts;
-- ports/listeners/VIP support;
-- health assertions;
-- backup/restore method;
-- patch/upgrade path;
-- rollback/recovery semantics;
-- resource requirements;
-- destructive operations and confirmations.
-
-Initial provider priorities:
-
-1. PostgreSQL standalone vertical slice;
-2. MySQL/MariaDB family;
+1. PostgreSQL standalone live vertical slice;
+2. MySQL/MariaDB;
 3. Redis/Valkey;
-4. Nginx/Apache/Tomcat;
-5. Node.js/Python/Podman runtime providers;
-6. cluster topologies only after standalone lifecycle quality is proven.
+4. representative Nginx/HTTPD/Tomcat/runtime providers;
+5. provider-specific multi-node/HA only after standalone quality is proven.
 
-Do not claim whole-provider support from plan-only logic.
+Current source already contains substantial Go control/provider code and Ansible roles/playbooks. The exact current implemented/CI state is defined only by the module `CURRENT_STATUS.md`; do not regress it because an older handoff predates current source.
 
-## 12. Cluster mode
+## 8. First production vertical slice
 
-Cluster semantics are provider-specific.
+PostgreSQL standalone is the first proof:
 
-Before mutation validate:
+```text
+fresh Rocky 9 VM + separate non-OS data disk
+ -> exact current RPM install
+ -> live root/OS-disk rejection proof
+ -> immutable Go plan/confirmation
+ -> Ansible PostgreSQL install/configure
+ -> external data/WAL/log mapping as selected
+ -> SELinux/firewalld preserved
+ -> health/read-write
+ -> exact idempotent rerun
+ -> backup + actual restore/data-integrity verification
+ -> VM reboot and mount/service/data recovery
+ -> repair/upgrade where supported
+ -> uninstall/residue audit with customer-data preservation
+```
 
-- node role/topology;
-- peer uniqueness/addressing;
-- version compatibility;
-- required ports/connectivity;
-- time/DNS assumptions;
-- storage readiness;
-- quorum/bootstrap prerequisites;
-- existing provider-native cluster state.
+Do not expand provider breadth while this vertical slice's first live gate fails.
 
-Ansible may orchestrate bootstrap/join where supported, but LayerSentry must not become a competing consensus authority.
+## 9. Backup/recovery
 
-Real multi-node replication/quorum/failover evidence requires a real multi-VM environment. Mocks/local namespaces prove only parser/planner/error handling.
+Every provider must expose a truthful backup/recovery contract.
 
-## 13. Backup/recovery
+CloudStack VM backup may be integrated where appropriate, but VM backup/snapshot success is not automatically application-consistent DB recovery. Database-native logical/physical backup or PITR is exposed only when supported and proven by actual restored data.
 
-Every DB/application provider must define a truthful backup/recovery contract.
+Cross-site DR remains governed by the independent global DR workstream. This Single-OS context does not invent a competing DR system.
 
-Where CloudStack VM backup is appropriate, integrate with the global Backup/DR authority rather than creating a second DR system. Where database-native logical/physical backup/PITR is required, expose it through the provider contract and validate actual restored data.
+## 10. Security baseline
 
-Do not equate VM snapshot success with application-consistent database recovery.
-
-## 14. Hardening
-
-Required baseline:
+Minimum:
 
 - Rocky Linux 9 supported baseline;
 - SELinux Enforcing;
-- firewalld active/default-deny;
-- explicit provider ports only;
-- no `curl | bash`, arbitrary remote scripts or `eval`;
-- no normal root-password SSH for production appliances;
+- firewalld active/default-deny with explicit provider ports;
+- least-privilege systemd/Runner boundary;
+- no normal root-password SSH for production appliance use;
 - safe canonical path/symlink handling;
 - bounded timeouts/retries/cache/log growth;
-- least privilege/systemd hardening for the Go service and Runner boundary;
 - no secrets in argv/logs/evidence;
-- rollback cannot disable SELinux/firewall/security controls to make a provider start.
+- rollback cannot disable security controls simply to make a provider start.
 
-## 15. Lifecycle contract
+## 11. Lab reset optimization
 
-A normal mutation follows:
+Disposable acceptance VMs may be manually reinstalled/recreated by the owner after a destructive/dirty failed test.
 
-```text
-validate intent
- -> authorize target
- -> acquire operation lock
- -> inspect current guest state
- -> resolve exact approved version
- -> validate repositories/signatures/provenance
- -> build immutable plan
- -> customer confirmation
- -> optional safe checkpoint
- -> execute approved Ansible playbook/roles
- -> health/security assertions
- -> commit durable state/evidence
- -> cleanup bounded temporary/cache state
-```
+When that happens:
 
-An ambiguous mutation must be observed/reconciled before retrying. Do not blindly rerun a failed/unknown playbook if duplicate execution could be destructive.
+1. capture exact failure/evidence;
+2. stop mutating the guest;
+3. report `LAB_RESET_REQUIRED` with clean-host prerequisites;
+4. resume the same gate on the fresh Rocky VM.
 
-## 16. First vertical slice definition of done
+Do not spend engineering/Codex effort building automatic test-VM reimage/snapshot rollback solely for lab cleanup. This does not remove product idempotency, repair, upgrade, uninstall, backup/restore or recovery requirements.
 
-PostgreSQL standalone is the first proof.
+## 12. Evidence ceiling
 
-Required path:
+Use repository-wide statuses only.
 
-```text
-GUI/API intent
- -> CloudStack VM + attached data volume(s)
- -> Go immutable plan
- -> approved Ansible execution
- -> PostgreSQL exact package/version installed
- -> external data/WAL/log mapping as selected
- -> SELinux/firewalld preserved
- -> service health
- -> idempotent rerun
- -> reboot/recovery
- -> backup + actual restore validation
- -> same-line patch/repair where supported
- -> uninstall/residue audit
-```
+- source/tests may reach `SOURCE_COMPLETE`;
+- reproducible exact automation/artifact evidence may reach `CI_VERIFIED`;
+- actual Rocky execution may reach `LIVE_VERIFIED` for the exact provider/topology;
+- real multi-node replication/quorum/failover requires real multi-node evidence;
+- `PRODUCTION_CERTIFIED` additionally requires provider-specific security, backup/recovery, upgrade/rollback, resource/performance and supported-topology evidence.
 
-Only after this is proven should provider breadth expand aggressively.
-
-## 17. Evidence ceiling
-
-Use repository-wide statuses.
-
-- source + source tests may reach `SOURCE_COMPLETE`;
-- reproducible automation may reach `CI_VERIFIED`;
-- actual Rocky execution may reach `LIVE_VERIFIED` for the exact tested provider/topology;
-- real multi-node HA/replication/failover remains below live certification until exercised on a real multi-node environment;
-- `PRODUCTION_CERTIFIED` requires provider-specific security, backup/recovery, upgrade/rollback, resource/performance and supported-topology evidence.
-
-The current status pointer must not promote the existing Go implementation or future Ansible implementation beyond the evidence actually present in Git/workflows/live targets.
-
-## 18. Execution ownership
-
-This workstream is **ChatGPT-led by default** to conserve Codex credits for Kubernetes/RKE2.
-
-Codex must not be started for routine Single-OS provider/Ansible implementation unless the owner explicitly changes the execution contract.
+Current exact RPM/workflow/live gate belongs in `docs/layersentry/evidence/single-os/CURRENT_STATUS.md`, not this stable master.
