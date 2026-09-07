@@ -15,6 +15,12 @@
           - layersentry_service_id == layersentry_request.service_id
         fail_msg: Invalid or mismatched LayerSentry apply invocation.
 
+    - name: Decode transient provider secrets in memory only
+      ansible.builtin.set_fact:
+        layersentry_secrets:
+          admin_password: "{{ layersentry_secrets_b64.admin_password | b64decode }}"
+      no_log: true
+
     - name: Validate Rocky Linux and security baseline
       ansible.builtin.include_role:
         name: rocky9_base
