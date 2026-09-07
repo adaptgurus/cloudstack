@@ -1,0 +1,20 @@
+---
+- name: Control LayerSentry Single-OS PostgreSQL service
+  hosts: layersentry_single_os
+  gather_facts: false
+  become: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require supported service action
+      ansible.builtin.assert:
+        that:
+          - layersentry_provider == 'postgresql'
+          - layersentry_action in ['start', 'stop', 'restart']
+          - layersentry_request.release_line in ['16', '17']
+        fail_msg: Unsupported Single-OS service action.
+
+    - name: Apply requested PostgreSQL systemd state
+      ansible.builtin.systemd_service:
+        name: "postgresql-{{ layersentry_request.release_line }}.service"
+        enabled: "{{ layersentry_action != 'stop' }}"
+        state: "{{ 'started' if layersentry_action == 'start' else ('stopped' if layersentry_action == 'stop' else 'restarted') }}"
