@@ -104,6 +104,7 @@ func validateNetwork(n model.NetworkSpec) error {
 						found = true
 					}
 				}
+			}
 			if !found {
 				return fmt.Errorf("listen IP %s is not assigned to this guest", n.ListenAddress)
 			}
