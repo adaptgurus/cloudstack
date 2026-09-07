@@ -1,13 +1,13 @@
-# Codex Workstream E — LayerSentry RKE2 / Kubernetes / DBaaS / APaaS / Streaming
+# Codex Workstream E — LayerSentry RKE2 / Kubernetes / Data Services
 
 **Execution owner:** Codex  
-**Primary objective:** convert existing source foundations into working end-to-end vertical slices  
+**Primary objective:** finish one reusable LayerSentry RKE2 lifecycle end to end, then install/qualify upstream services through the same Flux package plane  
 **Cloud baseline:** Apache CloudStack 4.22.1.1 + KVM  
-**Customer distribution:** RKE2
+**Customer Kubernetes distribution:** RKE2
 
-This is the primary Codex workstream. Do not spend Codex capacity on UI redesign, VM-native Single-OS providers or native DR troubleshooting unless the owner explicitly reassigns scope.
+This is the primary technical Codex workstream. Workstream A is the separate bounded Codex UI-finishing stream. Do not spend this workstream on VM-native Single-OS implementation or native DR troubleshooting.
 
-## 1. Startup
+## 1. Minimal startup
 
 Read only:
 
@@ -16,11 +16,11 @@ Read only:
 3. `docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md`;
 4. `docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md`;
 5. this file;
-6. fetch actual branch/current component/runtime state.
+6. fetch the actual integration branch, current `release-candidate-lane-b.json`, workflow state and live target.
 
-Open dated validation/evidence only for the exact blocker/version being worked. Do not reread every historical K8s audit by default.
+Open dated evidence only for the exact blocker/version being worked. Do not reread every historical K8s audit.
 
-## 2. Frozen architecture unless evidence invalidates it
+## 2. Current architecture — one cluster lifecycle
 
 Preferred path:
 
@@ -29,160 +29,187 @@ LayerSentry UI/BFF
  -> CAPI
     -> CAPC -> CloudStack 4.22.1.1/KVM
     -> CAPRKE2 -> RKE2
+ -> CNI/CCM/CSI
  -> central Flux
- -> CNI/CCM/CSI/operators
+ -> selected packages/operators
 ```
 
-Ownership rules:
+One lifecycle serves:
 
-- CloudStack owns IaaS and account/project/RBAC/quota;
+- user/self-service RKE2;
+- Data Services RKE2 profiles;
+- APaaS profiles;
+- Streaming/Kafka profiles.
+
+Profiles differ in node pools, placement, storage, networking, security and package selection. They do **not** receive separate cluster provisioning engines.
+
+Ownership:
+
+- CloudStack owns IaaS, project/account/RBAC/quota and native infrastructure state;
 - CAPI owns cluster/machine desired state;
 - CAPC owns CloudStack resources created for CAPI Machines;
 - CAPRKE2 owns RKE2 bootstrap/control-plane lifecycle;
-- CloudStack CCM owns selected Kubernetes L4 load-balancer lifecycle;
+- CloudStack CCM owns the selected Kubernetes L4 LoadBalancer lifecycle;
+- CSI owns workload-volume lifecycle on the certified storage path;
 - Flux owns internal package reconciliation;
-- CSI owns workload-volume lifecycle on its certified path;
-- database/application operators own application-specific lifecycle;
-- LayerSentry owns GUI, policy, compatibility, audit and composite workflow state.
+- upstream DB/application operators own application-specific lifecycle;
+- LayerSentry owns UI/BFF, profiles, compatibility, policy, audit, entitlement and composite workflow state.
 
-Never create two active controllers for one VM, VIP, node disk, CSI volume or application lifecycle.
+Never create two active controllers for one VM, VIP, node disk, CSI volume, cluster or application lifecycle.
 
-## 3. Stop broad horizontal scaffolding
+## 3. Existing source must be reused
 
-The branch already contains substantial source for:
+The integration branch already contains substantial source for:
 
 - BFF/auth/RBAC;
 - durable saga/journal/reconciliation;
-- CloudStack client/preflight;
+- CloudStack API client/preflight;
 - CAPI/CAPC/CAPRKE2 resource generation;
-- lifecycle executor;
-- CAPC downstream endpoint/volume-ownership work;
-- CCM Kubernetes 1.36 source overlay;
-- CSI idempotent-expansion work;
+- create/status/scale/delete executor;
+- CAPC dual 6443/9345 endpoint and volume-ownership work;
+- CloudStack CCM Kubernetes 1.36 downstream work;
+- CloudStack CSI idempotent/project qualification work;
 - NodeDiskSet planning;
-- systemd/runtime wiring.
+- Flux resources;
+- systemd/runtime wiring;
+- K8s/Data Services UI source and tests.
 
-Do not keep adding adjacent frameworks merely to increase code percentage.
+Do not rebuild these foundations or add adjacent frameworks merely to increase code percentage.
 
-The first priority is to publish/deploy the exact components and exercise one complete cluster lifecycle.
+## 4. First objective: close E0/E1 live gates
 
-## 4. E0/E1 definition of done
-
-Codex must close the existing hard gates through one exact release tuple.
+The current release candidate remains blocked until the hard gates in `tools/layersentry/k8s/release-candidate-lane-b.json` pass.
 
 ### 4.1 Immutable artifacts
 
-Before deployment, produce/consume exact immutable artifacts for the selected components:
+Resolve and publish exact immutable artifacts required by the release candidate:
 
-- CAPC/downstream patch/build as applicable;
+- CAPC/downstream build when applicable;
 - CAPRKE2;
-- RKE2 release/image artifacts;
-- CloudStack CCM;
-- patched CloudStack CSI;
-- CNI;
+- RKE2 artifacts;
+- CloudStack CCM final image;
+- patched CloudStack CSI final image;
+- selected CNI;
 - Flux components/catalog;
-- controller/BFF package;
+- LayerSentry controller/BFF package;
 - OS/QCOW2 image;
-- SBOM/provenance/digests/signatures according to release policy.
+- required SBOM/provenance/digests/signatures.
 
-No moving tags, unresolved package layers or null final images in a stable candidate.
+Do not deploy stable candidates from moving tags, unresolved package repositories or null final images.
 
-### 4.2 Management/controller deployment
+### 4.2 Controller deployment
 
-Deploy the exact controller/BFF/reconciler components on the intended Rocky Linux 9 management environment and prove:
+Deploy the exact controller/BFF/reconciler stack and prove:
 
 - service start/restart;
-- auth/session integration;
-- Kubernetes API connectivity;
+- CloudStack session/auth/RBAC integration;
 - CloudStack API connectivity;
-- durable reconciliation after process restart;
+- Kubernetes management API connectivity;
+- durable reconciliation after restart;
 - no secret leakage;
-- fail-closed unresolved component handling.
+- fail-closed unresolved component behavior.
 
-### 4.3 Cluster create
+### 4.3 One real cluster create
 
-From LayerSentry GUI/API:
+From the LayerSentry GUI/API:
 
-- select project/Site/network/service offering/template/profile;
-- create the CAPI cluster;
-- CAPC creates the required CloudStack VMs/resources;
-- CAPRKE2 performs automatic bootstrap/join;
-- user does not paste tokens or SSH nodes;
-- 6443 endpoint becomes reachable;
-- 9345 supervisor/join endpoint is owned/reconciled and proven;
-- cluster reaches Ready.
+```text
+select project/Site/network/offering/template/profile
+ -> create CAPI objects
+ -> CAPC creates CloudStack VMs/resources
+ -> CAPRKE2 automatically bootstraps/joins nodes
+ -> 6443 reachable
+ -> 9345 reachable
+ -> control plane forms
+ -> workers join
+ -> cluster Ready
+```
+
+No user-pasted token, manual SSH or manual YAML is part of the normal managed workflow.
 
 ### 4.4 Networking
 
-Prove one primary CNI first.
+Prove one primary CNI first. Do not qualify every CNI simultaneously.
 
-Then prove CloudStack CCM/L4 lifecycle on the exact Kubernetes 1.36/RKE2 candidate:
+Then prove CloudStack CCM/L4 on the exact release:
 
-- Service `LoadBalancer` create;
-- backend membership/readiness;
+- `Service type=LoadBalancer` create;
+- backend readiness/membership;
 - update/reconcile;
 - delete/cleanup;
-- restart/recovery behavior.
-
-Do not implement every CNI/Gateway/WAF provider before one path works.
+- controller restart/recovery.
 
 ### 4.5 Storage/data safety
 
-Prove one safe storage path first.
-
-Hard requirements before stateful DBaaS:
+Prove one production-safe CSI/storage path first:
 
 - project scoping/isolation;
-- attach/detach;
+- provision/attach/mount/detach/delete;
 - snapshot/restore where supported;
-- resize/idempotency;
-- Machine delete/replacement does not destroy unowned CSI workload data;
-- NodeDiskSet/direct node-disk ownership is explicit if that feature is exposed;
-- ambiguous mutations reconcile rather than blindly replay.
+- resize/idempotency where offered;
+- worker/Machine replacement;
+- CAPC Machine deletion does **not** destroy unowned CSI workload data;
+- NodeDiskSet ownership explicit where exposed;
+- ambiguous mutation is observed/reconciled before retry.
 
-Stateful DBaaS remains blocked until the exact release passes these gates.
+Stateful service profiles remain blocked until these gates pass.
 
 ### 4.6 Flux
 
 Prove central Flux from immutable content:
 
-- exact source commit/digest;
-- per-cluster reconciliation;
-- package install/update/remove;
+- exact source/digest;
+- remote cluster reconciliation;
+- HelmRelease/package install;
+- update/remove;
 - controller restart/recovery;
-- no dependency on moving Internet content for offline-certified profiles.
+- no Internet dependency for an offline-certified release.
 
-### 4.7 Cluster Day-2
+This package plane is reused by OpenEverest, OpenBao, Harbor, Strimzi and other approved services.
+
+### 4.7 Day-2
 
 Prove:
 
 - status;
 - scale up;
-- safe scale down only where storage ownership is proven;
-- node replacement;
+- safe scale down where data ownership permits;
+- worker replacement;
+- control-plane replacement where supported;
 - restart/reconciliation;
 - delete/cleanup;
-- failure/timeout/unknown-state recovery;
-- upgrade path for the exact supported release sequence.
+- timeout/UNKNOWN recovery;
+- exact supported RKE2/Kubernetes upgrade path.
 
-## 5. E2E evidence is the priority
+## 5. E2E-first defect loop
 
-For the current phase, a new code change is valuable only when it closes a concrete E0/E1 gate or an observed E2E defect.
+For each live failure:
 
-For each failing live step:
-
-1. capture the exact observed failure;
-2. identify whether the defect is CloudStack, CAPC, CAPRKE2, RKE2, CCM, CSI, CNI, Flux, LayerSentry or environment;
-3. fix the smallest correct owner;
+1. capture exact failure, resource/job IDs and logs;
+2. classify owner: CloudStack, environment, CAPC, CAPRKE2, RKE2, CNI, CCM, CSI, Flux or LayerSentry;
+3. fix the **smallest correct owner**;
 4. add regression coverage;
-5. rerun the same vertical step;
-6. continue until the full cluster lifecycle passes.
+5. build the affected immutable artifact;
+6. redeploy the exact artifact;
+7. rerun the same step;
+8. continue only after it passes.
 
-Do not redesign the architecture because of a fixable integration defect.
+Do not redesign the architecture for a fixable integration defect.
 
-## 6. Approved fallback
+## 6. CAPC/CAPRKE2 stop-loss
 
-If exact evidence shows CAPC/CAPRKE2 cannot satisfy a required V1 gate without disproportionate downstream maintenance, record a focused decision and select the approved fallback for that release:
+CAPI/CAPC/CAPRKE2 remains preferred because substantial source and downstream work already exists.
+
+Do not patch CAPC indefinitely.
+
+If a bounded focused qualification campaign repeatedly cannot reach all four minimum base outcomes:
+
+1. CloudStack VMs/resources created correctly;
+2. CAPRKE2 automatic join works;
+3. 6443 and 9345 are reachable/owned correctly;
+4. cluster reaches `Ready`;
+
+and evidence shows the remaining downstream maintenance is disproportionate, record a release decision and switch to:
 
 ```text
 LayerSentry durable workflow
@@ -195,104 +222,154 @@ LayerSentry durable workflow
 
 Rules:
 
-- this is a release-level choice, not a second simultaneous owner;
-- do not maintain both implementations for one lifecycle;
-- fallback RKE2 installation/configuration uses Ansible, not shell-script lifecycle;
-- preserve CloudStack as IaaS authority.
+- one release, one lifecycle owner;
+- do not maintain both paths as active alternatives for the same release;
+- fallback installation/configuration uses Ansible, not shell lifecycle;
+- CloudStack remains IaaS authority;
+- reuse the same CNI/CCM/CSI/Flux/package contracts above the fallback cluster.
 
-## 7. Kubernetes DBaaS sequence
+## 7. Upstream service integration — do not rebuild products
 
-Do not begin broad DB engine coverage until the base RKE2 vertical slice is live-proven.
+After the base RKE2/CSI/CCM/Flux lifecycle is live-proven, the remaining service work is primarily **pinned manifest/Helm integration and E2E qualification**.
 
-First Kubernetes DBaaS vertical slice: **PostgreSQL**.
+### 7.1 OpenEverest
 
-Definition of done includes:
+For supported PostgreSQL/PXC-MySQL/MongoDB V1 services, use the exact qualified **OpenEverest stable v1 line** and its existing database operators/control-plane semantics.
+
+Codex SHALL NOT implement a replacement:
+
+- PostgreSQL/MySQL/MongoDB operator;
+- DB HA/failover controller;
+- database backup scheduler;
+- PITR engine;
+- database engine-upgrade controller;
+- replacement DBaaS frontend merely to duplicate OpenEverest.
+
+LayerSentry work is limited to the necessary integration:
 
 ```text
-GUI/API provision
- -> dedicated/certified Data Services profile
- -> safe storage
- -> database operator reconcile
- -> service endpoint
- -> health/read-write test
- -> backup
- -> PITR/restore where selected
- -> maintenance/patch/upgrade
- -> restart/node replacement/data integrity
- -> delete/retention behavior
+Flux source/HelmRelease
+ -> namespace/RBAC/project policy
+ -> certified StorageClass
+ -> network/VIP/exposure policy
+ -> local/offline artifact references
+ -> health/status integration
+ -> E2E qualification of the upstream lifecycle
 ```
 
-Only then expand to MySQL/MongoDB/Redis/Valkey according to the selected provider architecture.
+For current V1, do not spend Codex work rebranding the OpenEverest UI unless the owner explicitly assigns branding later.
 
-## 8. APaaS/Streaming sequence
+Certification may still require proving one supported database lifecycle through OpenEverest: create, read/write, HA/failure behavior, backup, PITR/restore where offered, upgrade, worker replacement/data integrity and delete/retention. Those are **tests of upstream integration**, not a mandate to rewrite the features.
 
-After PostgreSQL DBaaS:
+### 7.2 OpenBao
 
-1. complete one APaaS vertical slice — OpenBao or Harbor;
-2. complete the other only after the first lifecycle is stable;
-3. then Strimzi/Kafka with protocol-correct exposure and storage/recovery tests.
+Install from pinned supported Helm/OCI content through Flux. Configure the certified HA/storage/network/TLS values and test required failure/backup/upgrade behavior. Do not write an OpenBao controller.
 
-Do not build a broad package catalog before proving install/update/recovery semantics.
+### 7.3 Harbor
 
-## 9. Air-gap
+Install from pinned supported Helm/OCI content through Flux. Configure certified persistence, external/HA dependencies, network exposure and scanning/signing integrations as selected. Do not write a Harbor controller.
 
-Air-gap is proven only by denying external egress and successfully executing the claimed lifecycle using pinned local artifacts.
+### 7.4 Strimzi/Kafka
 
-For a stable offline profile test, as applicable:
+Install the pinned Strimzi operator through Flux and use Strimzi CRs for Kafka lifecycle. LayerSentry provides profile inputs and networking/storage policy. Do not write a Kafka operator.
 
-- create;
-- scale;
-- repair/replacement;
-- package install/update;
-- backup/restore;
-- upgrade/rollback.
+Kafka external exposure may require bootstrap plus broker-specific endpoints; validate this exact listener/VIP behavior rather than assuming one generic VIP.
 
-Marketing/upstream support statements are not proof of the LayerSentry offline combination.
+### 7.5 Additional services
 
-## 10. UI boundary
+Use a mature existing operator/provider where one exists. Do not create custom operators solely to enlarge the catalog.
 
-The broad UI is feature-frozen.
+## 8. One signed V1 platform carrier
 
-Workstream E changes UI only when required for the K8s/Data Services vertical slice:
+Current V1 execution uses one logical signed release carrier:
+
+```text
+layersentry-platform-<release>.iso
+```
+
+It can contain logical sections for:
+
+- QCOW2/RKE2/CAPI/CAPC/CAPRKE2;
+- CNI/CCM/CSI;
+- Flux;
+- OpenEverest/database operators/images;
+- OpenBao;
+- Harbor;
+- Strimzi/Kafka;
+- approved security/observability/backup packages;
+- local RPM/DEB/OCI/chart content;
+- compatibility manifest, signatures, checksums, SBOM and provenance.
+
+Bundled means `AVAILABLE`. Flux installs only selected packages. Package installation later must not require reinstalling the ISO or rebuilding the cluster unless a host/kernel dependency changes.
+
+This current V1 decision supersedes the older conceptual split into separate K8s and Data Services ISO carriers for execution.
+
+## 9. UI coordination
+
+General LayerSentry UI finishing is Codex Workstream A. Workstream E owns K8s-specific API contract and integration requirements.
+
+Coordinate shared files such as router/config/API contracts before edits. Do not duplicate lifecycle logic in Vue/browser code.
+
+For K8s/Data Services, UI must truthfully expose only real capabilities and provide:
 
 - create/status/scale/delete;
-- profiles/version selection;
+- profile/release selection;
 - storage/network/VIP choices;
-- package/DBaaS/APaaS status;
-- meaningful errors/progress;
-- RBAC and direct-route correctness.
+- package/service selection;
+- meaningful progress/errors;
+- RBAC/direct-route correctness.
 
-Do not launch a general UI redesign from Workstream E.
+No broad UI redesign belongs in Workstream E.
+
+## 10. Air-gap
+
+Air-gap is proven only by denying external egress and completing the claimed lifecycle from local pinned artifacts.
+
+For the stable profile test, as applicable:
+
+- cluster create;
+- scale;
+- replacement/repair;
+- Flux package install/update;
+- one OpenEverest service lifecycle;
+- backup/restore where claimed;
+- upgrade/rollback.
+
+An upstream project saying it does or does not support air-gap is not LayerSentry runtime proof. If LayerSentry mirrors all required artifacts and qualifies the result, record it as a LayerSentry-certified profile, not as an inherited upstream claim.
 
 ## 11. Testing minimum
 
-For the exact release, include as applicable:
+For the exact release include, as applicable:
 
-- source/unit tests;
-- exact-component build tests;
-- controller service restart/recovery;
+- existing source/unit tests;
+- exact component builds;
+- immutable artifact validation;
+- controller restart/recovery;
 - auth/RBAC/project negatives;
 - cluster create/status/scale/delete;
-- 6443/9345 endpoint tests;
+- 6443/9345;
 - CNI/CCM/CSI lifecycle;
-- storage survival under node replacement;
-- package/Flux recovery;
+- PVC survival under node replacement;
+- Flux package lifecycle;
+- selected upstream service lifecycle;
 - upgrade/rollback;
 - air-gap;
-- browser E2E;
+- browser E2E through Workstream A;
 - Rocky Linux 9 runtime evidence;
-- failure/timeout/ambiguous mutation reconciliation.
+- timeout/ambiguous-mutation reconciliation.
 
-Do not promote to `LIVE_VERIFIED` from mocks/source tests.
+Do not promote mocks/source tests to `LIVE_VERIFIED`.
 
-## 12. Codex token discipline
+## 12. Codex efficiency rules
 
-- remain in this workstream until the current vertical slice is complete;
-- do not spend sessions rewriting master contexts unless a material architecture change is required;
-- do not duplicate ChatGPT-owned Single-OS/DR/UI work;
-- reuse current source instead of rebuilding frameworks from scratch;
-- prefer fixing the first failing E2E gate over adding a new provider;
-- checkpoint after meaningful vertical milestones, not every tiny edit.
+- stay on the first failing vertical gate until resolved;
+- reuse existing source instead of starting a replacement controller;
+- do not implement upstream product features that already exist;
+- do not build separate cluster engines for DBaaS/APaaS/Streaming;
+- do not qualify every CNI/CSI/provider simultaneously;
+- do not repeatedly research frozen versions without a blocker;
+- keep one active K8s Codex implementation stream unless the owner explicitly authorizes a non-overlapping substream;
+- checkpoint only meaningful milestones, not every tiny edit.
 
 ## 13. Handoff
 
@@ -300,9 +377,9 @@ Report concisely:
 
 - exact branch/base/final commit;
 - exact release tuple/artifact digests;
-- vertical-slice step reached;
+- first/last vertical step reached;
 - tests/live actions actually executed;
-- observed failure/root cause if blocked;
+- exact observed failure/root cause if blocked;
 - storage/data-safety result;
-- rollback/recovery result;
+- fallback decision if any;
 - exact next failing gate.
