@@ -1,0 +1,475 @@
+---
+- name: Require a controller-issued control-plane VM intent
+  ansible.builtin.assert:
+    that:
+      - layersentry_control_plane_vm is defined
+      - layersentry_control_plane_vm is mapping
+      - layersentry_bootstrap_release_id is defined
+      - layersentry_bootstrap_release_id is string
+      - layersentry_bootstrap_release_id is match('^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')
+      - layersentry_operation_uuid is defined
+      - layersentry_operation_uuid is string
+      - layersentry_operation_uuid is match('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$')
+      - layersentry_failure_domain is defined
+      - layersentry_management_bridge is defined
+      - layersentry_management_mtu is defined
+    fail_msg: A validated bootstrap release and per-host control-plane VM intent are required.
+
+- name: Require all control-plane VM intent fields
+  ansible.builtin.assert:
+    that:
+      - item in layersentry_control_plane_vm
+    fail_msg: "Control-plane VM intent is missing required field: {{ item }}"
+  loop:
+    - name
+    - role
+    - uuid
+    - failure_domain
+    - memory_mib
+    - vcpus
+    - machine
+    - firmware
+    - osinfo
+    - storage_pool
+    - base_volume
+    - base_image_sha256
+    - root_size_gib
+    - management_bridge
+    - management_mtu
+    - mac
+    - hostname
+    - ip_cidr
+    - gateway
+    - dns_servers
+    - ssh_authorized_keys
+
+- name: Define the narrow bootstrap VM allowlist
+  ansible.builtin.set_fact:
+    layersentry_control_plane_allowed_names:
+      db:
+        - LS-DB-01
+        - LS-DB-02
+        - LS-DB-03
+      management:
+        - LS-MGMT-01
+        - LS-MGMT-02
+        - LS-MGMT-03
+      lb:
+        - LS-LB-01
+        - LS-LB-02
+  changed_when: false
+
+- name: Validate control-plane VM ownership and placement intent
+  ansible.builtin.assert:
+    that:
+      - layersentry_control_plane_vm.role in layersentry_control_plane_allowed_names
+      - layersentry_control_plane_vm.name in layersentry_control_plane_allowed_names[layersentry_control_plane_vm.role]
+      - layersentry_control_plane_vm.uuid is match('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$')
+      - layersentry_control_plane_vm.failure_domain == layersentry_failure_domain
+      - layersentry_control_plane_vm.memory_mib | int > 0
+      - layersentry_control_plane_vm.vcpus | int > 0
+      - layersentry_control_plane_vm.root_size_gib | int > 0
+      - layersentry_control_plane_vm.machine is match('^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$')
+      - layersentry_control_plane_vm.firmware == 'uefi'
+      - layersentry_control_plane_vm.osinfo is match('^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$')
+      - layersentry_control_plane_vm.storage_pool is match('^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$')
+      - layersentry_control_plane_vm.base_volume is match('^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$')
+      - layersentry_control_plane_vm.base_image_sha256 is match('^[A-Fa-f0-9]{64}$')
+      - layersentry_control_plane_vm.management_bridge == layersentry_management_bridge
+      - layersentry_control_plane_vm.management_bridge is match('^[A-Za-z0-9][A-Za-z0-9_.:-]{0,62}$')
+      - layersentry_control_plane_vm.management_bridge in ansible_facts.interfaces
+      - layersentry_control_plane_vm.management_mtu | int == layersentry_management_mtu | int
+      - layersentry_control_plane_vm.management_mtu | int >= 1280
+      - layersentry_control_plane_vm.management_mtu | int <= 9216
+      - layersentry_control_plane_vm.mac is match('^52:54:([0-9A-Fa-f]{2}:){3}[0-9A-Fa-f]{2}$')
+      - layersentry_control_plane_vm.hostname is match('^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$')
+      - layersentry_control_plane_vm.ip_cidr is match('^[0-9]{1,3}(?:\\.[0-9]{1,3}){3}/(?:[0-9]|[12][0-9]|3[0-2])$')
+      - layersentry_control_plane_vm.gateway is match('^[0-9]{1,3}(?:\\.[0-9]{1,3}){3}$')
+      - layersentry_control_plane_vm.dns_servers is sequence
+      - layersentry_control_plane_vm.dns_servers is not string
+      - layersentry_control_plane_vm.dns_servers | length > 0
+      - layersentry_control_plane_vm.ssh_authorized_keys is sequence
+      - layersentry_control_plane_vm.ssh_authorized_keys is not string
+      - layersentry_control_plane_vm.ssh_authorized_keys | length > 0
+    fail_msg: Control-plane VM intent violates the bootstrap ownership, placement, network, storage or identity contract.
+
+- name: Validate guest IPv4 octets
+  vars:
+    layersentry_ipv4_candidates: >-
+      {{
+        [layersentry_control_plane_vm.ip_cidr.split('/')[0], layersentry_control_plane_vm.gateway]
+        + layersentry_control_plane_vm.dns_servers
+      }}
+  ansible.builtin.assert:
+    that:
+      - item is match('^[0-9]{1,3}(?:\\.[0-9]{1,3}){3}$')
+      - item.split('.') | map('int') | min >= 0
+      - item.split('.') | map('int') | max <= 255
+    fail_msg: "Invalid IPv4 address in control-plane VM intent: {{ item }}"
+  loop: "{{ layersentry_ipv4_candidates }}"
+
+- name: Validate bootstrap SSH public keys
+  ansible.builtin.assert:
+    that:
+      - item is match('^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh.com|sk-ecdsa-sha2-nistp256@openssh.com) [A-Za-z0-9+/=]+(?: .*)?$')
+    fail_msg: Bootstrap access accepts public SSH keys only; passwords and arbitrary authorized_keys options are not allowed.
+  loop: "{{ layersentry_control_plane_vm.ssh_authorized_keys }}"
+  no_log: true
+
+- name: Derive deterministic bootstrap-owned resource identities
+  ansible.builtin.set_fact:
+    layersentry_control_plane_root_volume_name: >-
+      {{ layersentry_control_plane_vm.name }}-{{ layersentry_control_plane_vm.uuid | replace('-', '') }}-root.qcow2
+    layersentry_control_plane_ownership_marker: >-
+      LayerSentry bootstrap-owned control-plane role={{ layersentry_control_plane_vm.role }} uuid={{ layersentry_control_plane_vm.uuid }}
+    layersentry_control_plane_root_operation_marker: >-
+      LayerSentry root role={{ layersentry_control_plane_vm.role }} uuid={{ layersentry_control_plane_vm.uuid }} operation={{ layersentry_operation_uuid }} base_sha256={{ layersentry_control_plane_vm.base_image_sha256 | lower }}
+    layersentry_control_plane_seed_identity: >-
+      {{
+        [
+          layersentry_bootstrap_release_id,
+          layersentry_operation_uuid,
+          layersentry_control_plane_vm.name,
+          layersentry_control_plane_vm.uuid,
+          layersentry_control_plane_vm.hostname,
+          layersentry_control_plane_vm.mac | lower,
+          layersentry_control_plane_vm.ip_cidr,
+          layersentry_control_plane_vm.gateway,
+          layersentry_control_plane_vm.dns_servers | join(','),
+          layersentry_control_plane_vm.ssh_authorized_keys | join(',')
+        ] | join('|')
+      }}
+  changed_when: false
+  no_log: true
+
+- name: Derive deterministic seed digest
+  ansible.builtin.set_fact:
+    layersentry_control_plane_seed_digest: "{{ layersentry_control_plane_seed_identity | hash('sha256') }}"
+  changed_when: false
+  no_log: true
+
+- name: Derive deterministic CIDATA volume name
+  ansible.builtin.set_fact:
+    layersentry_control_plane_seed_volume_name: >-
+      {{ layersentry_control_plane_vm.name }}-{{ layersentry_control_plane_vm.uuid | replace('-', '') }}-seed-{{ layersentry_control_plane_seed_digest[0:16] }}.iso
+  changed_when: false
+
+- name: Observe an existing same-name libvirt domain before any storage mutation
+  community.libvirt.virt:
+    command: get_xml
+    name: "{{ layersentry_control_plane_vm.name }}"
+    uri: qemu:///system
+  register: layersentry_control_plane_domain_probe
+  changed_when: false
+  failed_when: false
+
+- name: Mark whether the exact domain already exists
+  ansible.builtin.set_fact:
+    layersentry_control_plane_domain_exists: "{{ layersentry_control_plane_domain_probe.get_xml is defined }}"
+  changed_when: false
+
+- name: Reject adoption of a foreign same-name domain
+  ansible.builtin.assert:
+    that:
+      - "('<uuid>' ~ layersentry_control_plane_vm.uuid ~ '</uuid>') in layersentry_control_plane_domain_probe.get_xml"
+      - layersentry_control_plane_ownership_marker in layersentry_control_plane_domain_probe.get_xml
+    fail_msg: A same-name libvirt domain exists but does not carry the expected LayerSentry UUID/ownership marker; refusing adoption or recreation.
+  when: layersentry_control_plane_domain_exists | bool
+
+- name: Materialize the bootstrap-owned domain only when it is absent
+  when: not (layersentry_control_plane_domain_exists | bool)
+  block:
+    - name: Observe storage-pool volumes before mutation
+      community.libvirt.virt_volume:
+        pool: "{{ layersentry_control_plane_vm.storage_pool }}"
+        command: list_volumes
+        uri: qemu:///system
+      register: layersentry_control_plane_pool_before
+      changed_when: false
+
+    - name: Select immutable base and deterministic partial resources
+      ansible.builtin.set_fact:
+        layersentry_control_plane_base_matches: >-
+          {{
+            layersentry_control_plane_pool_before.list_volumes
+            | selectattr('name', 'equalto', layersentry_control_plane_vm.base_volume)
+            | list
+          }}
+        layersentry_control_plane_root_matches: >-
+          {{
+            layersentry_control_plane_pool_before.list_volumes
+            | selectattr('name', 'equalto', layersentry_control_plane_root_volume_name)
+            | list
+          }}
+        layersentry_control_plane_seed_matches: >-
+          {{
+            layersentry_control_plane_pool_before.list_volumes
+            | selectattr('name', 'equalto', layersentry_control_plane_seed_volume_name)
+            | list
+          }}
+      changed_when: false
+
+    - name: Require one immutable base volume and no duplicate deterministic volumes
+      ansible.builtin.assert:
+        that:
+          - layersentry_control_plane_base_matches | length == 1
+          - layersentry_control_plane_root_matches | length <= 1
+          - layersentry_control_plane_seed_matches | length <= 1
+        fail_msg: The storage pool is missing the exact base volume or contains duplicate deterministic control-plane resources.
+
+    - name: Inspect immutable base image bytes
+      ansible.builtin.stat:
+        path: "{{ (layersentry_control_plane_base_matches | first).path }}"
+        checksum_algorithm: sha256
+        get_checksum: true
+        follow: false
+      register: layersentry_control_plane_base_stat
+
+    - name: Require exact immutable base image digest
+      ansible.builtin.assert:
+        that:
+          - layersentry_control_plane_base_stat.stat.exists
+          - layersentry_control_plane_base_stat.stat.isreg | default(false)
+          - layersentry_control_plane_base_stat.stat.checksum | default('') | lower == layersentry_control_plane_vm.base_image_sha256 | lower
+          - (layersentry_control_plane_base_matches | first).capacity | int <= (layersentry_control_plane_vm.root_size_gib | int * 1073741824)
+          - "'<format type=\"qcow2\"' in (layersentry_control_plane_base_matches | first).XMLDesc or \"<format type='qcow2'\" in (layersentry_control_plane_base_matches | first).XMLDesc"
+        fail_msg: Base volume digest/format is invalid or the requested root volume is smaller than the base image.
+
+    - name: Validate an interrupted root-volume resume without resizing it
+      ansible.builtin.assert:
+        that:
+          - (layersentry_control_plane_root_matches | first).capacity | int == (layersentry_control_plane_vm.root_size_gib | int * 1073741824)
+          - "'<format type=\"qcow2\"' in (layersentry_control_plane_root_matches | first).XMLDesc or \"<format type='qcow2'\" in (layersentry_control_plane_root_matches | first).XMLDesc"
+          - layersentry_control_plane_root_operation_marker in (layersentry_control_plane_root_matches | first).XMLDesc
+        fail_msg: Existing deterministic root volume has unexpected capacity, format or operation ownership; refusing destructive resize/adoption.
+      when: layersentry_control_plane_root_matches | length == 1
+
+    - name: Create the deterministic root volume from the immutable base
+      community.libvirt.virt_volume:
+        pool: "{{ layersentry_control_plane_vm.storage_pool }}"
+        state: present
+        clone_source: "{{ layersentry_control_plane_vm.base_volume }}"
+        uri: qemu:///system
+        xml: |
+          <volume type="file">
+            <name>{{ layersentry_control_plane_root_volume_name }}</name>
+            <description>{{ layersentry_control_plane_root_operation_marker }}</description>
+            <capacity unit="GiB">{{ layersentry_control_plane_vm.root_size_gib | int }}</capacity>
+            <target>
+              <format type="qcow2"/>
+              <permissions>
+                <mode>0600</mode>
+                <label>virt_image_t</label>
+              </permissions>
+            </target>
+          </volume>
+      when: layersentry_control_plane_root_matches | length == 0
+      register: layersentry_control_plane_root_create
+
+    - name: Validate an interrupted CIDATA-volume resume
+      ansible.builtin.assert:
+        that:
+          - "'<format type=\"iso\"' in (layersentry_control_plane_seed_matches | first).XMLDesc or \"<format type='iso'\" in (layersentry_control_plane_seed_matches | first).XMLDesc"
+        fail_msg: Existing deterministic CIDATA volume is not an ISO volume; refusing adoption.
+      when: layersentry_control_plane_seed_matches | length == 1
+
+    - name: Create deterministic CIDATA for first-boot network and key access
+      community.libvirt.virt_volume:
+        pool: "{{ layersentry_control_plane_vm.storage_pool }}"
+        command: create_cidata_cdrom
+        name: "{{ layersentry_control_plane_seed_volume_name }}"
+        uri: qemu:///system
+        cloudinit_config:
+          METADATA:
+            instance-id: "{{ layersentry_control_plane_vm.uuid }}"
+            local-hostname: "{{ layersentry_control_plane_vm.hostname }}"
+          NETWORK_CONFIG:
+            version: 2
+            ethernets:
+              mgmt0:
+                match:
+                  macaddress: "{{ layersentry_control_plane_vm.mac | lower }}"
+                addresses:
+                  - "{{ layersentry_control_plane_vm.ip_cidr }}"
+                routes:
+                  - to: 0.0.0.0/0
+                    via: "{{ layersentry_control_plane_vm.gateway }}"
+                nameservers:
+                  addresses: "{{ layersentry_control_plane_vm.dns_servers }}"
+          USERDATA:
+            hostname: "{{ layersentry_control_plane_vm.hostname }}"
+            manage_etc_hosts: true
+            ssh_pwauth: false
+            disable_root: true
+            users:
+              - name: layersentry-bootstrap
+                gecos: LayerSentry temporary bootstrap
+                groups:
+                  - wheel
+                sudo:
+                  - ALL=(ALL) NOPASSWD:ALL
+                shell: /bin/bash
+                lock_passwd: true
+                ssh_authorized_keys: "{{ layersentry_control_plane_vm.ssh_authorized_keys }}"
+      when: layersentry_control_plane_seed_matches | length == 0
+      register: layersentry_control_plane_seed_create
+      no_log: true
+
+    - name: Re-observe deterministic volumes before domain creation
+      community.libvirt.virt_volume:
+        pool: "{{ layersentry_control_plane_vm.storage_pool }}"
+        command: list_volumes
+        uri: qemu:///system
+      register: layersentry_control_plane_pool_ready
+      changed_when: false
+
+    - name: Resolve exact root and CIDATA paths
+      ansible.builtin.set_fact:
+        layersentry_control_plane_root_ready: >-
+          {{
+            layersentry_control_plane_pool_ready.list_volumes
+            | selectattr('name', 'equalto', layersentry_control_plane_root_volume_name)
+            | list
+          }}
+        layersentry_control_plane_seed_ready: >-
+          {{
+            layersentry_control_plane_pool_ready.list_volumes
+            | selectattr('name', 'equalto', layersentry_control_plane_seed_volume_name)
+            | list
+          }}
+      changed_when: false
+
+    - name: Require one exact root and CIDATA volume before VM mutation
+      ansible.builtin.assert:
+        that:
+          - layersentry_control_plane_root_ready | length == 1
+          - layersentry_control_plane_seed_ready | length == 1
+        fail_msg: Deterministic root/CIDATA storage observation is incomplete; refusing VM creation.
+
+    - name: Create the allowlisted control-plane domain
+      block:
+        - name: Create deterministic libvirt domain
+          community.libvirt.virt_install:
+            name: "{{ layersentry_control_plane_vm.name }}"
+            state: present
+            recreate: false
+            uri: qemu:///system
+            memory: "{{ layersentry_control_plane_vm.memory_mib | int }}"
+            vcpus: "{{ layersentry_control_plane_vm.vcpus | int }}"
+            machine: "{{ layersentry_control_plane_vm.machine }}"
+            metadata:
+              uuid: "{{ layersentry_control_plane_vm.uuid }}"
+              description: "{{ layersentry_control_plane_ownership_marker }}"
+            boot: uefi
+            import: true
+            osinfo:
+              name: "{{ layersentry_control_plane_vm.osinfo }}"
+            virt_type: kvm
+            autostart: true
+            events:
+              on_crash: restart
+              on_reboot: restart
+              on_poweroff: destroy
+            disks:
+              - path: "{{ (layersentry_control_plane_root_ready | first).path }}"
+                format: qcow2
+                bus: virtio
+              - path: "{{ (layersentry_control_plane_seed_ready | first).path }}"
+                format: raw
+                bus: virtio
+                readonly: true
+            networks:
+              - bridge: "{{ layersentry_control_plane_vm.management_bridge }}"
+                model:
+                  type: virtio
+                mac:
+                  address: "{{ layersentry_control_plane_vm.mac | lower }}"
+                mtu:
+                  size: "{{ layersentry_control_plane_vm.management_mtu | int }}"
+            graphics:
+              type: none
+          register: layersentry_control_plane_create
+      rescue:
+        - name: Observe libvirt after an ambiguous create failure
+          community.libvirt.virt:
+            command: get_xml
+            name: "{{ layersentry_control_plane_vm.name }}"
+            uri: qemu:///system
+          register: layersentry_control_plane_ambiguous_probe
+          changed_when: false
+          failed_when: false
+
+        - name: Refuse automatic replay when create outcome cannot be proven
+          ansible.builtin.fail:
+            msg: >-
+              Control-plane VM creation failed and no authoritative same-name domain was observed.
+              Operation state is UNKNOWN; reconcile libvirt before any retry.
+          when: layersentry_control_plane_ambiguous_probe.get_xml is not defined
+
+        - name: Record observed ambiguous outcome for final ownership validation
+          ansible.builtin.set_fact:
+            layersentry_control_plane_domain_probe:
+              get_xml: "{{ layersentry_control_plane_ambiguous_probe.get_xml }}"
+          when: layersentry_control_plane_ambiguous_probe.get_xml is defined
+          changed_when: false
+
+- name: Authoritatively read the final libvirt domain XML
+  community.libvirt.virt:
+    command: get_xml
+    name: "{{ layersentry_control_plane_vm.name }}"
+    uri: qemu:///system
+  register: layersentry_control_plane_final_domain
+  changed_when: false
+
+- name: Authoritatively read the final domain UUID
+  community.libvirt.virt:
+    command: uuid
+    name: "{{ layersentry_control_plane_vm.name }}"
+    uri: qemu:///system
+  register: layersentry_control_plane_final_uuid
+  changed_when: false
+
+- name: Validate final control-plane domain ownership and configuration
+  ansible.builtin.assert:
+    that:
+      - layersentry_control_plane_final_uuid.uuid | lower == layersentry_control_plane_vm.uuid | lower
+      - layersentry_control_plane_ownership_marker in layersentry_control_plane_final_domain.get_xml
+      - layersentry_control_plane_final_domain.get_xml is regex('<vcpu(?:\\s[^>]*)?>\\s*' ~ (layersentry_control_plane_vm.vcpus | string) ~ '\\s*</vcpu>')
+      - layersentry_control_plane_final_domain.get_xml is regex('<memory(?:\\s[^>]*)?>\\s*' ~ ((layersentry_control_plane_vm.memory_mib | int * 1024) | string) ~ '\\s*</memory>')
+      - layersentry_control_plane_root_volume_name in layersentry_control_plane_final_domain.get_xml
+      - layersentry_control_plane_seed_volume_name in layersentry_control_plane_final_domain.get_xml
+      - layersentry_control_plane_vm.management_bridge in layersentry_control_plane_final_domain.get_xml
+      - layersentry_control_plane_vm.mac | lower in layersentry_control_plane_final_domain.get_xml | lower
+      - "'<loader' in layersentry_control_plane_final_domain.get_xml"
+    fail_msg: Final libvirt observation does not match the controller-approved control-plane VM identity/configuration.
+
+- name: Wait for first-boot management SSH reachability
+  ansible.builtin.wait_for:
+    host: "{{ layersentry_control_plane_vm.ip_cidr.split('/')[0] }}"
+    port: 22
+    connect_timeout: 5
+    sleep: 2
+    timeout: "{{ layersentry_control_plane_vm.readiness_timeout_seconds | default(180) | int }}"
+    state: started
+
+- name: Publish non-secret control-plane VM evidence
+  ansible.builtin.set_stats:
+    data:
+      layersentry_control_plane_vm_evidence:
+        release_id: "{{ layersentry_bootstrap_release_id }}"
+        operation_uuid: "{{ layersentry_operation_uuid }}"
+        host: "{{ inventory_hostname }}"
+        failure_domain: "{{ layersentry_failure_domain }}"
+        role: "{{ layersentry_control_plane_vm.role }}"
+        name: "{{ layersentry_control_plane_vm.name }}"
+        uuid: "{{ layersentry_control_plane_vm.uuid }}"
+        root_volume: "{{ layersentry_control_plane_root_volume_name }}"
+        seed_volume: "{{ layersentry_control_plane_seed_volume_name }}"
+        seed_digest: "{{ layersentry_control_plane_seed_digest }}"
+        bridge: "{{ layersentry_control_plane_vm.management_bridge }}"
+        mtu: "{{ layersentry_control_plane_vm.management_mtu | int }}"
+        mac: "{{ layersentry_control_plane_vm.mac | lower }}"
+        address: "{{ layersentry_control_plane_vm.ip_cidr }}"
+        base_image_sha256: "{{ layersentry_control_plane_vm.base_image_sha256 | lower }}"
+    per_host: true
+    aggregate: false

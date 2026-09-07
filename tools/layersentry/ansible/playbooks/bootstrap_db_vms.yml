@@ -1,0 +1,60 @@
+---
+- name: LayerSentry one-time bootstrap B1 database VM provisioning
+  hosts: layersentry_hypervisors
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  serial: 1
+
+  pre_tasks:
+    - name: Require exactly three hypervisor targets
+      ansible.builtin.assert:
+        that:
+          - groups['layersentry_hypervisors'] | length == 3
+        fail_msg: B1 requires exactly three preflight-qualified hypervisors.
+      run_once: true
+      delegate_to: localhost
+      become: false
+
+    - name: Require one DB VM intent on every hypervisor
+      ansible.builtin.assert:
+        that:
+          - hostvars[item].layersentry_db_vm is defined
+          - hostvars[item].layersentry_db_vm is mapping
+        fail_msg: "Missing database VM intent for hypervisor {{ item }}."
+      loop: "{{ groups['layersentry_hypervisors'] }}"
+      run_once: true
+      delegate_to: localhost
+      become: false
+
+    - name: Collect cross-host DB VM intents
+      ansible.builtin.set_fact:
+        layersentry_db_vm_intents: >-
+          {{
+            groups['layersentry_hypervisors']
+            | map('extract', hostvars, 'layersentry_db_vm')
+            | list
+          }}
+      run_once: true
+      delegate_to: localhost
+      become: false
+      changed_when: false
+
+    - name: Require exact DB names and globally unique VM identities
+      ansible.builtin.assert:
+        that:
+          - layersentry_db_vm_intents | map(attribute='name') | list | sort == ['LS-DB-01', 'LS-DB-02', 'LS-DB-03']
+          - layersentry_db_vm_intents | map(attribute='role') | list | unique == ['db']
+          - layersentry_db_vm_intents | map(attribute='uuid') | list | unique | length == 3
+          - layersentry_db_vm_intents | map(attribute='mac') | map('lower') | list | unique | length == 3
+          - layersentry_db_vm_intents | map(attribute='ip_cidr') | list | unique | length == 3
+          - layersentry_db_vm_intents | map(attribute='failure_domain') | list | unique | length == 3
+        fail_msg: B1 DB intents must describe exactly LS-DB-01..03 with unique UUID, MAC, address and failure-domain identities.
+      run_once: true
+      delegate_to: localhost
+      become: false
+
+  roles:
+    - role: control_plane_vm
+      vars:
+        layersentry_control_plane_vm: "{{ layersentry_db_vm }}"
