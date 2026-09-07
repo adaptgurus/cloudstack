@@ -3,20 +3,23 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-usage: module-writer-guard.sh start|check|advance MODULE [REMOTE] [BRANCH]
+usage: module-writer-guard.sh start|check|precommit|advance MODULE [REMOTE] [BRANCH]
 
 MODULE: k8s | single-os | dr | bootstrap | ui
 REMOTE defaults to origin.
 BRANCH defaults to layersentry/4.22.1.1-ui.
 
-start   fetches and records the current remote branch as this session's base.
-check   fetches and fails if the remote branch gained changes in this module's
-        owned paths since the recorded base.
-advance records the latest remote branch after the session has reconciled its
-        own/foreign commits and is ready for the next batch.
+start     fetches and records the current remote branch as this session's base.
+check     fetches and fails if the remote branch gained changes in this module's
+          owned paths since the recorded base.
+precommit fails if any currently staged path is outside this module's writable
+          fence. Run it after staging and before every module source commit.
+advance   records the latest remote branch after the session has reconciled its
+          own/foreign commits and is ready for the next batch.
 
-This is collision detection, not a distributed lock. It does not replace
-fetch/review/reconcile before mutation.
+This is collision/path-fence enforcement, not a distributed lock. It does not
+replace fetch/review/reconcile before mutation. CI independently rechecks K8s
+commit paths so a local guard cannot be treated as production evidence alone.
 EOF
 }
 
@@ -41,10 +44,6 @@ git_dir="$(git rev-parse --git-dir)"
 state_dir="$git_dir/layersentry-writer-guard"
 mkdir -p "$state_dir"
 state_file="$state_dir/${module}.base"
-
-git fetch --quiet "$remote" "$branch"
-remote_ref="refs/remotes/${remote}/${branch}"
-remote_head="$(git rev-parse "$remote_ref")"
 
 owned_path() {
   local p="$1"
@@ -90,6 +89,35 @@ owned_path() {
       ;;
   esac
 }
+
+if [[ "$action" == "precommit" ]]; then
+  mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMRD)
+  if ((${#staged[@]} == 0)); then
+    printf 'WRITER_GUARD_OK module=%s staged=0 action=precommit\n' "$module"
+    exit 0
+  fi
+
+  foreign=()
+  for p in "${staged[@]}"; do
+    if ! owned_path "$p"; then
+      foreign+=("$p")
+    fi
+  done
+
+  if ((${#foreign[@]} > 0)); then
+    printf 'FOREIGN_MODULE_EDIT module=%s stage=precommit\n' "$module" >&2
+    printf 'forbidden_path=%s\n' "${foreign[@]}" >&2
+    echo "action=unstage_foreign_paths_and_hand_to_owning_module" >&2
+    exit 4
+  fi
+
+  printf 'MODULE_PATH_FENCE_OK module=%s staged=%d action=precommit\n' "$module" "${#staged[@]}"
+  exit 0
+fi
+
+git fetch --quiet "$remote" "$branch"
+remote_ref="refs/remotes/${remote}/${branch}"
+remote_head="$(git rev-parse "$remote_ref")"
 
 record_base() {
   printf '%s\n' "$remote_head" > "$state_file"
