@@ -6,9 +6,23 @@ source /etc/os-release
 command -v layersentryd >/dev/null || { echo "FAIL layersentryd_missing"; exit 1; }
 command -v layersentryctl >/dev/null || { echo "FAIL layersentryctl_missing"; exit 1; }
 command -v layersentry-configure-from-file >/dev/null || { echo "FAIL config_file_wrapper_missing"; exit 1; }
+command -v ansible-playbook >/dev/null || { echo "FAIL ansible_core_missing"; exit 1; }
 command -v pvcreate >/dev/null || { echo "FAIL lvm2_missing"; exit 1; }
 command -v nmcli >/dev/null || { echo "FAIL NetworkManager_cli_missing"; exit 1; }
 command -v semanage >/dev/null || { echo "FAIL semanage_missing"; exit 1; }
+for path in \
+  /usr/lib/layersentry/ansible/ansible.cfg \
+  /usr/lib/layersentry/ansible/inventory/localhost.ini \
+  /usr/lib/layersentry/ansible/library/layersentry_storage.py \
+  /usr/lib/layersentry/ansible/playbooks/single_os_apply.yml \
+  /usr/lib/layersentry/ansible/playbooks/single_os_upgrade.yml \
+  /usr/lib/layersentry/ansible/playbooks/single_os_repair.yml \
+  /usr/lib/layersentry/ansible/playbooks/single_os_uninstall.yml; do
+  [[ -f "$path" && ! -L "$path" ]] || { echo "FAIL ansible_project_missing_or_unsafe=$path"; exit 1; }
+done
+[[ -z "$(find /usr/lib/layersentry/ansible -type l -print -quit)" ]] || { echo "FAIL ansible_project_symlink"; exit 1; }
+[[ -z "$(find /usr/lib/layersentry/ansible -type f -perm /022 -print -quit)" ]] || { echo "FAIL ansible_project_writable_file"; exit 1; }
+[[ -z "$(find /usr/lib/layersentry/ansible -type d -perm /022 -print -quit)" ]] || { echo "FAIL ansible_project_writable_directory"; exit 1; }
 getenforce | grep -Fxq Enforcing || { echo "FAIL selinux_not_enforcing"; exit 1; }
 systemctl is-enabled --quiet firewalld || { echo "FAIL firewalld_not_enabled"; exit 1; }
 systemctl is-enabled --quiet NetworkManager || { echo "FAIL NetworkManager_not_enabled"; exit 1; }
