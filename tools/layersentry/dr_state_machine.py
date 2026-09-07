@@ -770,10 +770,15 @@ class DurableDrStore:
         *,
         actor: str,
     ) -> LeaseRecord:
+        """Acquire a fresh executor lease; live leases require token-based renewal.
+
+        Operation IDs identify durable work, not its current executor. Returning
+        a live token to a duplicate worker would let either worker release the
+        other's protection while a provider mutation remains in flight.
+        """
         _require_values(resource_key, operation_id, actor)
         if ttl_seconds <= 0:
             raise ValidationError("lease ttl_seconds must be positive")
-        now = _epoch_now()
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -792,14 +797,15 @@ class DurableDrStore:
             existing = connection.execute(
                 "SELECT * FROM dr_leases WHERE resource_key=?", (resource_key,)
             ).fetchone()
+            # SQLite lock acquisition can wait longer than the lease TTL. Base
+            # ownership and the new TTL on time after that wait, never before it.
+            now = _epoch_now()
             if existing is not None and int(existing["expires_at_epoch"]) > now:
-                if existing["operation_id"] != operation_id:
-                    raise LeaseConflict(
-                        f"resource {resource_key} is leased by another operation"
-                    )
-                token = str(existing["token"])
-            else:
-                token = secrets.token_urlsafe(32)
+                raise LeaseConflict(
+                    f"resource {resource_key} already has a live executor lease; "
+                    "renewal requires its token"
+                )
+            token = secrets.token_urlsafe(32)
 
             expires = now + ttl_seconds
             connection.execute(
@@ -852,11 +858,11 @@ class DurableDrStore:
         _require_values(resource_key, operation_id, token, actor)
         if ttl_seconds <= 0:
             raise ValidationError("lease ttl_seconds must be positive")
-        now = _epoch_now()
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
-            self._assert_lease_in_tx(connection, resource_key, operation_id, token, now)
+            self._assert_lease_in_tx(connection, resource_key, operation_id, token)
+            now = _epoch_now()
             expires = now + ttl_seconds
             connection.execute(
                 """
@@ -895,11 +901,11 @@ class DurableDrStore:
         actor: str,
     ) -> None:
         _require_values(resource_key, operation_id, token, actor)
-        now = _epoch_now()
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
-            self._assert_lease_in_tx(connection, resource_key, operation_id, token, now)
+            self._assert_lease_in_tx(connection, resource_key, operation_id, token)
+            now = _epoch_now()
             state_row = connection.execute(
                 "SELECT state FROM dr_operations WHERE operation_id=?", (operation_id,)
             ).fetchone()
@@ -926,7 +932,6 @@ class DurableDrStore:
 
     def assert_lease(self, operation_id: str, token: str) -> LeaseRecord:
         _require_values(operation_id, token)
-        now = _epoch_now()
         with self._connect() as connection:
             operation = connection.execute(
                 "SELECT lease_resource FROM dr_operations WHERE operation_id=?",
@@ -939,7 +944,6 @@ class DurableDrStore:
                 str(operation["lease_resource"]),
                 operation_id,
                 token,
-                now,
             )
 
     def transition(
@@ -1020,7 +1024,6 @@ class DurableDrStore:
         auto_proof: Optional[AutoFailoverProof],
     ) -> OperationRecord:
         _require_values(operation_id, actor, event_type)
-        now = _epoch_now()
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -1046,7 +1049,6 @@ class DurableDrStore:
                     record.lease_resource,
                     operation_id,
                     lease_token,
-                    now,
                 )
 
             if record.operation_type is OperationType.AUTO_FAILOVER:
@@ -1067,6 +1069,7 @@ class DurableDrStore:
             elif any(value is not None for value in (auto_plan, auto_provider, auto_proof)):
                 raise ValidationError("automatic-failover evidence supplied to non-auto operation")
 
+            now = _epoch_now()
             connection.execute(
                 """
                 UPDATE dr_operations
@@ -1166,7 +1169,6 @@ class DurableDrStore:
         resource_key: str,
         operation_id: str,
         token: str,
-        now: int,
     ) -> LeaseRecord:
         row = connection.execute(
             """
@@ -1181,7 +1183,9 @@ class DurableDrStore:
             str(row["token"]), token
         ):
             raise LeaseRequired("exclusive lease is owned by a different operation/token")
-        if int(row["expires_at_epoch"]) <= now:
+        # Reads may also wait on a writer. Check expiry using a fresh clock only
+        # after the authoritative lease row has actually been read.
+        if int(row["expires_at_epoch"]) <= _epoch_now():
             raise LeaseRequired("exclusive lease has expired")
         return LeaseRecord(
             resource_key=str(row["resource_key"]),
