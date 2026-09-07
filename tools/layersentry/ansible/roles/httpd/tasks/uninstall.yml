@@ -1,0 +1,33 @@
+---
+- name: Refuse destructive Apache uninstall through normal lifecycle
+  ansible.builtin.assert:
+    that:
+      - not (layersentry_destroy_data | default(false) | bool)
+    fail_msg: Apache HTTPD uninstall never destroys customer application data.
+
+- name: Restore Rocky primary Apache listener when LayerSentry owns it
+  ansible.builtin.replace:
+    path: /etc/httpd/conf/httpd.conf
+    regexp: '(?m)^Listen [^\n]+ # LayerSentry managed primary Listen$'
+    replace: 'Listen 80'
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Remove LayerSentry Apache virtual host
+  ansible.builtin.file:
+    path: "/etc/httpd/conf.d/layersentry-{{ (layersentry_service_id | hash('sha256'))[:12] }}.conf"
+    state: absent
+
+- name: Remove internal legacy Apache owner and listener backup markers
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/layersentryd/state/apache-httpd-owner
+    - /var/lib/layersentryd/state/apache-httpd-original-listen
+
+- name: Remove Apache HTTPD package while preserving application content
+  ansible.builtin.dnf:
+    name: httpd
+    state: absent
