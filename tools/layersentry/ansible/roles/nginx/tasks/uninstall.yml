@@ -1,0 +1,21 @@
+---
+- name: Refuse destructive Nginx uninstall through normal lifecycle
+  ansible.builtin.assert:
+    that:
+      - not (layersentry_destroy_data | default(false) | bool)
+    fail_msg: Nginx uninstall never destroys customer application data.
+
+- name: Remove LayerSentry Nginx vhost
+  ansible.builtin.file:
+    path: "/etc/nginx/conf.d/layersentry-{{ (layersentry_service_id | hash('sha256'))[:12] }}.conf"
+    state: absent
+
+- name: Remove internal legacy Nginx owner marker if present
+  ansible.builtin.file:
+    path: /var/lib/layersentryd/state/nginx-owner
+    state: absent
+
+- name: Remove Nginx package while preserving application content
+  ansible.builtin.dnf:
+    name: nginx
+    state: absent
