@@ -36,19 +36,28 @@ def run(argv, ok=(0,), timeout=120) -> str:
 
 
 def ancestry(device: str) -> set[str]:
+    p = subprocess.run(["/usr/bin/lsblk", "-s", "-nrpo", "PATH", device], stdin=subprocess.DEVNULL,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False, timeout=30)
+    if p.returncode != 0:
+        fail("cannot prove block-device ancestry for %s" % device)
     out: set[str] = set()
-    cur = os.path.realpath(device)
-    for _ in range(32):
-        if not cur or cur in out:
-            break
-        out.add(cur)
-        p = subprocess.run(["/usr/bin/lsblk", "-nro", "PKNAME", cur], stdout=subprocess.PIPE,
-                           stderr=subprocess.DEVNULL, text=True, check=False, timeout=10)
-        parent = p.stdout.strip()
-        if not parent:
-            break
-        cur = os.path.realpath(parent if parent.startswith("/") else "/dev/" + parent)
+    for raw in p.stdout.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        real = os.path.realpath(raw)
+        if real:
+            out.add(real)
+    if not out:
+        fail("empty block-device ancestry for %s" % device)
     return out
+
+
+def block_type(device: str) -> str:
+    values = [line.strip() for line in run(["/usr/bin/lsblk", "-dnro", "TYPE", device]).splitlines() if line.strip()]
+    if len(values) != 1:
+        fail("cannot prove block-device type for %s" % device)
+    return values[0]
 
 
 def validate_data_device(path: str) -> None:
@@ -58,9 +67,34 @@ def validate_data_device(path: str) -> None:
     st = os.stat(real)
     if not stat.S_ISBLK(st.st_mode):
         fail("acceptance device is not a block device")
+    if block_type(real) != "disk":
+        fail("acceptance device must resolve to a whole disk")
+    rows = [line.strip() for line in run(["/usr/bin/lsblk", "-nrpo", "PATH", real]).splitlines() if line.strip()]
+    if rows != [real]:
+        fail("acceptance device must be an unpartitioned whole disk")
     root = run(["/usr/bin/findmnt", "-nro", "SOURCE", "/"])
     if ancestry(root).intersection(ancestry(real)):
         fail("refusing OS/root/root-parent device")
+    if subprocess.run(["/usr/bin/findmnt", "-rn", "-S", real], stdin=subprocess.DEVNULL,
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=30).returncode == 0:
+        fail("acceptance device is mounted")
+    wipe = subprocess.run(["/usr/sbin/wipefs", "-n", real], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, text=True, check=False, timeout=30)
+    if wipe.returncode != 0:
+        fail("cannot inspect acceptance-device signatures")
+    if wipe.stdout.strip():
+        fail("acceptance device contains an existing filesystem/partition/LVM signature")
+    pv = subprocess.run(["/usr/sbin/pvs", "--noheadings", "-o", "pv_name", real], stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False, timeout=30)
+    if pv.returncode == 0 and pv.stdout.strip():
+        fail("acceptance device is already an LVM PV")
+    if pv.returncode not in (0, 5):
+        fail("cannot prove acceptance device is outside LVM")
+    holders = Path("/sys/class/block") / os.path.basename(real) / "holders"
+    if not holders.is_dir():
+        fail("cannot inspect acceptance-device holders")
+    if any(holders.iterdir()):
+        fail("acceptance device has active kernel holders")
 
 
 def parse_size(value: str) -> int:
