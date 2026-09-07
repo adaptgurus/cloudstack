@@ -31,8 +31,24 @@ type Provider interface {
  ResidueAudit(context.Context,model.ServiceState)(map[string]string,error)
 }
 
+// TransactionalGuestProvider owns the complete guest-side mutation for a
+// confirmed install plan. The lifecycle engine still owns validation, plan
+// confirmation, locking, journal/state and post-apply health. Implementations
+// use this contract when storage/package/config/firewall/VIP/service mutation
+// is delegated to one reviewed execution boundary such as Ansible.
+type TransactionalGuestProvider interface {
+ Provider
+ Apply(context.Context,model.Operation,model.Plan) error
+ ManagesGuestPlatform() bool
+}
+
 type Registry struct{mu sync.RWMutex;items map[string]Provider}
 func NewRegistry()*Registry{return &Registry{items:map[string]Provider{}}}
 func(r *Registry)Register(p Provider)error{if p==nil||p.ID()==""{return errors.New("invalid provider")};r.mu.Lock();defer r.mu.Unlock();if _,ok:=r.items[p.ID()];ok{return errors.New("duplicate provider")};r.items[p.ID()]=p;return nil}
 func(r *Registry)Get(id string)(Provider,bool){r.mu.RLock();defer r.mu.RUnlock();p,ok:=r.items[id];return p,ok}
 func(r *Registry)IDs()[]string{r.mu.RLock();defer r.mu.RUnlock();out:=make([]string,0,len(r.items));for k:=range r.items{out=append(out,k)};sort.Strings(out);return out}
+
+func ManagesGuestPlatform(p Provider) bool {
+ if tx,ok:=p.(TransactionalGuestProvider);ok{return tx.ManagesGuestPlatform()}
+ return false
+}
