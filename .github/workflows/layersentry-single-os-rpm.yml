@@ -93,7 +93,7 @@ jobs:
           rm -rf "$out"
           mkdir -p "$out"
 
-          tools/layersentry/single-os/packaging/build-rpm.sh "$out" | tee "$out/build.log"
+          bash tools/layersentry/single-os/packaging/build-rpm.sh "$out" | tee "$out/build.log"
 
           mapfile -t rpms < <(find "$out" -maxdepth 1 -type f -name '*.rpm' | sort)
           if [[ "${#rpms[@]}" -ne 1 ]]; then
