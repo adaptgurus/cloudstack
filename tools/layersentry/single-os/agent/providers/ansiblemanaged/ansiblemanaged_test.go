@@ -21,7 +21,7 @@ func (fakeProvider) ResolveVersion(context.Context, model.ServiceRequest) (strin
 func (fakeProvider) Plan(context.Context, model.ServiceRequest, string) (model.Plan, error) {
 	return model.Plan{}, nil
 }
-func (fakeProvider) Install(context.Context, model.Operation, model.Plan) error    { return nil }
+func (fakeProvider) Install(context.Context, model.Operation, model.Plan) error   { return nil }
 func (fakeProvider) Configure(context.Context, model.Operation, model.Plan) error { return nil }
 func (fakeProvider) Initialize(context.Context, model.Operation, model.Plan) error {
 	return nil
@@ -33,8 +33,8 @@ func (fakeProvider) Health(context.Context, model.ServiceState) (model.HealthRes
 func (fakeProvider) Start(context.Context, model.Operation, model.ServiceState) error   { return nil }
 func (fakeProvider) Stop(context.Context, model.Operation, model.ServiceState) error    { return nil }
 func (fakeProvider) Restart(context.Context, model.Operation, model.ServiceState) error { return nil }
-func (fakeProvider) Upgrade(context.Context, model.Operation, model.Plan) error          { return nil }
-func (fakeProvider) Repair(context.Context, model.Operation, model.Plan) error           { return nil }
+func (fakeProvider) Upgrade(context.Context, model.Operation, model.Plan) error         { return nil }
+func (fakeProvider) Repair(context.Context, model.Operation, model.Plan) error          { return nil }
 func (fakeProvider) Backup(context.Context, model.Operation, model.ServiceState) (model.BackupRecord, error) {
 	return model.BackupRecord{}, errors.New("unsupported")
 }
