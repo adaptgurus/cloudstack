@@ -4,11 +4,21 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT="$ROOT/agent"
 ANSIBLE="$(cd "$ROOT/.." && pwd)/ansible"
 
-for cmd in go python3 ansible-playbook bash; do
+for cmd in go gofmt python3 ansible-playbook bash; do
   command -v "$cmd" >/dev/null || { echo "VALIDATION_FAIL missing_tool=$cmd" >&2; exit 1; }
 done
 
 pushd "$AGENT" >/dev/null
+if [[ ! -f go.sum ]]; then
+  echo "VALIDATION_FAIL committed_go_sum_missing" >&2
+  echo "VALIDATION_INFO expected_module_lock_diff_follows" >&2
+  go mod tidy -diff >&2 || true
+  exit 1
+fi
+if ! go mod tidy -diff; then
+  echo "VALIDATION_FAIL go_module_lock_not_tidy" >&2
+  exit 1
+fi
 unformatted="$(gofmt -l .)"
 [[ -z "$unformatted" ]] || { printf 'VALIDATION_FAIL gofmt files:\n%s\n' "$unformatted" >&2; exit 1; }
 go test -count=1 ./...
