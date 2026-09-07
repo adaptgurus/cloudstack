@@ -1,0 +1,34 @@
+---
+- name: Refuse destructive Node.js runtime uninstall
+  ansible.builtin.assert:
+    that:
+      - not (layersentry_destroy_data | default(false) | bool)
+    fail_msg: Runtime package uninstall never destroys customer application data.
+
+- name: Read Node.js module ownership marker
+  ansible.builtin.slurp:
+    src: /var/lib/layersentryd/state/nodejs-module-owner
+  register: layersentry_node_owner
+  failed_when: false
+  changed_when: false
+
+- name: Require matching Node.js module owner before reset
+  ansible.builtin.assert:
+    that:
+      - layersentry_node_owner.failed | default(false) or ((layersentry_node_owner.content | b64decode | trim) == layersentry_service_id)
+    fail_msg: Node.js module ownership changed; refusing module reset.
+
+- name: Remove Node.js runtime package
+  ansible.builtin.dnf:
+    name: nodejs
+    state: absent
+
+- name: Reset Node.js module stream only when LayerSentry owned it
+  ansible.builtin.command:
+    argv: [/usr/bin/dnf, -y, module, reset, nodejs]
+  when: not (layersentry_node_owner.failed | default(false))
+
+- name: Remove Node.js module ownership marker
+  ansible.builtin.file:
+    path: /var/lib/layersentryd/state/nodejs-module-owner
+    state: absent
