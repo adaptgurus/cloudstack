@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT="$ROOT/agent"
 ANSIBLE="$(cd "$ROOT/.." && pwd)/ansible"
 
-for cmd in go gofmt python3 ansible-playbook bash; do
+for cmd in go gofmt python3 ansible-playbook bash git gzip base64; do
   command -v "$cmd" >/dev/null || { echo "VALIDATION_FAIL missing_tool=$cmd" >&2; exit 1; }
 done
 
@@ -19,8 +19,18 @@ if ! go mod tidy -diff; then
   echo "VALIDATION_FAIL go_module_lock_not_tidy" >&2
   exit 1
 fi
+
+formatting_dirty=0
 unformatted="$(gofmt -l .)"
-[[ -z "$unformatted" ]] || { printf 'VALIDATION_FAIL gofmt files:\n%s\n' "$unformatted" >&2; exit 1; }
+if [[ -n "$unformatted" ]]; then
+  formatting_dirty=1
+  printf 'VALIDATION_INFO gofmt_required files:\n%s\n' "$unformatted" >&2
+  gofmt -w .
+  printf 'GOFMT_PATCH_B64_BEGIN\n'
+  git diff --binary -- . | gzip -9 | base64 -w0
+  printf '\nGOFMT_PATCH_B64_END\n'
+fi
+
 go test -count=1 ./...
 go vet ./...
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -41,5 +51,10 @@ done
 while IFS= read -r -d '' script; do
   bash -n "$script"
 done < <(find "$ROOT" -type f -name '*.sh' -print0)
+
+if [[ "$formatting_dirty" -ne 0 ]]; then
+  echo "VALIDATION_FAIL gofmt_changes_required; commit the emitted GOFMT_PATCH_B64 payload and rerun" >&2
+  exit 1
+fi
 
 printf 'SINGLE_OS_SOURCE_VALIDATION_OK agent=%s ansible=%s\n' "$AGENT" "$ANSIBLE"
