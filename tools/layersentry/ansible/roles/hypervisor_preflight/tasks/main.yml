@@ -1,0 +1,84 @@
+---
+- name: Validate hypervisor intent contract
+  ansible.builtin.assert:
+    that:
+      - layersentry_hypervisor_release_id is string
+      - layersentry_hypervisor_release_id | length > 0
+      - layersentry_hypervisor_profile == 'layersentry-kvm-standard'
+      - layersentry_cloudstack_version == '4.22.1.1'
+      - layersentry_hypervisor_packages is sequence
+      - layersentry_hypervisor_packages | length >= 4
+      - layersentry_hypervisor_repositories is sequence
+      - layersentry_hypervisor_repositories | length > 0
+    fail_msg: Hypervisor intent is incomplete or not certified for this V1 slice.
+
+- name: Require Rocky Linux 9
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Rocky'
+      - ansible_facts.distribution_major_version == '9'
+    fail_msg: LayerSentry V1 hypervisor installation supports Rocky Linux 9 only.
+
+- name: Require SELinux enforcing
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.selinux.status == 'enabled'
+      - ansible_facts.selinux.mode == 'enforcing'
+    fail_msg: SELinux must be enabled and enforcing before LayerSentry host mutation.
+
+- name: Collect service state
+  ansible.builtin.service_facts:
+
+- name: Require firewalld active
+  ansible.builtin.assert:
+    that:
+      - "'firewalld.service' in ansible_facts.services"
+      - ansible_facts.services['firewalld.service'].state == 'running'
+    fail_msg: firewalld must be active before LayerSentry host mutation.
+
+- name: Read CPU capabilities without executing a shell
+  ansible.builtin.slurp:
+    src: /proc/cpuinfo
+  register: layersentry_cpuinfo
+  changed_when: false
+
+- name: Require hardware virtualization CPU flag
+  ansible.builtin.assert:
+    that:
+      - (layersentry_cpuinfo.content | b64decode) is regex('(?m)^flags\\s*:.*\\b(vmx|svm)\\b')
+    fail_msg: CPU virtualization flag vmx/svm is not visible to the host.
+
+- name: Inspect KVM device
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: layersentry_kvm_device
+
+- name: Require usable KVM device
+  ansible.builtin.assert:
+    that:
+      - layersentry_kvm_device.stat.exists
+      - layersentry_kvm_device.stat.ischr | default(false)
+    fail_msg: /dev/kvm is missing or is not a character device.
+
+- name: Validate repository definitions
+  ansible.builtin.assert:
+    that:
+      - item.id is match('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')
+      - item.baseurl is match('^(https|file)://\\S+$')
+      - item.gpgkey is match('^(https|file)://\\S+$')
+      - item.gpg_fingerprint is match('^[A-Fa-f0-9]{40,64}$')
+    fail_msg: Repository definition violates the signed-intent trust contract.
+  loop: "{{ layersentry_hypervisor_repositories }}"
+  loop_control:
+    label: "{{ item.id | default('invalid') }}"
+
+- name: Optionally prove management-plane TCP reachability before mutation
+  ansible.builtin.wait_for:
+    host: "{{ layersentry_management_probe.host }}"
+    port: "{{ layersentry_management_probe.port }}"
+    connect_timeout: 5
+    timeout: 10
+    state: started
+  when:
+    - layersentry_management_probe.host is defined
+    - layersentry_management_probe.port is defined
