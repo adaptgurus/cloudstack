@@ -18,11 +18,14 @@ Always fetch the actual current branch before acting. Source/live evidence overr
 | MySQL/MariaDB | `PARTIAL` | external data/log/TLS/bootstrap source exists; live qualification remains |
 | Redis/Valkey | `PARTIAL` | ACL/data/SELinux/uninstall source exists; live qualification remains |
 | Nginx/HTTPD/Tomcat/runtime | `PARTIAL` | provider roles and data-preserving cleanup source exist; live qualification remains |
-| Fresh source validation | `PENDING` | current exact branch still needs durable Go test/vet/build + Python/Ansible syntax evidence |
-| Rocky 9 live provider qualification | `NOT_TESTED` | acceptance tooling is substantially prepared; a clean disposable target is required |
+| Fresh source validation | `CI_VERIFIED` | exact source gate passed on `1387794a4e1123746f734815c946cb58e5aea0be`; Go tidy/format/test/vet/build, Python compile, Ansible syntax and shell syntax are green with durable evidence |
+| Exact Rocky 9 RPM build | `CI_VERIFIED` | exact RPM `layersentry-single-os-0.2.0-1.el9.x86_64.rpm` built and inspected from `5e22bed39998a93b1a9c3dca65cda2566a380ba6`; RPM SHA-256 `a47d6fce81f19a87ce7c02374551775541f0a93aadaddf44c6bb96a25bd24d45` |
+| Rocky 9 live provider qualification | `NOT_TESTED` | acceptance tooling is substantially prepared; a clean disposable target with a separate non-OS data disk is required |
 | PostgreSQL multi-node HA | `NOT_TESTED` | requires real multi-node evidence |
 | Keepalived VRRP failover | `NOT_TESTED` | requires real multi-node evidence |
 | Production certification | `NOT_TESTED` | signed release, provider/security/backup/recovery/upgrade/performance gates remain |
+
+Durable CI evidence: `docs/layersentry/evidence/single-os/2026-09-07-source-and-rpm-ci-verification.md`.
 
 ## Current implementation to preserve
 
@@ -78,15 +81,13 @@ Do not build automated lab reimage/snapshot rollback solely to clean disposable 
 ## First unmet gates
 
 1. fetch/reconcile current source;
-2. execute/persist fresh source validation;
-3. build exact RPM and record SHA/signature state;
-4. prepare a clean disposable Rocky 9 VM with a separate non-OS data disk;
-5. install exact artifact;
-6. prove root/OS-disk exclusion;
-7. complete PostgreSQL standalone live path: storage, install, health/read-write, idempotent rerun, reboot, backup/restore, repair/upgrade, uninstall/residue;
-8. request manual OS reset whenever a dirty lab state would otherwise require reimage automation;
-9. then qualify MySQL-family, Redis/Valkey and representative APaaS/runtime providers;
-10. keep real DB HA and VRRP failover `NOT_TESTED` until a real multi-node lab is provided.
+2. obtain or provision a clean disposable Rocky Linux 9 VM with a separate non-OS data disk;
+3. install the exact CI-built RPM and verify SHA-256 before installation;
+4. prove root/OS-disk exclusion with the live host inventory and negative acceptance test;
+5. complete PostgreSQL standalone live path: storage, install, health/read-write, idempotent rerun, reboot, backup/restore, repair/upgrade, uninstall/residue;
+6. request manual OS reset whenever a dirty lab state would otherwise require reimage automation;
+7. then qualify MySQL-family, Redis/Valkey and representative APaaS/runtime providers;
+8. keep real DB HA and VRRP failover `NOT_TESTED` until a real multi-node lab is provided.
 
 ## File fence
 
