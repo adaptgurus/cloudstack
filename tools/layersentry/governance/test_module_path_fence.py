@@ -17,12 +17,14 @@
 
 import importlib.util
 from pathlib import Path
+import sys
 import unittest
 
 MODULE_PATH = Path(__file__).with_name("module_path_fence.py")
 SPEC = importlib.util.spec_from_file_location("module_path_fence", MODULE_PATH)
 assert SPEC and SPEC.loader
 FENCE = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = FENCE
 SPEC.loader.exec_module(FENCE)
 
 
