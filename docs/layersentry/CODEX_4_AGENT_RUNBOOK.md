@@ -1,170 +1,245 @@
 # LayerSentry — Codex Execution Runbook
 
 **Historical filename retained:** `CODEX_4_AGENT_RUNBOOK.md`  
-**Current model:** one primary Codex stream, Kubernetes/RKE2/Data Services
+**Current model:** two bounded Codex scopes — UI finishing and RKE2/Kubernetes E2E
 
-The previous multi-agent A/B/C/D/E model is no longer the default execution strategy. `LAYERSENTRY_EXECUTION_CONTRACT.md` supersedes the old routing.
+The old broad multi-agent model is not the default. `LAYERSENTRY_EXECUTION_CONTRACT.md` is authoritative.
 
-## 1. Why the model changed
+## 1. Why this model
 
-Parallel Codex streams created useful source, but also increased:
+Previous parallel Codex streams produced useful source but also repeated context loading, overlapping architecture work and source growth without proportional live E2E progress.
 
-- repeated context loading;
-- overlapping architecture work;
-- integration/handoff overhead;
-- source progress without proportional E2E progress;
-- Codex credit consumption outside the highest-value blocker.
+Current strategy:
 
-Current strategy reserves Codex for the Kubernetes/RKE2/Data Services vertical slice and uses ChatGPT for VM-native providers, native DR troubleshooting and UI integration/defects.
+- **Workstream A:** finish/optimize the existing UI;
+- **Workstream E:** finish the existing RKE2/Kubernetes stack end to end;
+- ChatGPT handles VM-native Go+Ansible, bootstrap/control-plane HA, native DR and context maintenance.
 
-## 2. Active Codex scope
+## 2. Active Codex scopes
 
-### Active — Workstream E
+### A — UI / Self-Service finishing
+
+`docs/layersentry/codex/WORKSTREAM_A_UI_SELF_SERVICE.md`
+
+Owns only the remaining bounded UI work:
+
+- route/action defects;
+- API/BFF wiring;
+- RBAC/direct-route behavior;
+- KVM-only customer presentation;
+- status/progress/errors;
+- integration with real K8s/DR/Single-OS backends;
+- browser E2E/responsive/accessibility/security fixes.
+
+Do not start another product redesign.
+
+### E — RKE2 / Kubernetes / Data Services
 
 `docs/layersentry/codex/WORKSTREAM_E_K8S_DBAAS_APAAS.md`
 
 Owns:
 
 - CAPI/CAPC/CAPRKE2/RKE2;
-- K8s controller/BFF integration;
+- LayerSentry K8s controller/BFF integration;
 - CNI/CCM/CSI;
 - Flux package plane;
-- Kubernetes DBaaS/APaaS/Streaming;
-- K8s-specific UI wiring only as required by the vertical slice;
-- immutable K8s component artifact integration;
-- K8s E2E/failure/upgrade/air-gap validation.
+- immutable K8s artifacts;
+- K8s-specific UI contract coordination with A;
+- package integration for OpenEverest/OpenBao/Harbor/Strimzi;
+- K8s failure/upgrade/air-gap E2E.
 
-Primary goal: **one complete RKE2 cluster lifecycle before expanding provider breadth**.
+Primary technical goal: **one complete reusable RKE2 lifecycle before service breadth**.
 
-## 3. Non-Codex default scopes
+## 3. One lifecycle, many profiles
 
-### UI / Self-service
+Do not build separate cluster engines for user K8s, DBaaS, APaaS and Streaming.
 
-ChatGPT defect/integration work only. Broad UI feature development is frozen.
+```text
+LayerSentry UI/BFF
+ -> CAPI
+    -> CAPC -> CloudStack/KVM
+    -> CAPRKE2 -> RKE2
+ -> CNI/CCM/CSI
+ -> Flux
+ -> selected upstream packages/operators
+```
 
-### Release / Installer
+Profiles change node pools, storage, networking, security and packages. Lifecycle ownership stays the same.
 
-ChatGPT by default, except exact Kubernetes artifact work needed to unblock Workstream E may be performed in the same coordinated Codex stream when it is inseparable from the K8s release candidate.
+## 4. Upstream-first service rule
 
-### Security / Validation
+For current V1, do not spend Codex building functionality mature upstream projects already provide.
 
-ChatGPT by default for shared controls. Workstream E owns the K8s-specific negative/destructive cases required to prove its vertical slice.
+Use pinned/qualified:
 
-### DR / HA / Upgrade
+- OpenEverest stable v1 line for supported PostgreSQL/PXC-MySQL/MongoDB;
+- OpenBao Helm content;
+- Harbor Helm content;
+- Strimzi for Kafka.
 
-ChatGPT-led, native CloudStack API and lab troubleshooting first. Do not use a separate Codex stream to expand custom DR code before native recovery works.
+Codex work is manifest/Helm/Flux integration, storage/network policy, local artifact packaging and E2E qualification.
 
-### VM-native Single-OS DBaaS/APaaS
+Do not build replacement database operators, backup/PITR engines, DB failover engines, Kafka operators, OpenBao controllers or Harbor controllers.
 
-ChatGPT-led. Selected architecture is Go orchestration + Ansible Runner. No shell-script product installation lifecycle.
+Do not spend Codex on upstream application UI rebranding unless the owner explicitly asks for it.
 
-## 4. Minimal Codex startup
+## 5. One V1 release carrier
 
-In the K8s worktree/session:
+Current V1 uses one logical signed release carrier:
+
+`layersentry-platform-<release>.iso`
+
+It may contain both platform and optional service artifacts. Bundled content is `AVAILABLE`; Flux installs only the selected packages.
+
+This supersedes the older execution idea of separate K8s and Data Services ISO carriers for current V1.
+
+## 6. Minimal Codex startup
+
+### UI session
 
 ```text
 Read AGENTS.md
- -> read LAYERSENTRY_EXECUTION_CONTRACT.md
- -> read LAYERSENTRY_PROGRESS_LEDGER.md
- -> read LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md
- -> read WORKSTREAM_E_K8S_DBAAS_APAAS.md
+ -> LAYERSENTRY_EXECUTION_CONTRACT.md
+ -> LAYERSENTRY_PROGRESS_LEDGER.md
+ -> WORKSTREAM_A_UI_SELF_SERVICE.md
  -> fetch actual integration ref
- -> inspect actual first unmet E2E gate
- -> continue existing source
+ -> inspect current UI defects/build/browser state
+ -> fix first blocking acceptance defect
 ```
 
-Do not start by reading every dated audit/handoff.
+### K8s session
 
-## 5. Repository/worktree discipline
+```text
+Read AGENTS.md
+ -> LAYERSENTRY_EXECUTION_CONTRACT.md
+ -> LAYERSENTRY_PROGRESS_LEDGER.md
+ -> LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md
+ -> WORKSTREAM_E_K8S_DBAAS_APAAS.md
+ -> fetch actual integration ref/release candidate/workflow/live state
+ -> close first failing E0/E1 gate
+```
 
-Use one isolated K8s Codex worktree/branch at a time unless the owner explicitly authorizes another independent non-overlapping K8s substream.
+Do not start by loading every historical handoff.
 
-Recommended layout:
+## 7. Recommended worktree discipline
+
+Use clean non-overlapping worktrees when Codex requires isolated edits.
+
+Conceptually:
 
 ```text
 ~/layersentry/
   cloudstack-base/
+  ui-codex/
   k8s-codex/
   cozystack-base/
-  k8s-runner/        # only when runner workflow changes are required
+  k8s-runner/      # only when runner changes are needed
 ```
 
-Before creation/reuse:
+Before creation/reuse inspect actual refs/worktrees. Never delete/reset an existing worktree because an example differs from current state.
 
-```bash
-cd ~/layersentry/cloudstack-base
-git fetch --all --tags --prune
-git status --short --branch
-git worktree list
-git branch --list 'codex/layersentry-*'
-```
+A and E may run concurrently only with clean ownership. Coordinate shared router/config/API-contract files before editing.
 
-Never delete/reset an existing worktree/branch merely because a runbook example differs from current state.
+Do not run multiple overlapping K8s Codex implementations.
 
-## 6. Copy/paste Codex prompt
+## 8. K8s E2E order
+
+Workstream E must prioritize:
 
 ```text
-You are the primary LayerSentry Kubernetes/RKE2/Data Services Codex engineer.
-
-Read AGENTS.md, docs/layersentry/LAYERSENTRY_EXECUTION_CONTRACT.md, docs/layersentry/LAYERSENTRY_PROGRESS_LEDGER.md, docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md and docs/layersentry/codex/WORKSTREAM_E_K8S_DBAAS_APAAS.md. Fetch and inspect the actual current integration ref and current live/workflow evidence before editing.
-
-Your job is not to create more horizontal scaffolding. Continue the existing CAPI/CAPC/CAPRKE2/RKE2 source and close the first failing E0/E1 end-to-end gate. Produce immutable component artifacts, deploy the exact controller stack, create one real RKE2 cluster from the LayerSentry workflow, prove 6443/9345, one CNI, CCM, one safe CSI/storage path and Flux, then prove status/scale/replacement/delete/reconciliation. Fix the smallest correct owner for each observed failure and rerun the same E2E step.
-
-Do not do broad UI redesign, VM-native Single-OS provider work or custom DR development. Stateful Kubernetes DBaaS remains blocked until cluster/storage safety gates pass. PostgreSQL is the first DBaaS vertical slice after the base cluster lifecycle works. Use the approved native CloudStack + Ansible RKE2 fallback only after exact evidence and a recorded release decision show the CAPI path cannot satisfy a required V1 gate without disproportionate downstream maintenance.
-
-Commit coherent milestones and report exact source/artifact/workflow/target evidence plus the next failing vertical gate.
+immutable artifacts
+ -> controller deployment
+ -> GUI/API create
+ -> CloudStack VM/resource creation
+ -> CAPRKE2 automatic join
+ -> 6443 + 9345
+ -> CNI
+ -> CCM
+ -> CSI + PVC safety
+ -> Flux
+ -> status/scale
+ -> replacement
+ -> delete
+ -> restart/UNKNOWN recovery
+ -> upgrade
+ -> air-gap
 ```
 
-## 7. E2E execution discipline
+Only after the shared substrate passes should it install OpenEverest/OpenBao/Harbor/Strimzi through Flux.
 
-At each step:
+## 9. CAPC stop-loss
 
-1. reproduce the exact live failure;
-2. preserve logs/resource/job IDs;
+Keep CAPI/CAPC/CAPRKE2 while it is a supportable provider integration.
+
+If a focused qualification campaign repeatedly cannot achieve CloudStack VM creation + automatic RKE2 join + 6443/9345 + cluster Ready, and the remaining downstream maintenance is disproportionate, record a release decision and use:
+
+```text
+LayerSentry durable workflow
+ -> native CloudStack APIs
+ -> hardened QCOW2/cloud-init
+ -> Ansible Runner
+ -> RKE2
+ -> Flux
+```
+
+One release, one lifecycle owner. Never run both paths as competing owners.
+
+## 10. E2E defect discipline
+
+At each failure:
+
+1. reproduce exact live failure;
+2. preserve resource/job/log evidence;
 3. classify owner layer;
-4. implement the smallest fix;
+4. fix the smallest correct owner;
 5. add regression coverage;
 6. build immutable affected artifact;
 7. redeploy exact artifact;
 8. rerun the same step;
-9. proceed only when it passes.
+9. continue only when it passes.
 
-Do not solve an E2E failure by adding a parallel controller or bypassing ownership boundaries.
+Do not solve an E2E defect by adding another controller.
 
-## 8. Resource/concurrency
+## 11. Resource/concurrency discipline
 
-Serialize operations that contend for the same runner/lab resources:
+Serialize operations that contend for the same lab resources:
 
-- Kubernetes cluster create/delete;
+- cluster create/delete;
 - VM mutation;
 - storage/CSI tests;
 - VIP/LB tests;
-- upgrade/replacement;
+- node upgrade/replacement;
 - destructive data-safety tests.
 
-Source analysis can run locally in parallel only when it does not create conflicting edits.
+Source analysis may run in parallel only when edits are non-overlapping.
 
-## 9. Recovery after session loss
+## 12. Copy/paste prompt — UI
 
-```bash
-git status --short --branch
-git rev-parse HEAD
-git log -5 --oneline --decorate
-git fetch --all --tags --prune
+```text
+You are the LayerSentry UI finishing Codex engineer. Read AGENTS.md, LAYERSENTRY_EXECUTION_CONTRACT.md, LAYERSENTRY_PROGRESS_LEDGER.md and WORKSTREAM_A_UI_SELF_SERVICE.md. Fetch the actual current branch before editing.
+
+Do not redesign the product. Continue the existing LayerSentry UI, reproduce the first current acceptance defect, fix the smallest correct owner, run the relevant unit/lint/build/browser checks and continue until the existing KVM-first UI is integrated with the real VM/K8s/DR/Single-OS backends. Preserve concurrent work and coordinate shared API/router/config files with Workstream E.
 ```
 
-Then inspect the exact last workflow/live operation before retrying. Resume from the first unmet gate; do not reconstruct work from chat memory.
+## 13. Copy/paste prompt — K8s
 
-## 10. Handoff size
+```text
+You are the primary LayerSentry RKE2/Kubernetes Codex engineer. Read AGENTS.md, LAYERSENTRY_EXECUTION_CONTRACT.md, LAYERSENTRY_PROGRESS_LEDGER.md, LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md and WORKSTREAM_E_K8S_DBAAS_APAAS.md. Fetch the actual current branch, release candidate and live/workflow state before editing.
+
+Your job is not to add more horizontal scaffolding. Close the first failing E0/E1 live gate using the existing source. Produce immutable artifacts, deploy the exact controller stack, create one real RKE2 cluster, prove automatic join, 6443/9345, one CNI, CCM, one safe CSI path and Flux, then prove status/scale/replacement/delete/reconciliation/upgrade/air-gap as required. Fix the smallest correct owner for each observed failure.
+
+After the shared RKE2 substrate is live-proven, install OpenEverest/OpenBao/Harbor/Strimzi through the same Flux package plane. Do not rewrite their operators/controllers or build separate cluster engines. Use the approved native CloudStack + Ansible RKE2 fallback only after a recorded stop-loss decision shows CAPC/CAPRKE2 maintenance is disproportionate.
+```
+
+## 14. Handoff
 
 Keep handoffs concise:
 
 - source commit;
-- exact component/release tuple;
-- artifact digests;
-- vertical-slice step reached;
-- workflow/job/target;
+- exact release/artifact tuple;
+- tests/live actions;
+- vertical step reached;
 - failure/root cause if blocked;
-- exact next E2E gate.
+- exact next acceptance/E2E gate.
 
 Do not generate another large master context unless architecture materially changes.
