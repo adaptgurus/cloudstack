@@ -1,0 +1,45 @@
+---
+- name: Apply confirmed LayerSentry Single-OS service plan
+  hosts: layersentry_single_os
+  gather_facts: true
+  become: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require immutable apply invocation
+      ansible.builtin.assert:
+        that:
+          - layersentry_action == 'apply'
+          - layersentry_provider == 'postgresql'
+          - layersentry_plan_digest | length == 64
+          - layersentry_operation_id == layersentry_request.operation_id
+          - layersentry_service_id == layersentry_request.service_id
+        fail_msg: Invalid or mismatched LayerSentry apply invocation.
+
+    - name: Validate Rocky Linux and security baseline
+      ansible.builtin.include_role:
+        name: rocky9_base
+
+    - name: Reconcile confirmed storage before provider initialization
+      ansible.builtin.include_role:
+        name: storage_lvm
+      vars:
+        layersentry_recovery_only: false
+
+    - name: Install configure and initialize PostgreSQL without starting it
+      ansible.builtin.include_role:
+        name: postgresql
+
+    - name: Apply client firewall and optional VIP before PostgreSQL starts
+      ansible.builtin.include_role:
+        name: network_vip
+      vars:
+        layersentry_network_state: present
+
+    - name: Flush network and VIP handlers before service start
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and start PostgreSQL after firewall and VIP are ready
+      ansible.builtin.systemd_service:
+        name: "postgresql-{{ layersentry_request.release_line }}.service"
+        enabled: true
+        state: started
