@@ -30,6 +30,9 @@
       "quickProvision": {
         "enabled": true
       },
+      "kubernetesDataServices": {
+        "enabled": false
+      },
       "buckets": {
         "enabled": false,
         "ready": false
