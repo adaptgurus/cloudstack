@@ -193,13 +193,16 @@ def phase_install(args, api: API) -> None:
     digest = plan.get("digest", "")
     if len(digest) != 64:
         fail("immutable plan digest missing")
-    installed = api.request("POST", "/api/v1/services/%s/install" % service_id,
-                            {"request": req, "confirmed_plan_digest": digest}, mutation=True)
+    install_body = {"request": req, "confirmed_plan_digest": digest}
+    installed = api.request("POST", "/api/v1/services/%s/install" % service_id, install_body, mutation=True)
     if installed.get("status") != "SUCCEEDED":
         fail("install did not succeed")
+    replayed = api.request("POST", "/api/v1/services/%s/install" % service_id, install_body, mutation=True)
+    if replayed.get("status") != "SUCCEEDED" or replayed.get("id") != installed.get("id") or replayed.get("id") != operation_id:
+        fail("successful install replay was not idempotent")
     health = api.request("GET", "/api/v1/services/%s/health" % service_id)
     if not health.get("healthy"):
-        fail("PostgreSQL health failed after install")
+        fail("PostgreSQL health failed after install/idempotent replay")
 
     marker = secrets.token_hex(16)
     sql(args.release, "postgres", "DROP DATABASE IF EXISTS layersentry_acceptance")
@@ -226,7 +229,7 @@ def phase_install(args, api: API) -> None:
         "marker": marker, "data_mount": "/data/postgresql", "wal_mount": "/data/postgresql-wal",
         "log_mount": "/data/postgresql-logs", "secret_ref": secret_ref,
     })
-    print("POSTGRESQL_PHASE1_OK service_id=%s state_file=%s next=actual_vm_reboot_then_post-reboot" % (service_id, args.state_file))
+    print("POSTGRESQL_PHASE1_OK service_id=%s state_file=%s idempotent_replay=pass next=actual_vm_reboot_then_post-reboot" % (service_id, args.state_file))
 
 
 def phase_post_reboot(args, api: API) -> None:
@@ -241,6 +244,10 @@ def phase_post_reboot(args, api: API) -> None:
     if observed != state["marker"]:
         fail("database marker changed across reboot")
     action(api, service_id, "repair")
+    action(api, service_id, "upgrade")
+    observed = sql(release, "layersentry_acceptance", "SELECT value FROM marker")
+    if observed != state["marker"]:
+        fail("database marker changed across repair/upgrade")
     action(api, service_id, "restart")
     action(api, service_id, "uninstall")
     if subprocess.run(["/usr/bin/rpm", "-q", "postgresql%s-server" % release], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
@@ -250,7 +257,7 @@ def phase_post_reboot(args, api: API) -> None:
     pg_version = Path(state["data_mount"]) / "data" / "PG_VERSION"
     if not pg_version.is_file():
         fail("customer PostgreSQL data was not preserved after uninstall")
-    print("POSTGRESQL_PHASE2_OK service_id=%s reboot_recovery=pass repair=pass uninstall_residue=pass data_preserved=pass" % service_id)
+    print("POSTGRESQL_PHASE2_OK service_id=%s reboot_recovery=pass repair=pass upgrade=pass uninstall_residue=pass data_preserved=pass" % service_id)
 
 
 def main() -> None:
