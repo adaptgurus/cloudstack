@@ -79,6 +79,15 @@ func (p *Owned) Restore(ctx context.Context,op model.Operation,st model.ServiceS
 func (p *Owned) Uninstall(ctx context.Context,op model.Operation,st model.ServiceState,destroy bool)error{scope,err:=p.stateScope(st);if err!=nil{return err};if err=p.verifyStateOwner(st);err!=nil{return err};if err=p.Inner.Uninstall(ctx,op,st,destroy);err!=nil{return err};return p.removeOwner(scope,st.ID)}
 func (p *Owned) ResidueAudit(ctx context.Context,st model.ServiceState)(map[string]string,error){out,err:=p.Inner.ResidueAudit(ctx,st);if err!=nil{return nil,err};scope,scopeErr:=p.stateScope(st);if scopeErr!=nil{return nil,scopeErr};_,exists,readErr:=p.readOwner(scope);if readErr!=nil{return nil,readErr};if exists{out["provider_owner"]="present"}else{out["provider_owner"]="absent"};return out,nil}
 
+// Apply forwards one complete confirmed guest transaction to a transactional
+// provider. Ownership is durably claimed before mutation so a failed/ambiguous
+// Ansible run cannot leave an unowned guest-global provider installation.
+func (p *Owned) Apply(ctx context.Context,op model.Operation,plan model.Plan)error{
+	tx,ok:=p.Inner.(TransactionalGuestProvider);if !ok||!tx.ManagesGuestPlatform(){return errors.New("inner provider does not own transactional guest execution")}
+	scope,err:=p.requestScope(plan.Request);if err!=nil{return err};if err=p.ensureOwner(scope,plan.ServiceID,true);err!=nil{return err};return tx.Apply(ctx,op,plan)
+}
+func (p *Owned) ManagesGuestPlatform()bool{tx,ok:=p.Inner.(TransactionalGuestProvider);return ok&&tx.ManagesGuestPlatform()}
+
 func (p *Owned) requestScope(r model.ServiceRequest)(string,error){if p.Spec.ScopeForRequest==nil{return "",errors.New("ownership request scope unavailable")};return validateOwnerScope(p.Spec.ScopeForRequest(r))}
 func (p *Owned) stateScope(st model.ServiceState)(string,error){if p.Spec.ScopeForState==nil{return "",errors.New("ownership state scope unavailable")};return validateOwnerScope(p.Spec.ScopeForState(st))}
 func validateOwnerScope(scope string)(string,error){if !ownerScopeRE.MatchString(scope){return "",errors.New("ownership scope is invalid")};return scope,nil}
