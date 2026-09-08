@@ -23,7 +23,7 @@ from pathlib import Path
 from controller.e1_executor import E1Executor
 from controller.e1_resources import ResolvedInfrastructure
 from controller.flux_resources import FluxBaseline, build_flux_baseline
-from controller.model import Actor, AuthorizationError, InvalidRequestError, NotFoundError, OperationStatus
+from controller.model import AmbiguousMutationError, Actor, AuthorizationError, InvalidRequestError, NotFoundError, OperationStatus
 from controller.service import ControllerService
 from controller.store import SagaStore
 from layersentry_k8s_policy import ReleaseGates
@@ -135,6 +135,46 @@ class E1ExecutorTest(unittest.TestCase):
         self.flux = FluxBaseline("https://git.example.test/catalog.git", "a" * 40, "./clusters/e1")
         self.executor = E1Executor(self.kubernetes, Resolver(), GATES, self.flux)
         self.service = ControllerService(self.store, Authorizer(), self.executor, GATES)
+
+    def test_unknown_apply_after_restart_observes_spec_without_duplicate_mutation(self):
+        operation, _ = self.service.submit_cluster_create(ACTOR, payload(), "e1-restart-native-001")
+        operation = self.service.advance(operation.id)
+        operation = self.service.advance(operation.id)
+        original_apply = self.kubernetes.apply
+        selected = [item for item in self.executor._resources(operation) if item["kind"] in {
+            "Namespace", "CloudStackCluster", "CloudStackMachineTemplate", "Cluster"}]
+        last_key = self.kubernetes._key(selected[-1])
+
+        def apply_then_timeout(resource):
+            result = original_apply(resource)
+            if self.kubernetes._key(resource) == last_key:
+                raise AmbiguousMutationError("synthetic response loss")
+            return result
+
+        self.kubernetes.apply = apply_then_timeout
+        unknown = self.service.advance(operation.id)
+        self.assertEqual(unknown.status, OperationStatus.UNKNOWN)
+        count = len(self.kubernetes.applied)
+        restarted = ControllerService(SagaStore(self.store.path), Authorizer(),
+                                      E1Executor(self.kubernetes, Resolver(), GATES, self.flux), GATES)
+        reconciled = restarted.reconcile_unknown(operation.id)
+        self.assertNotEqual(reconciled.status, OperationStatus.UNKNOWN)
+        self.assertEqual(len(self.kubernetes.applied), count)
+        self.assertEqual(reconciled.step_index, unknown.step_index + 1)
+
+    def test_unknown_apply_cannot_certify_owned_but_wrong_spec(self):
+        from controller.service import StepOutcome
+        operation, _ = self.service.submit_cluster_create(ACTOR, payload(), "e1-restart-spec-0001")
+        operation = self.service.advance(operation.id)
+        operation = self.service.advance(operation.id)
+        step = operation.plan[operation.step_index]
+        self.executor.reconcile(operation, step)
+        cluster = next(item for item in self.kubernetes.objects.values() if item["kind"] == "CloudStackCluster")
+        cluster["spec"] = {}
+        before = len(self.kubernetes.applied)
+        result = self.executor.observe_ambiguous(operation, step)
+        self.assertEqual(result.outcome, StepOutcome.RETRYABLE)
+        self.assertEqual(len(self.kubernetes.applied), before)
 
     def test_full_create_reconciliation_reaches_ready(self):
         operation, _ = self.service.submit_cluster_create(ACTOR, payload(), "e1-cluster-create-001")

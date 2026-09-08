@@ -55,6 +55,19 @@ def _ready_condition(resource: Mapping[str, Any], condition_type: str = "Ready")
     )
 
 
+def _contains_desired(actual, desired):
+    """Compare desired fields while allowing API-server defaulted object fields."""
+    if isinstance(desired, Mapping):
+        return isinstance(actual, Mapping) and all(
+            key in actual and _contains_desired(actual[key], value) for key, value in desired.items()
+        )
+    if isinstance(desired, list):
+        return isinstance(actual, list) and len(actual) == len(desired) and all(
+            _contains_desired(left, right) for left, right in zip(actual, desired)
+        )
+    return type(actual) is type(desired) and actual == desired
+
+
 class E1Executor:
     def __init__(
         self, kubernetes: KubernetesClient, resolver: InfrastructureResolver,
@@ -275,6 +288,11 @@ class E1Executor:
                 return StepResult(
                     StepOutcome.FAILED,
                     detail=f"{resource['kind']}/{resource['metadata']['name']} ownership verification failed",
+                )
+            if not _contains_desired(actual.get("spec", {}), resource.get("spec", {})):
+                return StepResult(
+                    StepOutcome.RETRYABLE, {"observedAfterUnknown": observed},
+                    "authoritative GET found desired infrastructure fields not yet applied",
                 )
             observed.append({
                 "kind": resource["kind"], "name": resource["metadata"]["name"],

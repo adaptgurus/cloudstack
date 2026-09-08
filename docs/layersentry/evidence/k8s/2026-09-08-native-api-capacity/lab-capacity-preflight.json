@@ -1,0 +1,48 @@
+{
+  "gate": "LAB_CAPACITY_PREFLIGHT",
+  "observed_at": "2026-09-08T00:31:02.342868+00:00",
+  "source_start": "0a68c004a7a49d17d39a502e048642d0e3df2ba6",
+  "nested_virtualization": "UNKNOWN",
+  "cloudstack_host": "UNKNOWN",
+  "total_cpu": "UNKNOWN",
+  "allocated_cpu": "UNKNOWN",
+  "used_cpu": "UNKNOWN",
+  "available_cpu": "UNKNOWN",
+  "total_ram_gib": "UNKNOWN",
+  "allocated_ram_gib": "UNKNOWN",
+  "used_ram_gib": "UNKNOWN",
+  "available_ram_gib": "UNKNOWN",
+  "primary_storage_total_gib": "UNKNOWN",
+  "primary_storage_allocated_gib": "UNKNOWN",
+  "primary_storage_used_gib": "UNKNOWN",
+  "primary_storage_available_gib": "UNKNOWN",
+  "management_and_system_overhead_observed": "UNKNOWN: no current trusted host receipt available",
+  "planned_topology": "Existing production policy: 3 control planes + at least 1 worker; no smaller profile introduced",
+  "planned_cluster_cpu": "UNKNOWN: exact offerings unavailable; theoretical lower bound 8 vCPU",
+  "planned_cluster_ram_gib": "UNKNOWN: exact offerings unavailable; theoretical lower bound 16 GiB",
+  "planned_cluster_storage_gib": "UNKNOWN: template/offering and selected pool unavailable",
+  "post_deployment_cpu_headroom": "UNKNOWN",
+  "post_deployment_ram_headroom_gib": "UNKNOWN",
+  "post_deployment_storage_headroom_gib": "UNKNOWN",
+  "decision": "PROVISION_BLOCKED_CAPACITY",
+  "reason": "CloudStack runtime configuration/credentials and current host/primary-storage evidence are unavailable in this environment. Actual shortage is not measured.",
+  "cluster_create_executed": false,
+  "live_status": "BLOCKED",
+  "live_gate_reached": "Local read-only admission fails closed before authentication or provisioning",
+  "additional_resources_required": {
+    "cpu": "UNKNOWN",
+    "ram": "UNKNOWN",
+    "storage": "UNKNOWN"
+  },
+  "checks": [
+    "No CLOUDSTACK/KUBECONFIG/LAYERSENTRY environment variable names found (values were not printed).",
+    "No installed /run/layersentry or /etc/layersentry files discovered.",
+    "Bounded TCP probe of DC 10.10.10.14:8443 unavailable from current environment; API URL was not assumed.",
+    "lab-capacity-preflight.py with unavailable runtime/host inputs exited 2, PROVISION_BLOCKED_CAPACITY; no native mutation."
+  ],
+  "limits": [
+    "Historical outer 12 vCPU/40 GiB allocation is not measured free capacity.",
+    "No API authentication, native inventory, nested KVM, endpoint reachability or Cluster Ready proof obtained.",
+    "No DC/DR/Hyper-V mutations; separate Hyper-V RKE2 environment not used as CloudStack proof."
+  ]
+}
