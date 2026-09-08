@@ -1,0 +1,10 @@
+{
+  "observed_at": "2026-09-08T11:09:14Z",
+  "host_id": "fef5d417-34f0-415b-bc70-d3c58c7dc3f1",
+  "nested_virtualization": "PASS",
+  "total_cpu": 24,
+  "total_ram_bytes": 81809063936,
+  "available_ram_bytes": 75791708160,
+  "management_cpu_reserve": 2,
+  "management_ram_reserve_bytes": 8589934592
+}

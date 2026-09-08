@@ -37,7 +37,10 @@ class CapacityClient(InventoryClient):
     def __init__(self):
         super().__init__()
         self.calls = []
+        self.offering_changes = {}
+        self.template_size = 20 * GIB
         self.rows = {
+            "listDiskOfferings": ("diskoffering", []),
             "listClusters": ("cluster", [{"id": "cluster-1", "zoneid": "zone-1", "hypervisortype": "KVM",
                 "allocationstate": "Enabled", "managedstate": "Managed", "cpuovercommitratio": "1.0",
                 "memoryovercommitratio": "1.0"}]),
@@ -67,9 +70,12 @@ class CapacityClient(InventoryClient):
             return {key: rows, "count": len(rows)}
         result = super().call(command, params)
         if command == "listServiceOfferings":
-            result["serviceoffering"][0].update(cpunumber=2, cpuspeed=2000, memory=4096, storagetype="shared")
+            result["serviceoffering"][0].update(cpunumber=2, cpuspeed=2000, memory=4096, storagetype="shared",
+                provisioningtype="thin", rootdisksize=0, iscustomized=False, iscustomizediops=False,
+                diskofferingstrictness=False)
+            result["serviceoffering"][0].update(self.offering_changes)
         if command == "listTemplates":
-            result["template"][0].update(size=20 * GIB, physicalsize=3 * GIB)
+            result["template"][0].update(size=self.template_size, physicalsize=3 * GIB)
         return result
 
 
@@ -105,6 +111,70 @@ class CloudStackCapacityTest(unittest.TestCase):
                 self.assertEqual(params["pagesize"], 100)
             if command == "listClusters":
                 self.assertTrue(params["showcapacities"])
+
+    def test_internal_compute_disk_link_and_live_root_plan(self):
+        self.client.offering_changes["diskofferingid"] = "internal-compute-disk"
+        self.client.template_size = 40 * GIB
+        self.client.calls.clear()
+        _, plan = plan_cluster(self.resolver, self.request)
+        self.assertEqual(plan["nodes"], 4)
+        self.assertEqual(plan["storage_bytes"], 160 * GIB)
+        self.assertEqual(plan["storage_bytes"] // plan["nodes"], 40 * GIB)
+        lookups = [params for cmd, params in self.client.calls if cmd == "listDiskOfferings"]
+        self.assertEqual(len(lookups), 2)
+        for params in lookups:
+            self.assertEqual(params["id"], "internal-compute-disk")
+            self.assertEqual(params["state"], "all")
+        self.assertTrue(all(cmd.startswith("list") for cmd, _ in self.client.calls))
+
+    def test_visible_linked_disk_offering_fails_closed(self):
+        self.client.offering_changes["diskofferingid"] = "selectable-disk"
+        self.client.rows["listDiskOfferings"] = ("diskoffering", [{"id": "selectable-disk"}])
+        with self.assertRaises(InvalidRequestError):
+            plan_cluster(self.resolver, self.request)
+
+    def test_unsupported_compute_and_storage_properties_fail_closed(self):
+        for field, value in (("iscustomized", True), ("storagetype", "local"),
+                ("provisioningtype", "thick"), ("provisioningtype", None),
+                ("iscustomizediops", True), ("iscustomizediops", "false"),
+                ("rootdisksize", None), ("rootdisksize", "40"), ("rootdisksize", -1),
+                ("rootdisksize", True), ("rootdisksize", 1.5)):
+            self.client.offering_changes = {field: value}
+            with self.subTest(field=field, value=value), self.assertRaises(InvalidRequestError):
+                plan_cluster(self.resolver, self.request)
+
+    def test_root_size_required_and_larger_offering_root_wins(self):
+        self.client.template_size = 40 * GIB
+        self.client.offering_changes = {"rootdisksize": 60}
+        _, plan = plan_cluster(self.resolver, self.request)
+        self.assertEqual(plan["storage_bytes"], 240 * GIB)
+        original = self.client.call
+        def missing_root(command, params):
+            result = original(command, params)
+            if command == "listServiceOfferings":
+                result["serviceoffering"][0].pop("rootdisksize")
+            return result
+        with patch.object(self.client, "call", side_effect=missing_root), self.assertRaises(InvalidRequestError):
+            plan_cluster(self.resolver, self.request)
+
+    def test_link_lookup_errors_malformed_results_and_drift_fail_closed(self):
+        self.client.offering_changes["diskofferingid"] = "internal-compute-disk"
+        original = self.client.call
+        for outcome in ("error", "malformed", "drift", "strict"):
+            self.client.offering_changes["rootdisksize"] = 0
+            self.client.offering_changes["diskofferingstrictness"] = outcome == "strict"
+            def lookup(command, params):
+                if command == "listDiskOfferings":
+                    if outcome == "error":
+                        raise InvalidRequestError("CloudStack API unavailable")
+                    if outcome == "malformed":
+                        return {"diskoffering": [None]}
+                    if outcome == "drift":
+                        self.client.offering_changes["rootdisksize"] = 100
+                return original(command, params)
+            with self.subTest(outcome=outcome), patch.object(self.client, "call", side_effect=lookup):
+                with self.assertRaises(InvalidRequestError):
+                    plan_cluster(self.resolver, self.request)
 
     def test_insufficient_cpu_ram_storage_and_exact_fit_block(self):
         for section, field, value in (("cpu", "available", 7), ("cpu", "available", 8),

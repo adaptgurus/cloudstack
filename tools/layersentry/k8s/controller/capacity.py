@@ -90,11 +90,32 @@ def plan_cluster(resolver: CloudStackResolver, request: Mapping[str, Any]):
         ram = integer(offering.get("memory"), "offering memory", 4096) * MIB
         # TemplateResponse.size is virtual bytes; physicalsize is compressed bytes.
         root = integer(template.get("size"), "template size", 1)
-        root = max(root, integer(offering.get("rootdisksize", 0), "offering rootdisksize") * GIB)
-        if offering.get("iscustomized") is True or offering.get("diskofferingid"):
-            raise InvalidRequestError("POC custom/disk offering root requirement is not resolved")
+        root = max(root, integer(offering.get("rootdisksize"), "offering rootdisksize") * GIB)
+        for field in ("iscustomized", "iscustomizediops"):
+            if offering.get(field) is not None and offering[field] is not False:
+                raise InvalidRequestError("POC customized compute/IOPS is not qualified")
         if offering.get("storagetype") != "shared":
             raise InvalidRequestError("POC local storage placement is not qualified")
+        if offering.get("provisioningtype") != "thin":
+            raise InvalidRequestError("POC storage provisioning type is not qualified")
+        linked_disk = offering.get("diskofferingid")
+        if linked_disk is not None:
+            if (not isinstance(linked_disk, str) or not linked_disk.strip()
+                    or offering.get("diskofferingstrictness") is not False):
+                raise InvalidRequestError("POC linked disk offering semantics are not qualified")
+            visible = _list_all(resolver.client, "listDiskOfferings", "diskoffering",
+                                {"id": linked_disk, "state": "all"})
+            if visible:
+                raise InvalidRequestError("POC externally selectable disk offering is not qualified")
+            # CloudStack 4.22 filters computeOnly=true from listDiskOfferings.
+            # Only a successful empty lookup plus stable ServiceOffering properties
+            # permits the internal link; API errors must propagate, never mean empty.
+            current = resolver._exact("listServiceOfferings", "serviceoffering", offering_id)
+            fields = ("diskofferingid", "diskofferingstrictness", "iscustomized",
+                      "iscustomizediops", "rootdisksize", "storagetype", "provisioningtype",
+                      "cpunumber", "cpuspeed", "memory", "state")
+            if any(current.get(field) != offering.get(field) for field in fields):
+                raise InvalidRequestError("POC service offering changed during disk discovery")
         cpu += replicas * cores
         memory += replicas * ram
         disk += replicas * root

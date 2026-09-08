@@ -211,6 +211,24 @@ class CloudStackControllerTest(unittest.TestCase):
             with self.assertRaises(InvalidRequestError):
                 client._signed_query(command, {})
 
+    def test_disk_offering_discovery_is_read_only(self):
+        from controller.cloudstack import _READ_COMMANDS
+        self.assertEqual(_READ_COMMANDS, {
+            "listProjects", "listZones", "listNetworks", "listServiceOfferings",
+            "listTemplates", "listPublicIpAddresses", "listLoadBalancerRules",
+            "listCapacity", "listClusters", "listHosts", "listStoragePools",
+            "listSystemVms", "listVirtualMachines", "listDiskOfferings",
+        })
+        client = CloudStackClient(self.credential_config())
+        query = urllib.parse.parse_qs(client._signed_query(
+            "listDiskOfferings", {"id": "synthetic-linked-disk", "state": "all"}))
+        self.assertEqual(query["command"], ["listDiskOfferings"])
+        self.assertEqual(query["state"], ["all"])
+        for command in ("createDiskOffering", "updateDiskOffering", "deleteDiskOffering",
+                        "createServiceOffering", "deployVirtualMachine"):
+            with self.subTest(command=command), self.assertRaises(InvalidRequestError):
+                client._signed_query(command, {})
+
     def test_hmac_signature_matches_cloudstack_canonical_form(self):
         client = CloudStackClient(self.credential_config(), lambda: datetime(2026, 9, 6, tzinfo=timezone.utc))
         actual = urllib.parse.parse_qs(client._signed_query("listZones", {"id": "A B+"}))

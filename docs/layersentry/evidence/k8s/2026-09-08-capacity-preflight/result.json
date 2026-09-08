@@ -1,0 +1,66 @@
+{
+  "available_cpu": 21,
+  "available_ram_gib": 70.58652877807617,
+  "cloudstack": {
+    "cpu": {
+      "allocated": 3,
+      "available": 21,
+      "total": 24,
+      "used": 3
+    },
+    "cpu_mhz": {
+      "allocated": 1500,
+      "available": 60900,
+      "total": 62400,
+      "used": 1500
+    },
+    "cpu_overcommit_ratio": "1.0",
+    "host_cpu": 24,
+    "host_id": "fef5d417-34f0-415b-bc70-d3c58c7dc3f1",
+    "host_speed_mhz": 2600,
+    "host_state": "UP",
+    "local_storage": "NOT_APPLICABLE_SHARED_PROFILE",
+    "memory": {
+      "allocated": 2147483648,
+      "available": 78587838464,
+      "total": 80735322112,
+      "used": 2147483648
+    },
+    "memory_overcommit_ratio": "1.0",
+    "primary": {
+      "allocated": 15728836688,
+      "available": 801654177792,
+      "total": 820712046592,
+      "used": 19057868800
+    },
+    "project_vm_count": 0,
+    "secondary": {
+      "allocated": null,
+      "available": null,
+      "total": 820712046592,
+      "used": 19062063104
+    },
+    "system_vm_count": 2
+  },
+  "cloudstack_host": "UP",
+  "cluster_create_executed": false,
+  "decision": "PROVISION_ALLOWED",
+  "gate": "LAB_CAPACITY_PREFLIGHT",
+  "management_cpu_reserve": 2,
+  "management_ram_reserve_gib": 8.0,
+  "nested_virtualization": "PASS",
+  "planned_topology": {
+    "control_planes": 3,
+    "cpu": 8,
+    "cpu_mhz": 16000,
+    "minimum_host_speed_mhz": 2000,
+    "nodes": 4,
+    "ram_bytes": 27917287424,
+    "storage_bytes": 171798691840,
+    "workers": 1
+  },
+  "post_deployment_cpu_headroom": 13,
+  "post_deployment_ram_headroom_gib": 44.58652877807617,
+  "post_deployment_storage_headroom_gib": 586.5986328125,
+  "reason": "Fresh native and host measurements preserve POC reserves"
+}
