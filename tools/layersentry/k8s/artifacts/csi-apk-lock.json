@@ -1,0 +1,156 @@
+{
+  "schemaVersion": "1.0",
+  "architecture": "x86_64",
+  "packages": [
+    {
+      "file": "blkid-2.40.4-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/blkid-2.40.4-r1.apk",
+      "sha256": "61adea9884109b9eb710ab3431ce3cc10ea272e2bd01ccee8fb7b4f1c47f9a70",
+      "bytes": 18450
+    },
+    {
+      "file": "busybox-1.37.0-r14.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/busybox-1.37.0-r14.apk",
+      "sha256": "e0c42bc21e4d25cf5b4e15947d9bd75045ea4b7a8237e87cbefbfa425e7d4717",
+      "bytes": 506055
+    },
+    {
+      "file": "busybox-binsh-1.37.0-r14.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/busybox-binsh-1.37.0-r14.apk",
+      "sha256": "cdb0e74af11fa4cc78cf6626637fdf63ee960871637f15483fcbc111c1f10996",
+      "bytes": 1511
+    },
+    {
+      "file": "ca-certificates-20260413-r0.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/ca-certificates-20260413-r0.apk",
+      "sha256": "1e5d59a3b58c01ae67a3dc5d62164845b2463e8c6e6c97aa391504c48e20ed7a",
+      "bytes": 153640
+    },
+    {
+      "file": "e2fsprogs-1.47.1-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/e2fsprogs-1.47.1-r1.apk",
+      "sha256": "f778a891aa832f40cf3be200b8ac346540c87fb90063e843f0d74044cff0b9c5",
+      "bytes": 180146
+    },
+    {
+      "file": "e2fsprogs-extra-1.47.1-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/e2fsprogs-extra-1.47.1-r1.apk",
+      "sha256": "7927e944dcf7b4d3bede7a3fde42fbaa38c3bf5d6c68c4460ded9bd40f7789db",
+      "bytes": 212656
+    },
+    {
+      "file": "e2fsprogs-libs-1.47.1-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/e2fsprogs-libs-1.47.1-r1.apk",
+      "sha256": "728d6d3c4d2f3a8d4384f64b00811f47c2ad1760f52b9e1ac82f88216c8fcbb3",
+      "bytes": 208102
+    },
+    {
+      "file": "eudev-3.2.14-r5.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/eudev-3.2.14-r5.apk",
+      "sha256": "ae84dc178ae3849e69198c4093438f6635d4745215b75918e91e84a2cc63ceef",
+      "bytes": 262463
+    },
+    {
+      "file": "inih-58-r0.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/inih-58-r0.apk",
+      "sha256": "1eec3d2356fc38413d7edae448218c252f6d3d5919c3761f26a3c48f27c5d152",
+      "bytes": 4090
+    },
+    {
+      "file": "kmod-libs-33-r2.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/kmod-libs-33-r2.apk",
+      "sha256": "b8ae7001a412f1d799a9366c39de3616d969d764436649af3aafbf90ef3f2482",
+      "bytes": 39832
+    },
+    {
+      "file": "libblkid-2.40.4-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libblkid-2.40.4-r1.apk",
+      "sha256": "74dbd807a8e2a7e88bbdbd0a30329c467e7d6512c03644e373ef12d14d28e817",
+      "bytes": 94106
+    },
+    {
+      "file": "libcom_err-1.47.1-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libcom_err-1.47.1-r1.apk",
+      "sha256": "71bd3a0c8590da126ac8372e0f2dd78007bc1f6471580e4d632cf2fa960dabeb",
+      "bytes": 6016
+    },
+    {
+      "file": "libcrypto3-3.3.7-r0.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libcrypto3-3.3.7-r0.apk",
+      "sha256": "e2b420a2f7a6e810c58e7ed7242a177e68148b47399018d13e5d5768ca6832b4",
+      "bytes": 1830639
+    },
+    {
+      "file": "libeconf-0.6.3-r0.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libeconf-0.6.3-r0.apk",
+      "sha256": "9bcd1c0d8fafa5532a0fe3c76a24dbbe06ef05d2f2c106c55074552251b446f0",
+      "bytes": 24380
+    },
+    {
+      "file": "libmount-2.40.4-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libmount-2.40.4-r1.apk",
+      "sha256": "1d9cdb82cedc15d7211e59db2c3f48b325a30e0f306773ba165e0ff8a8fa0d56",
+      "bytes": 123214
+    },
+    {
+      "file": "libuuid-2.40.4-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libuuid-2.40.4-r1.apk",
+      "sha256": "67dd6b9a714841008389bfa5cb4e42fd0539cd873eaf904481babee49eb11454",
+      "bytes": 13952
+    },
+    {
+      "file": "mount-2.40.4-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/mount-2.40.4-r1.apk",
+      "sha256": "e3dbbf85418cec42b3471a880511ccf0da2704035c26f551261386bda0dc7e3b",
+      "bytes": 13899
+    },
+    {
+      "file": "musl-1.2.5-r11.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/musl-1.2.5-r11.apk",
+      "sha256": "61e84757a8bfbc0d7fa8f4ce6de9cd4d791714369d78f6a08e5b03510fb2a623",
+      "bytes": 412204
+    },
+    {
+      "file": "udev-init-scripts-35-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/udev-init-scripts-35-r1.apk",
+      "sha256": "f1936db90d59e52472765c0e544bbe421caf43a1bd1d566d18c77797a1e2dd56",
+      "bytes": 1239
+    },
+    {
+      "file": "umount-2.40.4-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/umount-2.40.4-r1.apk",
+      "sha256": "e0180aad6fb56151b0030b2375c9ee54788a4808f93eabe25563879a95720118",
+      "bytes": 10834
+    },
+    {
+      "file": "userspace-rcu-0.14.1-r1.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/userspace-rcu-0.14.1-r1.apk",
+      "sha256": "5fae1134ab0924d52d779f5c059ee8d32a8f424f9afbf9da367baa9f36891847",
+      "bytes": 96144
+    },
+    {
+      "file": "xfsprogs-6.10.1-r0.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/xfsprogs-6.10.1-r0.apk",
+      "sha256": "6731a42ccca4e6153e61d7eddce9e0045c96e2f6d3be7da7f98b3973d9adf586",
+      "bytes": 514758
+    },
+    {
+      "file": "xz-libs-5.8.3-r0.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/xz-libs-5.8.3-r0.apk",
+      "sha256": "0a6e2ffa63da3314193103cc33dd0bb07a7c0683cc0001fde1fa0cf036a7ddeb",
+      "bytes": 117580
+    },
+    {
+      "file": "zlib-1.3.2-r0.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/zlib-1.3.2-r0.apk",
+      "sha256": "b224a975eb04ec3ec9bce7db2fce91c9e9d669996f79a9a750d4a3cd9324a404",
+      "bytes": 55393
+    },
+    {
+      "file": "zstd-libs-1.5.6-r2.apk",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/zstd-libs-1.5.6-r2.apk",
+      "sha256": "45a06bfc107f44502b7e0503fcd5c8d2d2e6cff255134ed959275eb99caf9979",
+      "bytes": 375122
+    }
+  ]
+}
