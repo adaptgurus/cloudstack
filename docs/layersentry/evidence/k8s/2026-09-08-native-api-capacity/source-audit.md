@@ -37,3 +37,28 @@ rerun immediately before a separately gated CAPI request. It is not a new
 production admission service. Endpoint API metadata is not a TCP or Ready proof.
 No release tuple, production HA semantics, application gates or runtime ownership
 changed. No GUI/DBaaS/APaaS/CSI/CCM/DR work belongs to this result.
+
+## Live continuation: management cluster recovered
+
+User authorized 3 control planes + 1 worker. The disposable local kind management
+cluster now runs digest-pinned Kubernetes 1.36.4. CAPI 1.13.5, upstream CAPC 0.6.1
+and CAPRKE2 bootstrap/control-plane 0.25.2 deployments are Available; provider
+CRDs are Established. Existing CAPC overlay was applied to exact upstream source
+and compiled successfully with upstream-pinned Go 1.23.2. The image uses the
+recorded distroless digest, was loaded into kind, and its Deployment rollout
+succeeded. Both changed CRD schemas were applied. See
+`live-management-checkpoint.json` for artifact and running image digests. This
+proves management/provider startup only, not workload lifecycle readiness.
+
+DC API and verified SSH work. Project is Active; both supplied offerings resolve.
+Native capacity reports 12 total/2 allocated/10 available cores; the 3+1 workload
+requests 8 cores and 26,000 MiB RAM, with at least 180 GiB roots. Management runs
+locally to preserve the DC reserve. These numbers do not approve provisioning.
+
+The first IaaS blocker is the Basic-zone shared network: no returned project ID,
+state Setup, no LB service and no project public IP. Existing LayerSentry requires
+a project network and authoritative dual-port frontend. No CloudStack mutations
+or workload cluster attempts were made. Do not reconstruct the existing DC Zone
+or introduce a second endpoint lifecycle. Resume with an Advanced-zone target or
+a separately authorized lab migration. Template and linked disk-offering/speed
+validation remain subsequent prerequisites; CCM/CSI/Flux were not attempted.
