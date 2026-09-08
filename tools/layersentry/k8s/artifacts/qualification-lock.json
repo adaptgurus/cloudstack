@@ -10,5 +10,35 @@
     "virtualSize": 42949672960
   },
   "evidenceSource": "operator-confirmed live-qualified identity; not rebuilt or re-registered in this pass",
-  "observedState": "Download Complete / isready=true"
+  "observedState": "Download Complete / isready=true",
+  "rke2Artifacts": {
+    "version": "v1.36.4+rke2r1",
+    "architecture": "amd64",
+    "assets": [
+      {
+        "filename": "sha256sum-amd64.txt",
+        "url": "https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/sha256sum-amd64.txt",
+        "sha256": "8e12805c4bda79bec2fd20c89f705af3cb2ed11ea8854dc4937fca41b124b57a"
+      },
+      {
+        "filename": "rke2.linux-amd64.tar.gz",
+        "url": "https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/rke2.linux-amd64.tar.gz",
+        "sha256": "7bcbd3167d6947e1d79cdf722acdc740b28021fefb50dd5b974a1980776d4079"
+      },
+      {
+        "filename": "rke2-images.linux-amd64.tar.zst",
+        "url": "https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/rke2-images.linux-amd64.tar.zst",
+        "sha256": "03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb"
+      },
+      {
+        "filename": "install.sh",
+        "url": "https://raw.githubusercontent.com/rancher/rke2/v1.36.4%2Brke2r1/install.sh",
+        "sha256": "42983c86d1da64a92061d83afb57630cedd69241989f1b0673f3db6c3d92ee6b"
+      }
+    ],
+    "imageProof": {
+      "path": "tools/layersentry/k8s/artifacts/rke2-image-proof.json",
+      "sha256": "e76c5315b65a8c94e6e9761b97652c9a305beaba1bf8e07eb8dee12b27cce1d4"
+    }
+  }
 }

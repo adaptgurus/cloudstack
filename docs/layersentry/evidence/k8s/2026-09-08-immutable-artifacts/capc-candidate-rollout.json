@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0",
+  "classification": "CANDIDATE_ROLLOUT_REQUIRED",
+  "applied": false,
+  "namespace": "capc-system",
+  "deployment": "capc-controller-manager",
+  "currentImage": "layersentry/capc:0.6.1-6d3fc88ccf98",
+  "runningImageIDs": [
+    "docker.io/library/import-2026-09-08@sha256:d3ced56ec9765002af0d98f9f069850f0747254a9ce8982d8b42738f0be7a9d5"
+  ],
+  "candidate": "ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e",
+  "patch": [
+    {
+      "op": "test",
+      "path": "/spec/template/spec/containers/0/image",
+      "value": "layersentry/capc:0.6.1-6d3fc88ccf98"
+    },
+    {
+      "op": "replace",
+      "path": "/spec/template/spec/containers/0/image",
+      "value": "ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e"
+    }
+  ],
+  "backupRequirements": [
+    "Before separately authorized rollout: save complete Deployment to operator-owned 0700 directory/0600 file; never Git. Record resourceVersion and replica count.",
+    "Confirm old image remains in the management node image store and export a protected rollback archive; do not prune the local import.",
+    "Capture existing CAPC conditions/webhooks/CRDs and logs before changing the image."
+  ],
+  "plannedCommands": [
+    "kubectl -n capc-system get deployment capc-controller-manager -o yaml > \"$PROTECTED_BACKUP/capc-deployment.yaml\"",
+    "kubectl -n capc-system patch deployment capc-controller-manager --type=json --patch-file capc-candidate-image-patch.json",
+    "kubectl -n capc-system rollout status deployment/capc-controller-manager --timeout=180s",
+    "kubectl -n capc-system get deployment,pods",
+    "kubectl -n capc-system logs deployment/capc-controller-manager --since=5m --tail=150",
+    "kubectl get crds -l cluster.x-k8s.io/provider=infrastructure-cloudstack",
+    "kubectl get validatingwebhookconfigurations,mutatingwebhookconfigurations",
+    "kubectl -n capc-system get providers,services,endpointslices"
+  ],
+  "readiness": [
+    "Deployment observedGeneration current, desired/updated/available replicas equal; manager Ready; imageID resolves to candidate.",
+    "No CrashLoopBackOff, leader-election/RBAC errors, reconciliation panic, webhook TLS/admission errors or provider version mismatch.",
+    "CAPC CRDs Established; provider inventory, webhook service endpoints and TLS remain healthy."
+  ],
+  "rollbackTrigger": "Any failed readiness/admission/provider check or new controller error; do not create workload objects to diagnose rollout.",
+  "rollbackPatch": [
+    {
+      "op": "test",
+      "path": "/spec/template/spec/containers/0/image",
+      "value": "ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e"
+    },
+    {
+      "op": "replace",
+      "path": "/spec/template/spec/containers/0/image",
+      "value": "layersentry/capc:0.6.1-6d3fc88ccf98"
+    }
+  ],
+  "rollbackSource": "Existing locally imported image; not registry-backed. Source checkout /home/opc/.local/share/layersentry/rke2-poc/capc-source is supplementary, not a substitute for retaining/exporting the exact old image.",
+  "workloadResourcesForbidden": true,
+  "otherSevenManagementPatchesApplied": false
+}

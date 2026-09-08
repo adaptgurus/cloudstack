@@ -166,12 +166,148 @@ def validate_qualification_templates(project_id, template_ids, manifest=None, ar
     if manifest is None:
         manifest = json.loads((root / "release-candidate-lane-b.json").read_bytes(), object_pairs_hook=_unique_object)
     lock = qualification_template(manifest, root)
-    if project_id == lock["projectId"] and set(template_ids) != {lock["template"]["id"]}:
-        raise InvalidRequestError("qualification template UUID differs from approved artifact lock")
+    if project_id == lock["projectId"]:
+        rke2_artifacts(lock)
+        if set(template_ids) != {lock["template"]["id"]}:
+            raise InvalidRequestError("qualification template UUID differs from approved artifact lock")
+    return lock
+
+
+_RKE2_HASHES = {
+    "sha256sum-amd64.txt": "8e12805c4bda79bec2fd20c89f705af3cb2ed11ea8854dc4937fca41b124b57a",
+    "rke2.linux-amd64.tar.gz": "7bcbd3167d6947e1d79cdf722acdc740b28021fefb50dd5b974a1980776d4079",
+    "rke2-images.linux-amd64.tar.zst": "03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb",
+    "install.sh": "42983c86d1da64a92061d83afb57630cedd69241989f1b0673f3db6c3d92ee6b",
+}
+
+
+def rke2_artifacts(lock):
+    value = lock.get("rke2Artifacts", {})
+    base = "https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/"
+    expected = [{"filename": name, "sha256": digest,
+        "url": base + name if name != "install.sh" else
+        "https://raw.githubusercontent.com/rancher/rke2/v1.36.4%2Brke2r1/install.sh"}
+        for name, digest in _RKE2_HASHES.items()]
+    if (value.get("version") != "v1.36.4+rke2r1" or value.get("architecture") != "amd64"
+            or value.get("assets") != expected):
+        raise InvalidRequestError("qualification RKE2 assets differ from approved release")
+    return value
+
+
+def _rke2_consumption(manifest, blockers, artifact_root):
+    try:
+        assets = rke2_artifacts(qualification_template(manifest, artifact_root))
+        proof = read_artifact_lock(assets.get("imageProof"),
+            "tools/layersentry/k8s/artifacts/rke2-image-proof.json", artifact_root)
+        rows = proof.get("images")
+        if (proof.get("archiveSha256") != _RKE2_HASHES["rke2-images.linux-amd64.tar.zst"]
+                or not isinstance(rows, list) or len(rows) != 16
+                or len({row["image"] for row in rows}) != 16
+                or any(row.get("expected") != row.get("archive")
+                       or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(row.get("expected", "")))
+                       for row in rows)):
+            raise InvalidRequestError("RKE2 archive image identity mismatch")
+    except (InvalidRequestError, OSError, ValueError, TypeError, KeyError, AttributeError):
+        blockers.append("RKE2 archive consumption identity is unresolved or mismatched")
+
+
+def _controller_distribution(manifest, blockers, artifact_root):
+    root = artifact_root if artifact_root is not None else Path(__file__).resolve().parents[1]
+    try:
+        receipt = read_artifact_lock(manifest.get("controllerDistribution"),
+            "tools/layersentry/k8s/artifacts/controller-distribution.json", root)
+        binding = manifest["controllerDistribution"]
+        if (receipt.get("distribution") != "systemd-filesystem"
+                or not isinstance(receipt.get("sourceCommit"), str)
+                or not _COMMIT.fullmatch(receipt["sourceCommit"])
+                or not isinstance(receipt.get("treeSha256"), str)
+                or not _SHA256.fullmatch(receipt["treeSha256"])
+                or binding.get("sourceCommit") != receipt["sourceCommit"]
+                or binding.get("treeSha256") != receipt["treeSha256"]):
+            raise InvalidRequestError("distribution identity invalid")
+        rows = receipt.get("files")
+        required = {"layersentry_k8s_policy.py", "layersentry_k8s_controller.py",
+                    "systemd/layersentry-k8s-bff.service", "systemd/layersentry-k8s-reconciler.service",
+                    "systemd/layersentry-k8s-reconciler.timer"}
+        required.update("controller/" + name for name in (
+            "__init__.py", "bff.py", "runtime.py", "service.py", "components.py", "e1_executor.py",
+            "e1_resources.py", "cloudstack.py", "model.py", "store.py", "kubernetes.py", "auth.py", "capacity.py", "flux_resources.py"))
+        expected = {str(p.relative_to(root)) for p in (root / "controller").glob("*.py")} | required
+        if not isinstance(rows, list) or len(rows) != len(expected):
+            raise InvalidRequestError("distribution file set invalid")
+        paths, installed = set(), set()
+        for row in rows:
+            if not isinstance(row, Mapping):
+                raise InvalidRequestError("distribution row invalid")
+            relative = row.get("path")
+            if relative not in expected or relative in paths:
+                raise InvalidRequestError("distribution path invalid")
+            target = ("/etc/systemd/system/" + Path(relative).name if relative.startswith("systemd/")
+                      else "/usr/lib/layersentry/k8s/" + relative)
+            if (row.get("installedPath") != target or target in installed or row.get("mode") != "0644"
+                    or not _SHA256.fullmatch(str(row.get("sha256", "")))):
+                raise InvalidRequestError("distribution install identity invalid")
+            # Source checkouts retain the unit input under systemd/. Installed
+            # runtimes must verify the actual unit at its declared destination.
+            path = Path(target) if root == Path("/usr/lib/layersentry/k8s") else root / relative
+            if any(part.is_symlink() for part in (path, *path.parents)):
+                raise InvalidRequestError("distribution symlink traversal")
+            if not path.is_file() or path.stat().st_mode & 0o022:
+                raise InvalidRequestError("distribution file unsafe")
+            if hashlib.sha256(path.read_bytes()).hexdigest() != row["sha256"]:
+                raise InvalidRequestError("distribution source mismatch")
+            paths.add(relative); installed.add(target)
+        if paths != expected or hashlib.sha256(json.dumps(rows, sort_keys=True,
+                separators=(",", ":")).encode()).hexdigest() != receipt["treeSha256"]:
+            raise InvalidRequestError("distribution tree mismatch")
+    except (InvalidRequestError, OSError, ValueError, TypeError, KeyError):
+        blockers.append("Controller distribution artifact is invalid")
+        return
+    try:
+        runtime = read_artifact_lock(receipt.get("runtimeDependencyLock"),
+            "tools/layersentry/k8s/artifacts/runtime-dependencies.json", root)
+        identity = receipt.get("runtimeIdentity", {})
+        python, gunicorn = runtime.get("python", {}), runtime.get("gunicorn", {})
+        if (runtime.get("status") != "PINNED" or runtime.get("architecture") != "x86_64"
+                or runtime.get("os") != identity.get("os") or not isinstance(runtime.get("os"), Mapping)
+                or runtime["os"].get("id") != "rocky"
+                or not re.fullmatch(r"9(?:\.[0-9]+)?", str(runtime["os"].get("versionId", "")))
+                or python.get("path") != "/usr/bin/python3" or python.get("implementation") != "CPython"
+                or not re.fullmatch(r"3\.[0-9]+\.[0-9]+", str(python.get("version", "")))
+                or python.get("version") != identity.get("pythonVersion")
+                or not _SHA256.fullmatch(str(python.get("sha256", "")))
+                or python["sha256"] != identity.get("pythonSha256")
+                or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", str(gunicorn.get("version", "")))
+                or gunicorn.get("version") != identity.get("gunicornVersion")
+                or not _SHA256.fullmatch(str(gunicorn.get("contentSha256", "")))
+                or gunicorn["contentSha256"] != identity.get("gunicornContentSha256")):
+            raise InvalidRequestError("runtime identity unresolved")
+        packages = runtime.get("packages")
+        if not isinstance(packages, list) or not packages:
+            raise InvalidRequestError("runtime packages unresolved")
+        names = set()
+        for package in packages:
+            name = package.get("name")
+            if (not isinstance(name, str) or not name or name in names
+                    or not re.fullmatch(r"[0-9][0-9a-zA-Z.+:~_-]*", str(package.get("version", "")))
+                    or not isinstance(package.get("installationSource"), Mapping)
+                    or package["installationSource"].get("kind") not in {"rpm", "wheel"}
+                    or not _SHA256.fullmatch(str(package["installationSource"].get("artifactSha256", "")))
+                    or not str(package["installationSource"].get("url", "")).startswith("https://")
+                    or (package["installationSource"]["kind"] == "rpm" and not package["installationSource"].get("nevra"))
+                    or not _SHA256.fullmatch(str(package.get("sha256", "")))):
+                raise InvalidRequestError("runtime package identity invalid")
+            names.add(name)
+        if not {"python", "gunicorn"} <= names or runtime.get("dependencyClosureVerified") is not True:
+            raise InvalidRequestError("runtime dependency closure unresolved")
+    except (InvalidRequestError, OSError, ValueError, TypeError, KeyError, AttributeError):
+        blockers.append("Controller runtime dependency identity is unresolved")
 
 
 def evaluate_component_readiness(manifest: Mapping[str, Any], *, artifact_root: Path | None = None) -> ComponentReadiness:
     blockers: list[str] = []
+    _controller_distribution(manifest, blockers, artifact_root)
+    _rke2_consumption(manifest, blockers, artifact_root)
     for key, expected in _EXACT_TUPLE.items():
         if manifest.get(key) != expected:
             blockers.append(f"release tuple {key} must equal {expected}")

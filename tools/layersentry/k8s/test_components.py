@@ -63,7 +63,7 @@ class ComponentReadinessTest(unittest.TestCase):
                 self.assertFalse(result.deployable)
                 self.assertTrue(any(message in blocker for blocker in result.blockers))
 
-    def test_exact_qualified_tuple_is_deployable(self):
+    def test_live_flags_alone_do_not_qualify_consumption(self):
         candidate = deepcopy(MANIFEST)
         candidate["cloudstackCcm"].update({
             "image": "registry.example.test/layersentry/cloudstack-ccm@sha256:" + "a" * 64,
@@ -84,8 +84,10 @@ class ComponentReadinessTest(unittest.TestCase):
         for gate in ("tupleReconciliation", "endpoint6443", "endpoint9345", "fluxRemoteReconcile"):
             candidate["hardGates"][gate] = True
         result = evaluate_component_readiness(candidate)
-        self.assertTrue(result.deployable, result.blockers)
-        result.require_deployable()
+        self.assertFalse(result.deployable)
+        self.assertIn("RKE2 archive consumption identity is unresolved or mismatched", result.blockers)
+        with self.assertRaises(InvalidRequestError):
+            result.require_deployable()
 
     def test_mutable_tag_and_tuple_drift_fail_closed(self):
         candidate = deepcopy(MANIFEST)

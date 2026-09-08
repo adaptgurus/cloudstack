@@ -1,0 +1,140 @@
+{
+  "schemaVersion": "1.0",
+  "archiveSha256": "03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb",
+  "images": [
+    {
+      "image": "docker.io/rancher/hardened-addon-resizer:1.8.23-build20260819",
+      "expected": "sha256:8026310fc44d985bf7c02434ad11d5f826a1aa1567606eea121b24ba9b3b0590",
+      "archive": "sha256:8026310fc44d985bf7c02434ad11d5f826a1aa1567606eea121b24ba9b3b0590",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-calico:v3.32.1-build20260827",
+      "expected": "sha256:a86f731f4fceb583a5eb305276c4943a88fd3f887d26165acf0cea917e6408e2",
+      "archive": "sha256:a86f731f4fceb583a5eb305276c4943a88fd3f887d26165acf0cea917e6408e2",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-cluster-autoscaler:v1.10.3-build20260819",
+      "expected": "sha256:c9b9b027e4d2cf1731311f9714f4aa633d37d7b0a72c9d3e6fc7a0594350d27c",
+      "archive": "sha256:c9b9b027e4d2cf1731311f9714f4aa633d37d7b0a72c9d3e6fc7a0594350d27c",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-coredns:v1.14.7-build20260819",
+      "expected": "sha256:e9435ef6526a98e8d01d98a85d23770859ca49028ebd282912ae5e76f92c0166",
+      "archive": "sha256:e9435ef6526a98e8d01d98a85d23770859ca49028ebd282912ae5e76f92c0166",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-dns-node-cache:1.26.8-build20260819",
+      "expected": "sha256:54a53cb983d47579a8e7cdcd9ae38bc58ff85c28c63fd26de02ce332d5f988ee",
+      "archive": "sha256:54a53cb983d47579a8e7cdcd9ae38bc58ff85c28c63fd26de02ce332d5f988ee",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-etcd:v3.6.14-k3s1-build20260819",
+      "expected": "sha256:4f7ffbb3399c9f8137f5d0dd3ca0eddc7909e5d0155b35f1b0449baf96d61bfa",
+      "archive": "sha256:4f7ffbb3399c9f8137f5d0dd3ca0eddc7909e5d0155b35f1b0449baf96d61bfa",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-flannel:v0.28.9-build20260819",
+      "expected": "sha256:8cf57d72f2db9ede62d85474b9241edc08f4fd0e11f340bb9c613e4fe292156e",
+      "archive": "sha256:8cf57d72f2db9ede62d85474b9241edc08f4fd0e11f340bb9c613e4fe292156e",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-k8s-metrics-server:v0.9.0-build20260819",
+      "expected": "sha256:4935e86e846d75591113f64ad4e0402718a1eda08f6900a9325d54f1df64945c",
+      "archive": "sha256:4935e86e846d75591113f64ad4e0402718a1eda08f6900a9325d54f1df64945c",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-kubernetes:v1.36.4-rke2r1-build20260821",
+      "expected": "sha256:c8e5263407ac439de1dcdde98c7623efb9e17050715a80259d8bd5e81b5a9289",
+      "archive": "sha256:c8e5263407ac439de1dcdde98c7623efb9e17050715a80259d8bd5e81b5a9289",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-snapshot-controller:v8.6.0-build20260819",
+      "expected": "sha256:8d5872d767f93393273cb1ecad81e4bc08af65311d206bc31ee8f48bc58e51c4",
+      "archive": "sha256:8d5872d767f93393273cb1ecad81e4bc08af65311d206bc31ee8f48bc58e51c4",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/hardened-traefik:v3.7.11-build20260819",
+      "expected": "sha256:dff360a22c8a28c2af3e78b2b4cf09a6c8edc199e27eb9f7c417bfc1ac41078e",
+      "archive": "sha256:dff360a22c8a28c2af3e78b2b4cf09a6c8edc199e27eb9f7c417bfc1ac41078e",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/klipper-helm:v0.13.3-build20260820",
+      "expected": "sha256:ba922718d919920b6b6168e3f55f8effa85032a38bf44d8cc5f4df79a2fe405d",
+      "archive": "sha256:ba922718d919920b6b6168e3f55f8effa85032a38bf44d8cc5f4df79a2fe405d",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/klipper-lb:v0.4.17",
+      "expected": "sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a",
+      "archive": "sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/mirrored-pause:3.10.2",
+      "expected": "sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
+      "archive": "sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/rke2-cloud-provider:v1.36.4-0.20260817193921-a2fc9574e060-build20260820",
+      "expected": "sha256:95a33533d97b10502be19e4f3e60e7ce9c30f4879084709af96259a01253f044",
+      "archive": "sha256:95a33533d97b10502be19e4f3e60e7ce9c30f4879084709af96259a01253f044",
+      "matches": true
+    },
+    {
+      "image": "docker.io/rancher/rke2-runtime:v1.36.4-rke2r1",
+      "expected": "sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9",
+      "archive": "sha256:7956a28b1ebd803f58341ba88fed4c8bc878ec13226c2e55959ba5a88c21341e",
+      "matches": false
+    }
+  ],
+  "runtimePlatformComparison": {
+    "registry": {
+      "image": "docker.io/rancher/rke2-runtime@sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9",
+      "anonymousPullVerified": true,
+      "platform": "linux/amd64",
+      "platformManifest": "sha256:b259e466c7539f3b10209da1725c2176352a5cbb7adec9e3dafd9959585d4940",
+      "configDigest": "sha256:46bbc6d54afda36bb8be422fcc850feb33c6b5dd80707aa3f10e3a4f32148c20"
+    },
+    "archiveIndex": {
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.oci.image.index.v1+json",
+      "manifests": [
+        {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:1577a9033d55d185f49102f1f1a7a8ededc5fa37522a58f7df34e46a6df23c6b",
+          "size": 482,
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        },
+        {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:4a13cbb9474634d624cd90b85d4f02d64cffd894a0cda2dc03969519ab79349a",
+          "size": 836,
+          "annotations": {
+            "vnd.docker.reference.digest": "sha256:1577a9033d55d185f49102f1f1a7a8ededc5fa37522a58f7df34e46a6df23c6b",
+            "vnd.docker.reference.type": "attestation-manifest"
+          },
+          "platform": {
+            "architecture": "unknown",
+            "os": "unknown"
+          }
+        }
+      ]
+    }
+  },
+  "status": "BLOCKED_RUNTIME_IMAGE_MISMATCH"
+}

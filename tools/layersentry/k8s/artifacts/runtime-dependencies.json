@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "status": "BLOCKED",
+  "reason": "Intended Rocky/systemd deployment host not identified; Python and Gunicorn installed package identities cannot be measured. No package or deployment platform invented.",
+  "architecture": "x86_64",
+  "os": null,
+  "python": null,
+  "gunicorn": null,
+  "packages": [],
+  "dependencyClosureVerified": false,
+  "sourceImportAudit": {
+    "imports": [
+      "__future__",
+      "argparse",
+      "base64",
+      "controller",
+      "dataclasses",
+      "datetime",
+      "decimal",
+      "enum",
+      "hashlib",
+      "hmac",
+      "http",
+      "ipaddress",
+      "json",
+      "layersentry_k8s_policy",
+      "os",
+      "pathlib",
+      "re",
+      "shlex",
+      "sqlite3",
+      "ssl",
+      "stat",
+      "sys",
+      "typing",
+      "urllib",
+      "uuid"
+    ],
+    "nonStdlibProductImports": [],
+    "systemdExternalModule": "gunicorn",
+    "gunicornTransitiveDependencies": "UNKNOWN until exact installed package is selected and audited"
+  }
+}

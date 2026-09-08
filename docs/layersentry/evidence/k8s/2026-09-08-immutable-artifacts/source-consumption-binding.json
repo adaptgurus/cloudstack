@@ -1,0 +1,79 @@
+{
+  "status": "SOURCE_COMPLETE_WITH_BLOCKERS",
+  "controlPlaneFields": {
+    "airGapped": true,
+    "airGappedChecksum": "8e12805c4bda79bec2fd20c89f705af3cb2ed11ea8854dc4937fca41b124b57a",
+    "preRKE2Commands": [
+      "sh -eu -c 'set -eu\numask 077\nfor d in /opt /opt/rke2-artifacts /etc/rancher /etc/rancher/rke2 /etc/rancher/rke2/config.yaml.d; do test ! -L \"$d\"; done\ninstall -d -o root -g root -m 0700 /opt/rke2-artifacts /etc/rancher/rke2/config.yaml.d\ntmp=$(mktemp -d /opt/rke2-artifacts/.qualification.XXXXXX)\ntrap '\"'\"'rm -rf \"$tmp\"'\"'\"' EXIT\ncurl --fail --silent --show-error --location --proto '\"'\"'=https'\"'\"' --proto-redir '\"'\"'=https'\"'\"' --connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/sha256sum-amd64.txt\" https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/sha256sum-amd64.txt\nprintf '\"'\"'%s  %s\\n'\"'\"' 8e12805c4bda79bec2fd20c89f705af3cb2ed11ea8854dc4937fca41b124b57a \"$tmp/sha256sum-amd64.txt\" | sha256sum --check --status\nchown root:root \"$tmp/sha256sum-amd64.txt\"\nchmod 0600 \"$tmp/sha256sum-amd64.txt\"\ntest ! -L /opt/rke2-artifacts/sha256sum-amd64.txt\nmv -T \"$tmp/sha256sum-amd64.txt\" /opt/rke2-artifacts/sha256sum-amd64.txt\ncurl --fail --silent --show-error --location --proto '\"'\"'=https'\"'\"' --proto-redir '\"'\"'=https'\"'\"' --connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/rke2.linux-amd64.tar.gz\" https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/rke2.linux-amd64.tar.gz\nprintf '\"'\"'%s  %s\\n'\"'\"' 7bcbd3167d6947e1d79cdf722acdc740b28021fefb50dd5b974a1980776d4079 \"$tmp/rke2.linux-amd64.tar.gz\" | sha256sum --check --status\nchown root:root \"$tmp/rke2.linux-amd64.tar.gz\"\nchmod 0600 \"$tmp/rke2.linux-amd64.tar.gz\"\ntest ! -L /opt/rke2-artifacts/rke2.linux-amd64.tar.gz\nmv -T \"$tmp/rke2.linux-amd64.tar.gz\" /opt/rke2-artifacts/rke2.linux-amd64.tar.gz\ncurl --fail --silent --show-error --location --proto '\"'\"'=https'\"'\"' --proto-redir '\"'\"'=https'\"'\"' --connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/rke2-images.linux-amd64.tar.zst\" https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/rke2-images.linux-amd64.tar.zst\nprintf '\"'\"'%s  %s\\n'\"'\"' 03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb \"$tmp/rke2-images.linux-amd64.tar.zst\" | sha256sum --check --status\nchown root:root \"$tmp/rke2-images.linux-amd64.tar.zst\"\nchmod 0600 \"$tmp/rke2-images.linux-amd64.tar.zst\"\ntest ! -L /opt/rke2-artifacts/rke2-images.linux-amd64.tar.zst\nmv -T \"$tmp/rke2-images.linux-amd64.tar.zst\" /opt/rke2-artifacts/rke2-images.linux-amd64.tar.zst\ncurl --fail --silent --show-error --location --proto '\"'\"'=https'\"'\"' --proto-redir '\"'\"'=https'\"'\"' --connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/install.sh\" https://raw.githubusercontent.com/rancher/rke2/v1.36.4%2Brke2r1/install.sh\nprintf '\"'\"'%s  %s\\n'\"'\"' 42983c86d1da64a92061d83afb57630cedd69241989f1b0673f3db6c3d92ee6b \"$tmp/install.sh\" | sha256sum --check --status\nchown root:root \"$tmp/install.sh\"\nchmod 0700 \"$tmp/install.sh\"\ntest ! -L /opt/install.sh\nmv -T \"$tmp/install.sh\" /opt/install.sh\nprintf '\"'\"'%s\\n'\"'\"' '\"'\"'disable-default-registry-endpoint: true'\"'\"' > \"$tmp/99-layersentry-qualification.yaml\"\nchmod 0600 \"$tmp/99-layersentry-qualification.yaml\"\ntest ! -L /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml\nmv -T \"$tmp/99-layersentry-qualification.yaml\" /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml' || exit 1"
+    ],
+    "privateRegistriesConfig": {
+      "mirrors": {
+        "*": {
+          "endpoint": [
+            "https://127.0.0.1:1"
+          ]
+        },
+        "docker.io": {
+          "endpoint": [
+            "https://127.0.0.1:1"
+          ]
+        }
+      }
+    }
+  },
+  "workerFields": {
+    "airGapped": true,
+    "airGappedChecksum": "8e12805c4bda79bec2fd20c89f705af3cb2ed11ea8854dc4937fca41b124b57a",
+    "preRKE2Commands": [
+      "sh -eu -c 'set -eu\numask 077\nfor d in /opt /opt/rke2-artifacts /etc/rancher /etc/rancher/rke2 /etc/rancher/rke2/config.yaml.d; do test ! -L \"$d\"; done\ninstall -d -o root -g root -m 0700 /opt/rke2-artifacts /etc/rancher/rke2/config.yaml.d\ntmp=$(mktemp -d /opt/rke2-artifacts/.qualification.XXXXXX)\ntrap '\"'\"'rm -rf \"$tmp\"'\"'\"' EXIT\ncurl --fail --silent --show-error --location --proto '\"'\"'=https'\"'\"' --proto-redir '\"'\"'=https'\"'\"' --connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/sha256sum-amd64.txt\" https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/sha256sum-amd64.txt\nprintf '\"'\"'%s  %s\\n'\"'\"' 8e12805c4bda79bec2fd20c89f705af3cb2ed11ea8854dc4937fca41b124b57a \"$tmp/sha256sum-amd64.txt\" | sha256sum --check --status\nchown root:root \"$tmp/sha256sum-amd64.txt\"\nchmod 0600 \"$tmp/sha256sum-amd64.txt\"\ntest ! -L /opt/rke2-artifacts/sha256sum-amd64.txt\nmv -T \"$tmp/sha256sum-amd64.txt\" /opt/rke2-artifacts/sha256sum-amd64.txt\ncurl --fail --silent --show-error --location --proto '\"'\"'=https'\"'\"' --proto-redir '\"'\"'=https'\"'\"' --connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/rke2.linux-amd64.tar.gz\" https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/rke2.linux-amd64.tar.gz\nprintf '\"'\"'%s  %s\\n'\"'\"' 7bcbd3167d6947e1d79cdf722acdc740b28021fefb50dd5b974a1980776d4079 \"$tmp/rke2.linux-amd64.tar.gz\" | sha256sum --check --status\nchown root:root \"$tmp/rke2.linux-amd64.tar.gz\"\nchmod 0600 \"$tmp/rke2.linux-amd64.tar.gz\"\ntest ! -L /opt/rke2-artifacts/rke2.linux-amd64.tar.gz\nmv -T \"$tmp/rke2.linux-amd64.tar.gz\" /opt/rke2-artifacts/rke2.linux-amd64.tar.gz\ncurl --fail --silent --show-error --location --proto '\"'\"'=https'\"'\"' --proto-redir '\"'\"'=https'\"'\"' --connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/rke2-images.linux-amd64.tar.zst\" https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/rke2-images.linux-amd64.tar.zst\nprintf '\"'\"'%s  %s\\n'\"'\"' 03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb \"$tmp/rke2-images.linux-amd64.tar.zst\" | sha256sum --check --status\nchown root:root \"$tmp/rke2-images.linux-amd64.tar.zst\"\nchmod 0600 \"$tmp/rke2-images.linux-amd64.tar.zst\"\ntest ! -L /opt/rke2-artifacts/rke2-images.linux-amd64.tar.zst\nmv -T \"$tmp/rke2-images.linux-amd64.tar.zst\" /opt/rke2-artifacts/rke2-images.linux-amd64.tar.zst\ncurl --fail --silent --show-error --location --proto '\"'\"'=https'\"'\"' --proto-redir '\"'\"'=https'\"'\"' --connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/install.sh\" https://raw.githubusercontent.com/rancher/rke2/v1.36.4%2Brke2r1/install.sh\nprintf '\"'\"'%s  %s\\n'\"'\"' 42983c86d1da64a92061d83afb57630cedd69241989f1b0673f3db6c3d92ee6b \"$tmp/install.sh\" | sha256sum --check --status\nchown root:root \"$tmp/install.sh\"\nchmod 0700 \"$tmp/install.sh\"\ntest ! -L /opt/install.sh\nmv -T \"$tmp/install.sh\" /opt/install.sh\nprintf '\"'\"'%s\\n'\"'\"' '\"'\"'disable-default-registry-endpoint: true'\"'\"' > \"$tmp/99-layersentry-qualification.yaml\"\nchmod 0600 \"$tmp/99-layersentry-qualification.yaml\"\ntest ! -L /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml\nmv -T \"$tmp/99-layersentry-qualification.yaml\" /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml' || exit 1"
+    ],
+    "privateRegistriesConfig": {
+      "mirrors": {
+        "*": {
+          "endpoint": [
+            "https://127.0.0.1:1"
+          ]
+        },
+        "docker.io": {
+          "endpoint": [
+            "https://127.0.0.1:1"
+          ]
+        }
+      }
+    }
+  },
+  "serverConfig": {
+    "cni": "canal"
+  },
+  "largeArchivesEmbedded": false,
+  "applied": false,
+  "firstClusterStartupPermitted": false,
+  "remainingBlockers": [
+    "Full official archive runtime image differs from approved immutable runtime digest.",
+    "Controller Rocky/systemd host not selected; Python/Gunicorn identity and transitive closure unknown."
+  ],
+  "sourceVerification": {
+    "rke2Commit": "7479a59cdd2c8ce0b8871699a24daa4b7c28cc64",
+    "k3sCommit": "a2fc9574e060",
+    "rke2Files": [
+      "pkg/cli/cmds/server.go",
+      "pkg/cli/cmds/agent.go",
+      "pkg/bootstrap/bootstrap.go"
+    ],
+    "k3sFiles": [
+      "pkg/agent/containerd/config.go:getHostConfigs",
+      "pkg/agent/templates/templates.go:HostsTomlTemplate",
+      "pkg/configfilearg/parser.go:dotDFiles"
+    ],
+    "caprke2Version": "v0.25.2",
+    "caprke2Files": [
+      "bootstrap/api/v1beta2/rke2config_types.go",
+      "bootstrap/internal/controllers/rke2config_controller.go:generateFileListIncludingRegistries",
+      "bootstrap/internal/cloudinit/controlplane_init.go",
+      "bootstrap/internal/cloudinit/worker_join.go"
+    ],
+    "registrySemantics": "DisableDefaultEndpoint clears default endpoint for configured mirrors. Wildcard plus explicit docker.io mirrors select loopback port 1; no public fallback. A verified archive supplies local images before startup. Runtime archive mismatch keeps release readiness blocked.",
+    "upstreamDocumentation": "https://docs.rke2.io/install/private_registry"
+  },
+  "deploymentHostEvidence": "docs/layersentry/evidence/k8s/2026-09-06-e1-controller-runtime-wiring.md:84 states development host is not Rocky acceptance target and Gunicorn is not packaged."
+}

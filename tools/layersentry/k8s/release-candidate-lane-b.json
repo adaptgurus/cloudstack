@@ -87,7 +87,7 @@
   ],
   "qualificationArtifactLock": {
     "path": "tools/layersentry/k8s/artifacts/qualification-lock.json",
-    "sha256": "f8cc91b46298e33c0612b99e34f8f716853699ce398a1ecaccc435e5c5a3751b"
+    "sha256": "d26f9bdfa62879cb7a46763beec7f8a7edcd8947d4161fa80ac723c1a8c276b4"
   },
   "managementArtifactLock": {
     "path": "tools/layersentry/k8s/artifacts/management-lock.json",

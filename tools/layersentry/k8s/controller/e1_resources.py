@@ -20,13 +20,14 @@ from __future__ import annotations
 
 import ipaddress
 import re
+import shlex
 from dataclasses import dataclass
 from typing import Any, Mapping, Tuple
 
 from layersentry_k8s_policy import ClusterRequest
 
 from .model import InvalidRequestError
-from .components import validate_qualification_templates
+from .components import validate_qualification_templates, rke2_artifacts
 
 
 CAPC_ENDPOINT_ANNOTATION = "infrastructure.cluster.x-k8s.io/layersentry-rke2-endpoint"
@@ -95,6 +96,43 @@ def _machine_template(
     }
 
 
+def qualification_bootstrap(lock):
+    """Render supported CAPRKE2 fields only; readiness still gates any apply."""
+    assets = rke2_artifacts(lock)
+    commands = ["set -eu", "umask 077",
+        "for d in /opt /opt/rke2-artifacts /etc/rancher /etc/rancher/rke2 /etc/rancher/rke2/config.yaml.d; do test ! -L \"$d\"; done",
+        "install -d -o root -g root -m 0700 /opt/rke2-artifacts /etc/rancher/rke2/config.yaml.d",
+        "tmp=$(mktemp -d /opt/rke2-artifacts/.qualification.XXXXXX)",
+        "trap 'rm -rf \"$tmp\"' EXIT"]
+    for item in assets["assets"]:
+        name = item["filename"]
+        target = "/opt/install.sh" if name == "install.sh" else "/opt/rke2-artifacts/" + name
+        commands += [
+            "curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' "
+            "--connect-timeout 15 --max-time 1800 --retry 2 --output \"$tmp/" + name + "\" " + shlex.quote(item["url"]),
+            "printf '%s  %s\\n' " + item["sha256"] + " \"$tmp/" + name + "\" | sha256sum --check --status",
+            "chown root:root \"$tmp/" + name + "\"",
+            "chmod " + ("0700" if name == "install.sh" else "0600") + " \"$tmp/" + name + "\"",
+            "test ! -L " + target,
+            "mv -T \"$tmp/" + name + "\" " + target,
+        ]
+    commands += [
+        "printf '%s\\n' 'disable-default-registry-endpoint: true' > \"$tmp/99-layersentry-qualification.yaml\"",
+        "chmod 0600 \"$tmp/99-layersentry-qualification.yaml\"",
+        "test ! -L /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml",
+        "mv -T \"$tmp/99-layersentry-qualification.yaml\" /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml",
+    ]
+    script = "\n".join(commands)
+    return {"airGapped": True,
+            "airGappedChecksum": assets["assets"][0]["sha256"],
+            # Exit the surrounding cloud-init runcmd script too, not merely a child.
+            "preRKE2Commands": ["sh -eu -c " + shlex.quote(script) + " || exit 1"],
+            "privateRegistriesConfig": {"mirrors": {
+                "*": {"endpoint": ["https://127.0.0.1:1"]},
+                "docker.io": {"endpoint": ["https://127.0.0.1:1"]},
+            }}}
+
+
 def build_cluster_resources(
     request: ClusterRequest, resolved: ResolvedInfrastructure,
     *, qualification_manifest=None,
@@ -105,11 +143,16 @@ def build_cluster_resources(
         raise InvalidRequestError("resolved project does not match the authorized request")
     if request.zone_id != resolved.zone_id or request.network_id != resolved.network_id:
         raise InvalidRequestError("resolved CloudStack Site/network does not match the request")
-    validate_qualification_templates(
+    qualification = validate_qualification_templates(
         resolved.project_id,
         [resolved.control_plane_template_id, *resolved.worker_template_ids.values()],
         manifest=qualification_manifest,
     )
+    bootstrap = {}
+    if resolved.project_id == qualification["projectId"]:
+        if request.cni != qualification["cni"]:
+            raise InvalidRequestError("qualification CNI differs from approved artifact lock")
+        bootstrap = qualification_bootstrap(qualification)
     for field_name in (
         "namespace", "cloudstack_secret_name", "cloudstack_secret_namespace", "project_id",
         "project_name", "zone_id", "zone_name", "network_id", "network_name",
@@ -166,6 +209,7 @@ def build_cluster_resources(
                 "rolloutStrategy": {"type": "RollingUpdate", "rollingUpdate": {"maxSurge": 1}},
                 "gzipUserData": False,
                 "airGapped": request.air_gapped,
+                **bootstrap,
                 "agentConfig": {
                     "nodeName": "{{ ds.meta_data.local_hostname }}",
                     "kubelet": {"extraArgs": ["provider-id=cloudstack:///{{ ds.meta_data.instance_id }}"]},
@@ -226,6 +270,7 @@ def build_cluster_resources(
                 "spec": {"template": {"spec": {
                     "gzipUserData": False,
                     "airGapped": request.air_gapped,
+                    **bootstrap,
                     "agentConfig": {
                         "nodeName": "{{ ds.meta_data.local_hostname }}",
                         "kubelet": {"extraArgs": ["provider-id=cloudstack:///{{ ds.meta_data.instance_id }}"]},

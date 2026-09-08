@@ -91,14 +91,15 @@ class ArtifactBindingTest(unittest.TestCase):
             with self.assertRaisesRegex(InvalidRequestError, 'SHA256 mismatch'):
                 validate_qualification_templates(lock['projectId'], [lock['template']['id']], candidate, root)
 
-    def test_live_gates_remain_false_and_exact_seven_blockers(self):
+    def test_live_gates_remain_false_with_consumption_blockers(self):
         self.assertTrue(all(value is False for value in MANIFEST['hardGates'].values()))
         for section, field in [('cloudstackCcm','kubernetes136Qualified'),
                                ('cloudstackCsiDownstream','projectLifecycleQualified'),
                                ('cloudstackCsiDownstream','resizeIdempotencyQualified')]:
             self.assertIs(MANIFEST[section][field], False)
         blockers = evaluate_component_readiness(MANIFEST).blockers
-        self.assertEqual(len(blockers), 7, blockers)
+        self.assertEqual(len([b for b in blockers if b.startswith("E1 evidence gate")]), 4)
+        self.assertIn("RKE2 archive consumption identity is unresolved or mismatched", blockers)
 
     def test_resource_generation_enforces_reserved_project_template(self):
         from test_e1_resources import request, resolved

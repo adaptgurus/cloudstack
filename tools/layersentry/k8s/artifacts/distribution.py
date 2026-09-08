@@ -78,7 +78,9 @@ def main():
             raise ValueError('runtime differs from claimed source commit')
     receipt = {'schemaVersion':'1.0','sourceCommit':args.source_commit,
                'distribution':'systemd-filesystem','files':rows,'treeSha256':tree_sha(rows),
-               'hostDependencies':'BLOCKED: Python/Gunicorn OS package identities not yet qualified',
+               'runtimeDependencyLock':{'path':'tools/layersentry/k8s/artifacts/runtime-dependencies.json',
+                   'sha256':hashlib.sha256((args.root/'artifacts/runtime-dependencies.json').read_bytes()).hexdigest()},
+               'runtimeIdentity':json.loads((args.root/'artifacts/runtime-dependencies.json').read_text()).get('identity', {}),
                'releaseMetadata':'Install the release manifest and referenced artifact locks from the exact release commit separately; never copy runtime credentials from Git.'}
     args.output.write_text(json.dumps(receipt,indent=2)+'\n')
     print(receipt['treeSha256'])
