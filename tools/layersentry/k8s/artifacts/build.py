@@ -99,7 +99,7 @@ def build(component, output):
             package_layer = ('COPY locked-apks /locked-apks\n'
                              'RUN --network=none apk add --no-network /locked-apks/*.apk '
                              '&& rm -rf /locked-apks /var/cache/apk/* /var/log/apk.log\n')
-        tests = "go test -p 2 ./pkg/... -ginkgo.label-filter=\"!integ\"" if component == 'capc' else 'go test -p 2 ./...'
+        tests = "REPO_ROOT=/src go test -p 2 ./pkg/... -ginkgo.label-filter=\"!integ\"" if component == 'capc' else 'go test -p 2 ./...'
         dockerfile = (f'FROM {images["builder"]} AS build\n'
                       'WORKDIR /src\nENV GOTOOLCHAIN=local CGO_ENABLED=0 GOFLAGS=-mod=readonly\n'
                       'COPY go.mod go.sum ./\nRUN go mod download && go mod verify\n'
