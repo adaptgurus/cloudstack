@@ -33,10 +33,11 @@ class ComponentReadinessTest(unittest.TestCase):
     def test_repository_candidate_is_truthfully_blocked(self):
         result = evaluate_component_readiness(MANIFEST)
         self.assertFalse(result.deployable)
-        self.assertIsNone(result.ccm_image)
-        self.assertIsNone(result.csi_image)
+        self.assertEqual(result.ccm_image, MANIFEST["cloudstackCcm"]["image"])
+        self.assertEqual(result.csi_image, MANIFEST["cloudstackCsiDownstream"]["image"])
         self.assertTrue(any("Kubernetes 1.36" in item for item in result.blockers))
-        self.assertTrue(any("Flux catalog commit" in item for item in result.blockers))
+        self.assertEqual(result.flux_commit, MANIFEST["fluxCatalog"]["commit"])
+        self.assertIn("E1 evidence gate fluxRemoteReconcile is false", result.blockers)
         self.assertEqual(
             MANIFEST["cloudstackCcm"]["downstreamPatchSha256"],
             "a6689998f2a46b9622ac69f97f8e67e231f075ffa8cca16a85a97fd0f4893726",
@@ -45,6 +46,22 @@ class ComponentReadinessTest(unittest.TestCase):
             result.require_deployable()
         contract = load_release_contract(ROOT / "release-candidate-lane-b.json")
         self.assertFalse(contract.gates.kubernetes_ready())
+
+    def test_missing_immutable_inputs_still_block_with_published_candidates(self):
+        for section, field, value, message in (
+            ("cloudstackCcm", "image", None, "CloudStack CCM immutable image"),
+            ("cloudstackCsiDownstream", "image", None, "downstream CloudStack CSI immutable image"),
+            ("cloudstackCsiDownstream", "apkPackageLayerDeterministic", False, "runtime package layer"),
+            ("fluxCatalog", "repository", None, "HTTPS repository"),
+            ("fluxCatalog", "commit", None, "Flux catalog commit"),
+            ("fluxCatalog", "contentDigestVerified", False, "content digest"),
+        ):
+            candidate = deepcopy(MANIFEST)
+            candidate[section][field] = value
+            with self.subTest(section=section, field=field):
+                result = evaluate_component_readiness(candidate)
+                self.assertFalse(result.deployable)
+                self.assertTrue(any(message in blocker for blocker in result.blockers))
 
     def test_exact_qualified_tuple_is_deployable(self):
         candidate = deepcopy(MANIFEST)

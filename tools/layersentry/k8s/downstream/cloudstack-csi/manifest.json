@@ -14,12 +14,12 @@
   "buildImages": {
     "builder": "docker.io/library/golang@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f",
     "runtime": "docker.io/library/alpine@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d",
-    "apkPackageLayer": "BLOCKED_PENDING_IMMUTABLE_MIRROR_OR_PACKAGE_LOCK"
+    "apkPackageLayer": "LOCKED_BY_SHA256_AND_OFFLINE_SIGNATURE_VERIFIED_INSTALL"
   },
   "activation": {
     "requiredConfig": ["global.project-id"],
     "projectPVCGrow": "disabled-until-live-qualified",
-    "artifactBuild": "disabled-until-apk-package-layer-is-deterministic"
+    "artifactBuild": "only-via-tools/layersentry/k8s/artifacts/build.py-with-csi-apk-lock.json"
   },
   "status": "NOT_TESTED"
 }

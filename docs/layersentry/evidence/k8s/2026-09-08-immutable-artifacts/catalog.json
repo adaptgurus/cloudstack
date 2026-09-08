@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/adaptgurus/layersentry-flux-catalog.git",
+  "commit": "8bc33753011555553736bfb73f281cf917bb5842",
+  "contentSha256": "5159e45a47ada5712b313973fda057f8c86f87e18a8ae3093541bb6810efbaa4",
+  "method": "SHA256 of canonical JSON list from git ls-tree -rz: path,mode,bytes,sha256(blob); sort_keys=True,separators=comma/colon",
+  "anonymousExactCommitCheckoutVerified": true,
+  "kustomizePathsVerified": [
+    "clusters/e1",
+    "workload"
+  ],
+  "selectedCni": "canal",
+  "fluxControllerCandidate": "v2.9.5",
+  "liveRemoteReconcile": false,
+  "imageBuildRun": 34225720208,
+  "builderSourceCommit": "1261a155ea04655de4577a46186ba58b40b30756"
+}
