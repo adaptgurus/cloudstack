@@ -1,0 +1,66 @@
+---
+- name: Require supported Tomcat immutable plan
+  ansible.builtin.assert:
+    that:
+      - layersentry_provider == 'tomcat'
+      - layersentry_request.topology == 'standalone'
+      - layersentry_repository_id == 'appstream'
+      - layersentry_resolved_version | length > 0
+    fail_msg: Tomcat Ansible execution received an unsupported or incomplete plan.
+
+- name: Resolve Tomcat external application path
+  ansible.builtin.set_fact:
+    layersentry_tomcat_mount_root: "{{ layersentry_paths['application-data'] | default('') }}"
+    layersentry_tomcat_app_base: "{{ (layersentry_paths['application-data'] ~ '/webapps') if (layersentry_paths['application-data'] | default('')) else '' }}"
+
+- name: Install exact Tomcat NEVRA
+  ansible.builtin.dnf:
+    name: "{{ layersentry_resolved_version }}"
+    state: present
+    install_weak_deps: false
+    disablerepo: '*'
+    enablerepo: "{{ layersentry_repository_id }}"
+    disable_gpg_check: false
+
+- name: Ensure external Tomcat webapps directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_tomcat_app_base }}"
+    state: directory
+    owner: tomcat
+    group: tomcat
+    mode: '0755'
+  when: layersentry_tomcat_app_base | length > 0
+
+- name: Persist Tomcat SELinux equivalence for external application root
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -a, -e, /var/lib/tomcat, "{{ layersentry_tomcat_mount_root }}"]
+  register: layersentry_tomcat_semanage_add
+  failed_when: false
+  changed_when: layersentry_tomcat_semanage_add.rc == 0
+  when:
+    - layersentry_tomcat_mount_root | length > 0
+    - layersentry_tomcat_mount_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Reconcile existing Tomcat SELinux equivalence
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -m, -e, /var/lib/tomcat, "{{ layersentry_tomcat_mount_root }}"]
+  when:
+    - layersentry_tomcat_semanage_add is defined
+    - layersentry_tomcat_semanage_add.rc | default(0) != 0
+  changed_when: false
+
+- name: Apply Tomcat external application SELinux context
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -RF, "{{ layersentry_tomcat_mount_root }}"]
+  changed_when: false
+  when:
+    - layersentry_tomcat_mount_root | length > 0
+    - layersentry_tomcat_mount_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Reconcile exactly one Tomcat HTTP Connector and optional Host appBase
+  layersentry_tomcat_config:
+    service_id: "{{ layersentry_service_id }}"
+    address: "{{ layersentry_request.network.listen_address }}"
+    port: "{{ layersentry_request.network.port | int }}"
+    app_base: "{{ layersentry_tomcat_app_base }}"
+    state: present

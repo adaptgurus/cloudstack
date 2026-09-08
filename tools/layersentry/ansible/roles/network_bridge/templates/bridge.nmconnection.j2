@@ -1,0 +1,19 @@
+# Managed by LayerSentry Ansible. Do not edit on the hypervisor.
+[connection]
+id=layersentry-bridge-{{ item.name }}
+type=bridge
+interface-name={{ item.name }}
+autoconnect=true
+autoconnect-priority=50
+
+[bridge]
+stp=false
+
+[ethernet]
+mtu={{ item.mtu | int }}
+
+[ipv4]
+method=disabled
+
+[ipv6]
+method=disabled

@@ -1,0 +1,10 @@
+---
+- name: LayerSentry KVM hypervisor preflight
+  hosts: layersentry_hypervisors
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  serial: 1
+
+  roles:
+    - role: hypervisor_preflight

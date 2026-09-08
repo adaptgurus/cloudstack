@@ -1,0 +1,21 @@
+# Managed by LayerSentry. Manual edits are overwritten by the confirmed plan.
+[mysqld]
+bind-address={{ layersentry_request.network.listen_address }}
+port={{ layersentry_request.network.port }}
+skip-name-resolve=1
+local-infile=0
+symbolic-links=0
+require_secure_transport=ON
+ssl-ca={{ layersentry_mysql_tls_dir }}/server.crt
+ssl-cert={{ layersentry_mysql_tls_dir }}/server.crt
+ssl-key={{ layersentry_mysql_tls_dir }}/server.key
+{% if layersentry_mysql_data_root %}
+datadir={{ layersentry_mysql_data }}
+{% endif %}
+{% if layersentry_mysql_logs %}
+log-error={{ layersentry_mysql_logs }}/{{ layersentry_provider }}.log
+{% endif %}
+{% if layersentry_provider == 'mysql' %}
+plugin-load-add=auth_socket.so
+auth_socket=FORCE_PLUS_PERMANENT
+{% endif %}

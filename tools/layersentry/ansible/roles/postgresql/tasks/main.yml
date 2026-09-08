@@ -1,0 +1,201 @@
+---
+- name: Require PostgreSQL standalone Ansible slice
+  ansible.builtin.assert:
+    that:
+      - layersentry_provider == 'postgresql'
+      - layersentry_request.topology == 'standalone'
+      - layersentry_request.release_line in ['16', '17']
+      - layersentry_resolved_version | length > 0
+      - layersentry_repository_id == ('pgdg' ~ layersentry_request.release_line)
+      - layersentry_secrets.admin_password | default('') | length >= 12
+    fail_msg: PostgreSQL Ansible execution received an unsupported or incomplete immutable plan.
+  no_log: true
+
+- name: Resolve PostgreSQL provider paths
+  ansible.builtin.set_fact:
+    layersentry_pg_major: "{{ layersentry_request.release_line }}"
+    layersentry_pg_vendor_data: "/var/lib/pgsql/{{ layersentry_request.release_line }}/data"
+    layersentry_pg_data_root: "{{ layersentry_paths['database-data'] | default('') }}"
+    layersentry_pg_wal_root: "{{ layersentry_paths['database-wal'] | default('') }}"
+    layersentry_pg_log_root: "{{ layersentry_paths['database-logs'] | default('') }}"
+
+- name: Derive PostgreSQL data WAL and log directories
+  ansible.builtin.set_fact:
+    layersentry_pg_data: "{{ (layersentry_pg_data_root ~ '/data') if layersentry_pg_data_root else layersentry_pg_vendor_data }}"
+    layersentry_pg_wal: "{{ (layersentry_pg_wal_root ~ '/wal') if layersentry_pg_wal_root else '' }}"
+    layersentry_pg_logs: "{{ (layersentry_pg_log_root ~ '/logs') if layersentry_pg_log_root else '' }}"
+    layersentry_pg_external_roots: "{{ [layersentry_pg_data_root, layersentry_pg_wal_root, layersentry_pg_log_root] | reject('equalto', '') | select('match', '^/(data|srv|opt/layersentry-data)(/|$)') | list | unique }}"
+
+- name: Reject mount roots that collide with provider-owned child names
+  ansible.builtin.assert:
+    that:
+      - not layersentry_pg_data_root.endswith('/data')
+      - not layersentry_pg_wal_root.endswith('/wal')
+      - not layersentry_pg_log_root.endswith('/logs')
+    fail_msg: PostgreSQL storage mount points must be filesystem/LV roots; LayerSentry creates data, wal and logs child directories.
+
+- name: Install exact approved PostgreSQL server NEVRA
+  ansible.builtin.dnf:
+    name: "{{ layersentry_resolved_version }}"
+    state: present
+    install_weak_deps: false
+    disablerepo: '*'
+    enablerepo: "{{ layersentry_repository_id }}"
+    disable_gpg_check: false
+
+- name: Ensure PostgreSQL data directory exists with strict mode
+  ansible.builtin.file:
+    path: "{{ layersentry_pg_data }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+
+- name: Ensure external PostgreSQL WAL directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_pg_wal }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+  when: layersentry_pg_wal | length > 0
+
+- name: Ensure external PostgreSQL log directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_pg_logs }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  when: layersentry_pg_logs | length > 0
+
+- name: Persist PostgreSQL SELinux equivalence for external roots
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -a, -e, /var/lib/pgsql, "{{ item }}"]
+  register: layersentry_pg_semanage_add
+  failed_when: false
+  changed_when: layersentry_pg_semanage_add.rc == 0
+  loop: "{{ layersentry_pg_external_roots }}"
+
+- name: Reconcile existing PostgreSQL SELinux equivalence entries
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -m, -e, /var/lib/pgsql, "{{ item.item }}"]
+  when: item.rc != 0
+  loop: "{{ layersentry_pg_semanage_add.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  changed_when: false
+
+- name: Apply PostgreSQL SELinux labels to external roots
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -RF, "{{ item }}"]
+  loop: "{{ layersentry_pg_external_roots }}"
+  changed_when: false
+
+- name: Inspect existing PostgreSQL cluster identity
+  ansible.builtin.stat:
+    path: "{{ layersentry_pg_data }}/PG_VERSION"
+  register: layersentry_pg_version_file
+
+- name: Read existing PostgreSQL major version
+  ansible.builtin.slurp:
+    src: "{{ layersentry_pg_data }}/PG_VERSION"
+  register: layersentry_pg_existing_version
+  when: layersentry_pg_version_file.stat.exists
+
+- name: Refuse a data directory initialized by another PostgreSQL major
+  ansible.builtin.assert:
+    that:
+      - (layersentry_pg_existing_version.content | b64decode | trim) == layersentry_pg_major
+    fail_msg: Existing PostgreSQL PG_VERSION does not match the confirmed release line.
+  when: layersentry_pg_version_file.stat.exists
+
+- name: Initialize PostgreSQL cluster when absent
+  when: not layersentry_pg_version_file.stat.exists
+  block:
+    - name: Stage one-operation PostgreSQL bootstrap password
+      ansible.builtin.copy:
+        content: "{{ layersentry_secrets.admin_password }}\n"
+        dest: "/run/layersentryd/ansible/pgpw-{{ layersentry_operation_id }}"
+        owner: postgres
+        group: postgres
+        mode: '0600'
+      no_log: true
+
+    - name: Initialize PostgreSQL with SCRAM authentication
+      ansible.builtin.command:
+        argv: "{{ ['/usr/sbin/runuser', '-u', 'postgres', '--', '/usr/pgsql-' ~ layersentry_pg_major ~ '/bin/initdb', '-D', layersentry_pg_data, '--username=postgres', '--pwfile=/run/layersentryd/ansible/pgpw-' ~ layersentry_operation_id, '--auth-local=peer', '--auth-host=scram-sha-256', '--encoding=UTF8'] + (['--waldir=' ~ layersentry_pg_wal] if layersentry_pg_wal else []) }}"
+      no_log: true
+  always:
+    - name: Remove transient PostgreSQL bootstrap password
+      ansible.builtin.file:
+        path: "/run/layersentryd/ansible/pgpw-{{ layersentry_operation_id }}"
+        state: absent
+      no_log: true
+
+- name: Ensure systemd drop-in directory exists
+  ansible.builtin.file:
+    path: "/etc/systemd/system/postgresql-{{ layersentry_pg_major }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Point PGDG service at the confirmed external PGDATA
+  ansible.builtin.copy:
+    content: |
+      [Service]
+      Environment=PGDATA={{ layersentry_pg_data }}
+    dest: "/etc/systemd/system/postgresql-{{ layersentry_pg_major }}.service.d/layersentry.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  when: layersentry_pg_data != layersentry_pg_vendor_data
+  register: layersentry_pg_dropin
+
+- name: Remove obsolete PGDATA override when using vendor default
+  ansible.builtin.file:
+    path: "/etc/systemd/system/postgresql-{{ layersentry_pg_major }}.service.d/layersentry.conf"
+    state: absent
+  when: layersentry_pg_data == layersentry_pg_vendor_data
+  register: layersentry_pg_dropin_removed
+
+- name: Write LayerSentry PostgreSQL managed settings
+  ansible.builtin.blockinfile:
+    path: "{{ layersentry_pg_data }}/postgresql.conf"
+    marker: "# {mark} LAYERSENTRY MANAGED SETTINGS"
+    block: |
+      listen_addresses = '{{ layersentry_request.network.listen_address }}'
+      port = {{ layersentry_request.network.port }}
+      password_encryption = 'scram-sha-256'
+      logging_collector = on
+      log_directory = '{{ layersentry_pg_logs if layersentry_pg_logs else 'log' }}'
+      log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    owner: postgres
+    group: postgres
+    mode: '0600'
+
+- name: Write deterministic PostgreSQL HBA policy
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: "{{ layersentry_pg_data }}/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: '0600'
+
+- name: Reload systemd unit metadata
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: (layersentry_pg_dropin is changed) or (layersentry_pg_dropin_removed is changed)
+
+- name: Parse PostgreSQL configuration before service start
+  ansible.builtin.command:
+    argv: [/usr/sbin/runuser, -u, postgres, --, "/usr/pgsql-{{ layersentry_pg_major }}/bin/postgres", -D, "{{ layersentry_pg_data }}", -C, port]
+  register: layersentry_pg_config_check
+  changed_when: false
+
+- name: Verify parsed PostgreSQL port matches confirmed plan
+  ansible.builtin.assert:
+    that:
+      - (layersentry_pg_config_check.stdout | trim | int) == (layersentry_request.network.port | int)
+    fail_msg: PostgreSQL parsed configuration does not match the confirmed listener port.

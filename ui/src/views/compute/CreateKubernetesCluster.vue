@@ -65,7 +65,13 @@
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item ref="hypervisor" name="hypervisor">
+        <a-alert
+          v-if="kvmProfile && kvmStatus"
+          :message="$t(kvmStatus)"
+          :type="hypervisorLoading ? 'info' : 'warning'"
+          show-icon
+          style="margin-bottom: 16px" />
+        <a-form-item v-if="!kvmProfile" ref="hypervisor" name="hypervisor">
           <template #label>
             <tooltip-label :title="$t('label.hypervisor')" :tooltip="apiParams.hypervisor.description"/>
           </template>
@@ -441,6 +447,8 @@ import { mixinForm } from '@/utils/mixin'
 import ResourceIcon from '@/components/view/ResourceIcon'
 import TooltipLabel from '@/components/widgets/TooltipLabel'
 import UserDataSelection from '@views/compute/wizard/UserDataSelection'
+import { filterProductHypervisors, filterProductImages, isLayersentryKvmProfile } from '@/config/productProfile'
+import { checkKvmSite, checkKvmImage } from '@/config/kvmProvisioning'
 
 export default {
   name: 'CreateKubernetesCluster',
@@ -470,6 +478,10 @@ export default {
       templateLoading: false,
       selectedZoneHypervisors: [],
       hypervisorLoading: false,
+      kvmProfile: isLayersentryKvmProfile(),
+      kvmStatus: 'message.layersentry.kvm.select.site',
+      kvmRequest: 0,
+      kvmTemplateRequest: 0,
       configLoading: false,
       cniConfigurationData: [],
       cniConfigLoading: false,
@@ -596,6 +608,7 @@ export default {
     },
     handleZoneChange (zone) {
       this.selectedZone = zone
+      if (this.kvmProfile) this.fetchKvmCksTemplates()
       this.fetchKubernetesVersionData()
       this.fetchNetworkData()
       this.fetchZoneHypervisors()
@@ -667,6 +680,7 @@ export default {
       return ['Admin', 'DomainAdmin'].includes(this.$store.getters.userInfo.roletype)
     },
     fetchCksTemplates () {
+      if (this.kvmProfile) return this.fetchKvmCksTemplates()
       var filters = []
       if (this.isAdminOrDomainAdmin()) {
         filters = ['all']
@@ -689,6 +703,28 @@ export default {
         })
       }
       this.templates = ckstemplates
+    },
+    async fetchKvmCksTemplates () {
+      const request = ++this.kvmTemplateRequest
+      const zoneid = this.selectedZone.id
+      this.templates = []
+      for (const field of ['controltemplateid', 'workertemplateid', 'etcdtemplateid']) this.form[field] = undefined
+      if (!zoneid) return
+      this.templateLoading = true
+      try {
+        const filters = this.isAdminOrDomainAdmin() ? ['all'] : ['self', 'featured', 'community']
+        const responses = await Promise.all(filters.map(templatefilter => getAPI('listTemplates', {
+          templatefilter, forcks: true, isready: true, hypervisor: 'KVM', zoneid
+        })))
+        if (request !== this.kvmTemplateRequest || zoneid !== this.selectedZone.id) return
+        const templates = responses.flatMap(response => response?.listtemplatesresponse?.template || [])
+        this.templates = filterProductImages(templates).filter((template, index, all) =>
+          all.findIndex(item => item.id === template.id) === index)
+      } catch (error) {
+        if (request === this.kvmTemplateRequest) this.$notifyError(error)
+      } finally {
+        if (request === this.kvmTemplateRequest) this.templateLoading = false
+      }
     },
     fetchNetworkData () {
       const params = {}
@@ -732,6 +768,7 @@ export default {
       })
     },
     fetchZoneHypervisors () {
+      if (this.kvmProfile) return this.fetchKvmHypervisors()
       const params = {
         zoneid: this.selectedZone.id
       }
@@ -739,10 +776,31 @@ export default {
 
       getAPI('listHypervisors', params).then(json => {
         const listResponse = json.listhypervisorsresponse.hypervisor || []
-        this.selectedZoneHypervisors = listResponse.filter(hypervisor => hypervisor.name !== 'External')
+        this.selectedZoneHypervisors = filterProductHypervisors(
+          listResponse.filter(hypervisor => hypervisor.name !== 'External')
+        )
       }).finally(() => {
         this.hypervisorLoading = false
       })
+    },
+    async fetchKvmHypervisors () {
+      const request = ++this.kvmRequest
+      const zoneid = this.selectedZone.id
+      this.selectedZoneHypervisors = []
+      this.form.hypervisor = null
+      this.hypervisorLoading = true
+      this.kvmStatus = 'message.layersentry.kvm.checking'
+      try {
+        const choices = await checkKvmSite(getAPI, zoneid)
+        if (request !== this.kvmRequest || zoneid !== this.selectedZone.id) return
+        this.selectedZoneHypervisors = choices
+        this.form.hypervisor = 0
+        this.kvmStatus = ''
+      } catch (error) {
+        if (request === this.kvmRequest && zoneid === this.selectedZone.id) this.kvmStatus = error.message
+      } finally {
+        if (request === this.kvmRequest) this.hypervisorLoading = false
+      }
     },
     handleZoneHypervisorChange (index) {
       this.form.hypervisor = index
@@ -825,11 +883,20 @@ export default {
       })
     },
     handleSubmit (e) {
-      e.preventDefault()
+      if (e && typeof e.preventDefault === 'function') e.preventDefault()
       if (this.loading) return
-      this.formRef.value.validate().then(() => {
+      return this.formRef.value.validate().then(async () => {
+        if (this.loading) return
         const formRaw = toRaw(this.form)
         const values = this.handleRemoveFields(formRaw)
+        if (this.kvmProfile && values.advancedmode) {
+          const fields = ['controltemplateid', 'workertemplateid']
+          if (values.etcdnodes > 0) fields.push('etcdtemplateid')
+          if (fields.some(field => values[field] != null && !this.templates[values[field]])) {
+            this.kvmStatus = 'message.layersentry.kvm.image.invalid'
+            return
+          }
+        }
         this.loading = true
         const params = {
           name: values.name,
@@ -840,7 +907,7 @@ export default {
           size: values.size,
           clustertype: 'CloudManaged'
         }
-        if (values.hypervisor !== null) {
+        if (!this.kvmProfile && values.hypervisor !== null) {
           params.hypervisor = this.selectedZoneHypervisors[values.hypervisor].name.toLowerCase()
         }
         var advancedOfferings = 0
@@ -920,6 +987,30 @@ export default {
         }
         if ('asnumber' in values && this.isASNumberRequired()) {
           params.asnumber = values.asnumber
+        }
+
+        if (this.kvmProfile) {
+          const templateFields = ['controltemplateid', 'workertemplateid', 'etcdtemplateid']
+          const selectedTemplates = templateFields.map(field => values[field])
+          try {
+            await checkKvmSite(getAPI, params.zoneid)
+            for (const [key, id] of Object.entries(params)) {
+              if (/^nodetemplates\[\d+\]\.template$/.test(key)) {
+                await checkKvmImage(getAPI, params.zoneid, 'templateid', id, { forcks: true })
+              }
+            }
+            if (params.zoneid !== this.selectedZone.id || params.zoneid !== this.zones[this.form.zoneid]?.id ||
+                templateFields.some((field, index) => selectedTemplates[index] !== this.form[field])) {
+              throw new Error('message.layersentry.kvm.selection.changed')
+            }
+            params.hypervisor = 'kvm'
+            this.kvmStatus = ''
+          } catch (error) {
+            this.kvmStatus = error.message
+            this.$notification.error({ message: this.$t('message.request.failed'), description: this.$t(error.message) })
+            this.loading = false
+            return
+          }
         }
 
         postAPI('createKubernetesCluster', params).then(json => {

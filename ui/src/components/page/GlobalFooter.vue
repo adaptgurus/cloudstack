@@ -17,63 +17,32 @@
 
 <template>
   <div class="footer">
-    <div class="line">
-      <span v-html="$config.footer" />
-    </div>
-    <div class="line" v-if="$store.getters.userInfo.roletype === 'Admin'">
-      CloudStack {{ $store.getters.features.cloudstackversion }}
-      <span v-if="showVersionUpdate()">
-        <a-divider type="vertical" />
-        <a
-          :href="'https://github.com/apache/cloudstack/releases/tag/' + $store.getters.latestVersion.version"
-          target="_blank">
-            <info-circle-outlined />
-            {{ $t('label.new.version.available') + ': ' + $store.getters.latestVersion.version }}
-        </a>
-      </span>
-      <a-divider type="vertical" />
-      <a href="https://github.com/apache/cloudstack/discussions" target="_blank">
-        <github-outlined />
-        {{ $t('label.report.bug') }}
-      </a>
-    </div>
+    <div class="product">{{ $config.footer || 'Layersentry V1.0' }}</div>
+    <div class="tagline">Secure cloud infrastructure management</div>
   </div>
 </template>
 
 <script>
-import semver from 'semver'
-import { getParsedVersion } from '@/utils/util'
-
 export default {
-  name: 'LayoutFooter',
-  data () {
-    return {
-    }
-  },
-  methods: {
-    showVersionUpdate () {
-      if (this.$store.getters?.features?.cloudstackversion && this.$store.getters?.latestVersion?.version) {
-        const currentVersion = getParsedVersion(this.$store.getters?.features?.cloudstackversion)
-        const latestVersion = getParsedVersion(this.$store.getters?.latestVersion?.version)
-        return semver.valid(currentVersion) && semver.valid(latestVersion) && semver.gt(latestVersion, currentVersion)
-      }
-      return false
-    }
-  }
+  name: 'LayoutFooter'
 }
 </script>
 
 <style lang="less" scoped>
   .footer {
     padding: 0 16px;
-    margin: 48px 0 24px;
+    margin: 32px 0 20px;
     text-align: center;
+    color: #667085;
+  }
 
-    .line {
-      margin-bottom: 8px;
-    }
-    .copyright {
-      font-size: 14px;
-    }
+  .product {
+    color: #344054;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .tagline {
+    font-size: 12px;
   }
 </style>

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "component": "cluster-api-provider-cloudstack",
+  "upstreamRepository": "https://github.com/kubernetes-sigs/cluster-api-provider-cloudstack.git",
+  "upstreamTag": "v0.6.1",
+  "upstreamCommit": "7521b14a31e6c46f81f16aae3738a27c08ad063f",
+  "patches": [
+    {
+      "path": "0001-layersentry-rke2-endpoint-volume-ownership.diff",
+      "sha256": "6d3fc88ccf986bd025fc6d714ec7b4fa19d0c2afe6f10c50ef02a198286cea74",
+      "purpose": "CAPC-owned RKE2 6443/9345 endpoint and ownership-safe Machine data-disk deletion"
+    }
+  ],
+  "activation": {
+    "clusterAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-rke2-endpoint=true",
+    "machineAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-volume-ownership=true"
+  },
+  "status": "NOT_TESTED"
+}

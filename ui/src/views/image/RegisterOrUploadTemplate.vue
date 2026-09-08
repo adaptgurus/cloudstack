@@ -508,6 +508,7 @@ import { mixinForm } from '@/utils/mixin'
 import ResourceIcon from '@/components/view/ResourceIcon'
 import TooltipLabel from '@/components/widgets/TooltipLabel'
 import DetailsInput from '@/components/widgets/DetailsInput'
+import { filterProductHypervisors } from '@/config/productProfile'
 
 export default {
   name: 'RegisterOrUploadTemplate',
@@ -763,7 +764,7 @@ export default {
         if (!this.isAdminRole) {
           listhyperVisors = listhyperVisors.filter(hv => hv.name !== 'External')
         }
-        this.hyperVisor.opts = listhyperVisors
+        this.hyperVisor.opts = filterProductHypervisors(listhyperVisors)
       }).finally(() => {
         this.hyperVisor.loading = false
       })

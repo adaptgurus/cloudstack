@@ -1,0 +1,20 @@
+global_defs {
+    enable_script_security
+}
+
+vrrp_instance LS_{{ layersentry_service_id | replace('-', '') | upper | truncate(12, true, '') }} {
+    state {{ layersentry_request.network.vip.state }}
+    interface {{ layersentry_request.network.vip.interface }}
+    virtual_router_id {{ layersentry_request.network.vip.virtual_router_id }}
+    priority {{ layersentry_request.network.vip.priority }}
+    advert_int 1
+    unicast_src_ip {{ layersentry_request.network.vip.source_address }}
+    unicast_peer {
+{% for peer in layersentry_request.network.vip.peers %}
+        {{ peer }}
+{% endfor %}
+    }
+    virtual_ipaddress {
+        {{ layersentry_request.network.vip.address }}/{{ layersentry_request.network.vip.prefix_length }} dev {{ layersentry_request.network.vip.interface }}
+    }
+}

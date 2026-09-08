@@ -1,0 +1,62 @@
+---
+- name: Require qualified Node.js 20 immutable plan
+  ansible.builtin.assert:
+    that:
+      - layersentry_provider == 'nodejs-runtime'
+      - layersentry_request.topology == 'standalone'
+      - layersentry_request.release_line == '20'
+      - layersentry_repository_id == 'appstream'
+      - layersentry_resolved_version is match('^nodejs-(?:[0-9]+:)?20\.')
+    fail_msg: Node.js Ansible execution requires the qualified nodejs:20 AppStream contract.
+
+- name: Inspect enabled Node.js module stream
+  ansible.builtin.command:
+    argv: [/usr/bin/dnf, -q, module, list, --enabled, nodejs]
+  register: layersentry_node_module_list
+  changed_when: false
+  failed_when: false
+
+- name: Parse enabled Node.js module stream
+  ansible.builtin.set_fact:
+    layersentry_node_enabled_stream: "{{ ((layersentry_node_module_list.stdout | regex_findall('(?m)^nodejs\s+([^\s\[]+)')) | first | default('')) }}"
+
+- name: Refuse a different pre-enabled Node.js stream
+  ansible.builtin.assert:
+    that:
+      - layersentry_node_enabled_stream in ['', '20']
+    fail_msg: A different Node.js module stream is already enabled.
+
+- name: Read LayerSentry Node.js stream ownership marker
+  ansible.builtin.slurp:
+    src: /var/lib/layersentryd/state/nodejs-module-owner
+  register: layersentry_node_owner
+  failed_when: false
+  changed_when: false
+
+- name: Refuse a foreign LayerSentry Node.js stream owner
+  ansible.builtin.assert:
+    that:
+      - layersentry_node_owner.failed | default(false) or ((layersentry_node_owner.content | b64decode | trim) == layersentry_service_id)
+    fail_msg: Node.js module stream is owned by another LayerSentry service.
+
+- name: Enable supported nodejs:20 stream when not already enabled
+  ansible.builtin.command:
+    argv: [/usr/bin/dnf, -y, module, enable, nodejs:20]
+  when: layersentry_node_enabled_stream == ''
+
+- name: Persist Node.js module stream owner
+  ansible.builtin.copy:
+    content: "{{ layersentry_service_id }}\n"
+    dest: /var/lib/layersentryd/state/nodejs-module-owner
+    owner: layersentry
+    group: layersentry
+    mode: '0600'
+
+- name: Install exact Node.js 20 NEVRA
+  ansible.builtin.dnf:
+    name: "{{ layersentry_resolved_version }}"
+    state: present
+    install_weak_deps: false
+    disablerepo: '*'
+    enablerepo: appstream
+    disable_gpg_check: false

@@ -1,0 +1,100 @@
+---
+- name: Require supported Nginx immutable plan
+  ansible.builtin.assert:
+    that:
+      - layersentry_provider == 'nginx'
+      - layersentry_request.topology == 'standalone'
+      - layersentry_repository_id == 'appstream'
+      - layersentry_resolved_version | length > 0
+    fail_msg: Nginx Ansible execution received an unsupported or incomplete plan.
+
+- name: Read existing Nginx owner marker
+  ansible.builtin.slurp:
+    src: /var/lib/layersentryd/state/nginx-owner
+  register: layersentry_nginx_owner
+  failed_when: false
+  changed_when: false
+
+- name: Refuse a foreign Nginx service owner
+  ansible.builtin.assert:
+    that:
+      - layersentry_nginx_owner.failed | default(false) or ((layersentry_nginx_owner.content | b64decode | trim) == layersentry_service_id)
+    fail_msg: nginx.service is already owned by another LayerSentry service.
+
+- name: Persist Nginx owner before mutation
+  ansible.builtin.copy:
+    content: "{{ layersentry_service_id }}\n"
+    dest: /var/lib/layersentryd/state/nginx-owner
+    owner: layersentry
+    group: layersentry
+    mode: '0600'
+
+- name: Resolve Nginx content and config paths
+  ansible.builtin.set_fact:
+    layersentry_app_mount_root: "{{ layersentry_paths['application-data'] | default('') }}"
+    layersentry_app_root: "{{ (layersentry_paths['application-data'] ~ '/www') if (layersentry_paths['application-data'] | default('')) else ('/var/lib/layersentryd/apps/' ~ layersentry_service_id ~ '/www') }}"
+    layersentry_nginx_conf: "/etc/nginx/conf.d/layersentry-{{ (layersentry_service_id | hash('sha256'))[:12] }}.conf"
+
+- name: Install exact Nginx NEVRA
+  ansible.builtin.dnf:
+    name: "{{ layersentry_resolved_version }}"
+    state: present
+    install_weak_deps: false
+    disablerepo: '*'
+    enablerepo: "{{ layersentry_repository_id }}"
+    disable_gpg_check: false
+
+- name: Ensure Nginx application root exists
+  ansible.builtin.file:
+    path: "{{ layersentry_app_root }}"
+    state: directory
+    owner: root
+    group: nginx
+    mode: '0755'
+
+- name: Persist HTTP content SELinux label for external application root
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -a, -t, httpd_sys_content_t, "{{ layersentry_app_mount_root }}(/.*)?"]
+  register: layersentry_nginx_semanage_add
+  failed_when: false
+  changed_when: layersentry_nginx_semanage_add.rc == 0
+  when:
+    - layersentry_app_mount_root | length > 0
+    - layersentry_app_mount_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Reconcile existing HTTP content SELinux label
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -m, -t, httpd_sys_content_t, "{{ layersentry_app_mount_root }}(/.*)?"]
+  when:
+    - layersentry_nginx_semanage_add is defined
+    - layersentry_nginx_semanage_add.rc | default(0) != 0
+  changed_when: false
+
+- name: Apply Nginx external content SELinux context
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -RF, "{{ layersentry_app_mount_root }}"]
+  changed_when: false
+  when:
+    - layersentry_app_mount_root | length > 0
+    - layersentry_app_mount_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Install deterministic Nginx health content
+  ansible.builtin.copy:
+    content: "LayerSentry managed Nginx application service\n"
+    dest: "{{ layersentry_app_root }}/index.html"
+    owner: root
+    group: nginx
+    mode: '0644'
+
+- name: Install LayerSentry Nginx vhost
+  ansible.builtin.template:
+    src: layersentry.conf.j2
+    dest: "{{ layersentry_nginx_conf }}"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Validate Nginx configuration before service start
+  ansible.builtin.command:
+    argv: [/usr/sbin/nginx, -t]
+  changed_when: false

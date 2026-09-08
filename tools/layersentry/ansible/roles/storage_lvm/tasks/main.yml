@@ -1,0 +1,13 @@
+---
+- name: Reconcile LayerSentry-owned attached storage
+  layersentry_storage:
+    service_id: "{{ layersentry_service_id }}"
+    storage: "{{ layersentry_request.storage | default([]) }}"
+    lvm: "{{ layersentry_request.lvm | default([]) }}"
+    recovery_only: "{{ layersentry_recovery_only | default(false) | bool }}"
+  register: layersentry_storage_result
+
+- name: Record storage reconciliation summary
+  ansible.builtin.set_fact:
+    layersentry_storage_changed: "{{ layersentry_storage_result.changed | bool }}"
+    layersentry_root_ancestry: "{{ layersentry_storage_result.root_ancestry | default([]) }}"

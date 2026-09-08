@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://layersentry.example/schemas/hypervisor-host-intent-v1.json",
+  "title": "LayerSentry Hypervisor Host Intent V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "release_id",
+    "host_profile",
+    "cloudstack_version",
+    "packages",
+    "repositories",
+    "failure_domain",
+    "management_bridge",
+    "management_mtu",
+    "min_memory_mib",
+    "min_vcpus",
+    "required_storage_paths",
+    "bridges",
+    "firewall"
+  ],
+  "properties": {
+    "release_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "host_profile": {
+      "const": "layersentry-kvm-standard"
+    },
+    "cloudstack_version": {
+      "const": "4.22.1.1"
+    },
+    "failure_domain": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+    },
+    "management_bridge": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,62}$"
+    },
+    "management_mtu": {
+      "type": "integer",
+      "minimum": 1280,
+      "maximum": 9216
+    },
+    "min_memory_mib": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "min_vcpus": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "required_storage_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^/[^\\u0000]*$",
+            "maxLength": 4096
+          },
+          "require_mount": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "bridges": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "mode",
+          "mtu"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$"
+          },
+          "mode": {
+            "enum": [
+              "validate-existing",
+              "manage-dedicated"
+            ]
+          },
+          "mtu": {
+            "type": "integer",
+            "minimum": 1280,
+            "maximum": 9216
+          },
+          "uplink": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,62}$"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "manage-dedicated"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "then": {
+              "required": [
+                "uplink"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "firewall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "zone",
+        "management_cidrs",
+        "agent_port"
+      ],
+      "properties": {
+        "zone": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$"
+        },
+        "management_cidrs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9A-Fa-f:.]+/[0-9]{1,3}$"
+          }
+        },
+        "agent_port": {
+          "const": 8250
+        }
+      }
+    },
+    "packages": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9+_.:-]*-[0-9][A-Za-z0-9+_.:~-]*$"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "pattern": "^qemu-kvm-"
+          }
+        },
+        {
+          "contains": {
+            "pattern": "^libvirt-"
+          }
+        },
+        {
+          "contains": {
+            "pattern": "^cloudstack-agent-4\\.22\\.1\\.1([.-]|$)"
+          }
+        }
+      ]
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "baseurl",
+          "gpgkey",
+          "gpg_fingerprint"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+          },
+          "baseurl": {
+            "type": "string",
+            "pattern": "^(https|file)://[^\\s]+$"
+          },
+          "gpgkey": {
+            "type": "string",
+            "pattern": "^(https|file)://[^\\s]+$"
+          },
+          "gpg_fingerprint": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{40,64}$"
+          }
+        }
+      }
+    },
+    "dns_probe": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253
+    },
+    "management_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "port"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}

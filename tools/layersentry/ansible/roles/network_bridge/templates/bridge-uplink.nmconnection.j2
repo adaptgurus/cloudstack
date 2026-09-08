@@ -1,0 +1,18 @@
+# Managed by LayerSentry Ansible. Do not edit on the hypervisor.
+[connection]
+id=layersentry-uplink-{{ item.uplink }}-{{ item.name }}
+type=ethernet
+interface-name={{ item.uplink }}
+master={{ item.name }}
+slave-type=bridge
+autoconnect=true
+autoconnect-priority=40
+
+[ethernet]
+mtu={{ item.mtu | int }}
+
+[ipv4]
+method=disabled
+
+[ipv6]
+method=disabled

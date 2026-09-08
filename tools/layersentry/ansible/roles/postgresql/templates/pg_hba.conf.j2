@@ -1,0 +1,5 @@
+# Managed by LayerSentry. Manual edits are overwritten by the confirmed plan.
+local   all             all                                     peer
+{% for cidr in layersentry_request.network.allowed_cidrs | default([]) %}
+host    all             all             {{ cidr }}              scram-sha-256
+{% endfor %}

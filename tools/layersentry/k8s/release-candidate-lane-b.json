@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0",
+  "status": "PENDING",
+  "qualificationLane": "B",
+  "cloudstack": "4.22.1.1",
+  "capi": "1.13.5",
+  "capc": "0.6.1",
+  "capcUpstreamCommit": "7521b14a31e6c46f81f16aae3738a27c08ad063f",
+  "capcDownstream": {
+    "manifest": "tools/layersentry/k8s/downstream/capc/manifest.json",
+    "patchSha256": "6d3fc88ccf986bd025fc6d714ec7b4fa19d0c2afe6f10c50ef02a198286cea74",
+    "clusterEndpointAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-rke2-endpoint=true",
+    "machineVolumeOwnershipAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-volume-ownership=true"
+  },
+  "caprke2": "0.25.2",
+  "rke2": "1.36.4+rke2r1",
+  "kubernetes": "1.36.x",
+  "cloudstackCsi": "3.0.2",
+  "cloudstackCsiUpstreamCommit": "a84477e922d62b82387ab55134fafc9c0b5aaf64",
+  "cloudstackCsiDownstream": {
+    "manifest": "tools/layersentry/k8s/downstream/cloudstack-csi/manifest.json",
+    "patchSha256": "ad1339342211b63d8c9c9a20994da20c66ae632e03c7ddc1c65d4215bf9c4f58",
+    "requiredProjectConfig": "global.project-id",
+    "builderImage": "docker.io/library/golang@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f",
+    "runtimeImage": "docker.io/library/alpine@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d",
+    "apkPackageLayerDeterministic": false,
+    "image": null,
+    "projectLifecycleQualified": false,
+    "resizeIdempotencyQualified": false
+  },
+  "cloudstackCcm": {
+    "version": "1.2.0",
+    "upstreamCommit": "4740dbcacc7fc5892354b03b2f0be7ebf5c92584",
+    "upstreamKubernetesLibraryVersion": "0.24.17",
+    "downstreamManifest": "tools/layersentry/k8s/downstream/cloudstack-ccm/manifest.json",
+    "downstreamPatchSha256": "a6689998f2a46b9622ac69f97f8e67e231f075ffa8cca16a85a97fd0f4893726",
+    "candidateKubernetesLibraryVersion": "0.36.0",
+    "candidateGoVersion": "1.26.0",
+    "builderImage": "docker.io/library/golang@sha256:fb612b7831d53a89cbc0aaa7855b69ad7b0caf603715860cf538df854d047b84",
+    "runtimeImage": "gcr.io/distroless/static@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7",
+    "candidateKubernetesVersion": "1.36.x",
+    "image": null,
+    "kubernetes136Qualified": false
+  },
+  "fluxCatalog": {
+    "repository": null,
+    "commit": null,
+    "contentDigestVerified": false
+  },
+  "architecture": {
+    "infrastructureOwner": "CloudStack",
+    "machineOwner": "CAPI/CAPC",
+    "rke2Owner": "CAPRKE2",
+    "packageOwner": "Flux",
+    "databaseOwner": "database-operator",
+    "requiredControlPlanePorts": [6443, 9345]
+  },
+  "hardGates": {
+    "tupleReconciliation": false,
+    "endpoint6443": false,
+    "endpoint9345": false,
+    "fluxRemoteReconcile": false,
+    "capcVolumeOwnershipSafe": false,
+    "nodeDiskSetOwnership": false,
+    "csiProjectScope": false,
+    "csiResizeIdempotent": false,
+    "airgapCreateScaleRepair": false,
+    "statefulMachineReplacement": false,
+    "backupRestore": false,
+    "pitrRestore": false
+  },
+  "productionRestrictions": {
+    "statefulDbaas": "BLOCKED",
+    "automaticStatefulMachineHealthRemediation": "DISABLED",
+    "databaseWorkerAutomaticScaleDown": "DISABLED",
+    "directNodeDisks": "PENDING_NODEDISKSET",
+    "projectPvcAutoGrow": "DISABLED",
+    "airGap": "NOT_TESTED"
+  },
+  "sourceOfTruth": [
+    "docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_SUPER_MASTER_CONTEXT.md",
+    "docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_ARCHITECTURE_ADDENDUM.md",
+    "docs/layersentry/evidence/k8s/2026-09-06-k8s-master-context-full-validation.md",
+    "docs/layersentry/codex/WORKSTREAM_E_K8S_DBAAS_APAAS.md"
+  ]
+}

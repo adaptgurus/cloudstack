@@ -1,0 +1,17 @@
+---
+- name: reload firewalld
+  ansible.builtin.command:
+    argv: [/usr/bin/firewall-cmd, --reload]
+
+- name: reapply secondary VIP
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/nmcli
+      - device
+      - reapply
+      - "{{ layersentry_request.network.vip.interface }}"
+
+- name: restart keepalived
+  ansible.builtin.systemd_service:
+    name: keepalived.service
+    state: restarted

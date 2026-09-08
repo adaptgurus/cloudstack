@@ -1,0 +1,7 @@
+---
+# Customer bootstrap is disconnected. Release packaging must mirror this exact
+# collection artifact and verify it against the signed release lock/manifest;
+# ansible-galaxy is not a production runtime dependency.
+collections:
+  - name: community.libvirt
+    version: 2.3.0

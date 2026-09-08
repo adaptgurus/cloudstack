@@ -1,0 +1,218 @@
+---
+- name: Require supported MySQL-family immutable plan
+  ansible.builtin.assert:
+    that:
+      - layersentry_provider in ['mysql', 'mariadb']
+      - layersentry_request.topology == 'standalone'
+      - layersentry_repository_id == 'appstream'
+      - layersentry_resolved_version | length > 0
+      - layersentry_secrets_b64.admin_password | default('') | length > 0
+    fail_msg: MySQL-family Ansible execution received an unsupported or incomplete plan.
+  no_log: true
+
+- name: Read existing MySQL-family owner marker
+  ansible.builtin.slurp:
+    src: /var/lib/layersentryd/state/mysql-family-owner
+  register: layersentry_mysql_owner
+  failed_when: false
+  changed_when: false
+
+- name: Refuse a foreign MySQL-family owner
+  ansible.builtin.assert:
+    that:
+      - layersentry_mysql_owner.failed | default(false) or ((layersentry_mysql_owner.content | b64decode | trim) == (layersentry_provider ~ ':' ~ layersentry_service_id))
+    fail_msg: A different MySQL-family LayerSentry service already owns this guest.
+
+- name: Persist MySQL-family owner marker before mutation
+  ansible.builtin.copy:
+    content: "{{ layersentry_provider }}:{{ layersentry_service_id }}\n"
+    dest: /var/lib/layersentryd/state/mysql-family-owner
+    owner: layersentry
+    group: layersentry
+    mode: '0600'
+
+- name: Resolve MySQL-family package and service contract
+  ansible.builtin.set_fact:
+    layersentry_mysql_package: "{{ 'mysql-server' if layersentry_provider == 'mysql' else 'mariadb-server' }}"
+    layersentry_mysql_conflict: "{{ 'mariadb-server' if layersentry_provider == 'mysql' else 'mysql-server' }}"
+    layersentry_mysql_service: "{{ 'mysqld.service' if layersentry_provider == 'mysql' else 'mariadb.service' }}"
+    layersentry_mysql_data_root: "{{ layersentry_paths['database-data'] | default('') }}"
+    layersentry_mysql_log_root: "{{ layersentry_paths['database-logs'] | default('') }}"
+    layersentry_mysql_tls_dir: "/var/lib/mysql/layersentry-{{ layersentry_service_id }}"
+
+- name: Derive MySQL-family data and log paths
+  ansible.builtin.set_fact:
+    layersentry_mysql_data: "{{ (layersentry_mysql_data_root ~ '/data') if layersentry_mysql_data_root else '/var/lib/mysql' }}"
+    layersentry_mysql_logs: "{{ (layersentry_mysql_log_root ~ '/logs') if layersentry_mysql_log_root else '' }}"
+    layersentry_mysql_external_roots: "{{ [layersentry_mysql_data_root] | reject('equalto', '') | select('match', '^/(data|srv|opt/layersentry-data)(/|$)') | list }}"
+
+- name: Refuse conflicting MySQL-family package
+  ansible.builtin.command:
+    argv: [/usr/bin/rpm, -q, "{{ layersentry_mysql_conflict }}"]
+  register: layersentry_mysql_conflict_query
+  failed_when: false
+  changed_when: false
+
+- name: Require conflicting package to be absent
+  ansible.builtin.assert:
+    that: [layersentry_mysql_conflict_query.rc != 0]
+    fail_msg: "{{ layersentry_provider }} conflicts with an already installed MySQL-family server package."
+
+- name: Install exact MySQL-family server NEVRA
+  ansible.builtin.dnf:
+    name: "{{ layersentry_resolved_version }}"
+    state: present
+    install_weak_deps: false
+    disablerepo: '*'
+    enablerepo: "{{ layersentry_repository_id }}"
+    disable_gpg_check: false
+
+- name: Ensure selected database data directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_mysql_data }}"
+    state: directory
+    owner: mysql
+    group: mysql
+    mode: '0750'
+
+- name: Persist SELinux equivalence for external database-data root
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -a, -e, /var/lib/mysql, "{{ item }}"]
+  register: layersentry_mysql_semanage_data_add
+  failed_when: false
+  changed_when: layersentry_mysql_semanage_data_add.rc == 0
+  loop: "{{ layersentry_mysql_external_roots }}"
+
+- name: Reconcile existing database-data SELinux equivalence
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -m, -e, /var/lib/mysql, "{{ item.item }}"]
+  when: item.rc != 0
+  loop: "{{ layersentry_mysql_semanage_data_add.results | default([]) }}"
+  changed_when: false
+
+- name: Ensure external database log directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_mysql_logs }}"
+    state: directory
+    owner: mysql
+    group: mysql
+    mode: '0750'
+  when: layersentry_mysql_logs | length > 0
+
+- name: Persist mysqld_log_t for external log root
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -a, -t, mysqld_log_t, "{{ layersentry_mysql_log_root }}(/.*)?"]
+  register: layersentry_mysql_semanage_log_add
+  failed_when: false
+  changed_when: layersentry_mysql_semanage_log_add.rc == 0
+  when:
+    - layersentry_mysql_log_root | length > 0
+    - layersentry_mysql_log_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Reconcile existing mysqld_log_t rule
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -m, -t, mysqld_log_t, "{{ layersentry_mysql_log_root }}(/.*)?"]
+  when:
+    - layersentry_mysql_semanage_log_add is defined
+    - layersentry_mysql_semanage_log_add.rc | default(0) != 0
+  changed_when: false
+
+- name: Restore database SELinux contexts
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -RF, "{{ item }}"]
+  loop: "{{ ([layersentry_mysql_data_root, layersentry_mysql_log_root] | reject('equalto', '') | select('match', '^/(data|srv|opt/layersentry-data)(/|$)') | list | unique) }}"
+  changed_when: false
+
+- name: Detect initialized MySQL-family system database
+  ansible.builtin.stat:
+    path: "{{ layersentry_mysql_data }}/mysql"
+  register: layersentry_mysql_system_db
+
+- name: Detect preferred MySQL server executable
+  ansible.builtin.stat:
+    path: /usr/libexec/mysqld
+  register: layersentry_mysql_libexec
+  when:
+    - layersentry_provider == 'mysql'
+    - not layersentry_mysql_system_db.stat.exists
+
+- name: Initialize MySQL datadir explicitly when empty
+  ansible.builtin.command:
+    argv:
+      - "{{ '/usr/libexec/mysqld' if layersentry_mysql_libexec.stat.exists else '/usr/sbin/mysqld' }}"
+      - --initialize-insecure
+      - --user=mysql
+      - "--datadir={{ layersentry_mysql_data }}"
+  when:
+    - layersentry_provider == 'mysql'
+    - not layersentry_mysql_system_db.stat.exists
+
+- name: Initialize MariaDB datadir explicitly when empty
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/mariadb-install-db
+      - --user=mysql
+      - "--datadir={{ layersentry_mysql_data }}"
+      - --auth-root-authentication-method=socket
+      - --skip-test-db
+  when:
+    - layersentry_provider == 'mariadb'
+    - not layersentry_mysql_system_db.stat.exists
+
+- name: Ensure service-owned TLS directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_mysql_tls_dir }}"
+    state: directory
+    owner: mysql
+    group: mysql
+    mode: '0700'
+
+- name: Inspect existing service TLS certificate
+  ansible.builtin.stat:
+    path: "{{ layersentry_mysql_tls_dir }}/server.crt"
+  register: layersentry_mysql_tls_cert
+
+- name: Generate service-local TLS key and certificate when absent
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/openssl
+      - req
+      - -x509
+      - -newkey
+      - rsa:3072
+      - -nodes
+      - -keyout
+      - "{{ layersentry_mysql_tls_dir }}/server.key"
+      - -out
+      - "{{ layersentry_mysql_tls_dir }}/server.crt"
+      - -days
+      - '825'
+      - -subj
+      - "/CN=layersentry-{{ layersentry_service_id }}"
+      - -addext
+      - "subjectAltName=IP:{{ layersentry_request.network.listen_address }}"
+  when: not layersentry_mysql_tls_cert.stat.exists
+  no_log: true
+
+- name: Secure generated TLS material
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: mysql
+    group: mysql
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ layersentry_mysql_tls_dir }}/server.key", mode: '0600' }
+    - { path: "{{ layersentry_mysql_tls_dir }}/server.crt", mode: '0640' }
+
+- name: Install LayerSentry MySQL-family configuration
+  ansible.builtin.template:
+    src: layersentry.cnf.j2
+    dest: "/etc/my.cnf.d/99-layersentry-{{ layersentry_provider }}.cnf"
+    owner: root
+    group: mysql
+    mode: '0640'
+
+- name: Restore MySQL-family managed configuration context
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -F, "/etc/my.cnf.d/99-layersentry-{{ layersentry_provider }}.cnf"]
+  changed_when: false

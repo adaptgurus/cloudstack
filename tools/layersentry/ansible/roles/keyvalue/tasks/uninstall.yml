@@ -1,0 +1,48 @@
+---
+- name: Refuse destructive key-value uninstall through normal lifecycle
+  ansible.builtin.assert:
+    that:
+      - not (layersentry_destroy_data | default(false) | bool)
+    fail_msg: Key-value data destruction requires a separately reviewed operation.
+
+- name: Resolve key-value uninstall contract
+  ansible.builtin.set_fact:
+    layersentry_kv_package: "{{ 'redis' if layersentry_provider == 'redis' else 'valkey' }}"
+    layersentry_kv_main_conf: "{{ '/etc/redis/redis.conf' if layersentry_provider == 'redis' else '/etc/valkey/valkey.conf' }}"
+    layersentry_kv_config_dir: "{{ '/etc/redis' if layersentry_provider == 'redis' else '/etc/valkey' }}"
+    layersentry_kv_data_root: "{{ '/var/lib/redis' if layersentry_provider == 'redis' else '/var/lib/valkey' }}"
+    layersentry_kv_external_root: "{{ layersentry_paths['database-data'] | default('') }}"
+
+- name: Derive key-value uninstall paths
+  ansible.builtin.set_fact:
+    layersentry_kv_vendor_data: "{{ layersentry_kv_data_root }}/layersentry-{{ layersentry_service_id }}"
+    layersentry_kv_external_data: "{{ (layersentry_kv_external_root ~ '/data') if layersentry_kv_external_root else '' }}"
+    layersentry_kv_managed_conf: "{{ layersentry_kv_config_dir }}/layersentry-{{ layersentry_service_id }}.conf"
+
+- name: Remove external-data bind while preserving source data
+  layersentry_bind_mount:
+    source: "{{ layersentry_kv_external_data }}"
+    target: "{{ layersentry_kv_vendor_data }}"
+    state: absent
+  when: layersentry_kv_external_data | length > 0
+
+- name: Remove LayerSentry include from provider main configuration
+  ansible.builtin.lineinfile:
+    path: "{{ layersentry_kv_main_conf }}"
+    line: "include {{ layersentry_kv_managed_conf }}"
+    state: absent
+
+- name: Remove LayerSentry managed key-value configuration
+  ansible.builtin.file:
+    path: "{{ layersentry_kv_managed_conf }}"
+    state: absent
+
+- name: Remove internal legacy owner marker if present
+  ansible.builtin.file:
+    path: "/var/lib/layersentryd/state/{{ layersentry_provider }}-owner"
+    state: absent
+
+- name: Remove Redis or Valkey package while preserving data roots
+  ansible.builtin.dnf:
+    name: "{{ layersentry_kv_package }}"
+    state: absent

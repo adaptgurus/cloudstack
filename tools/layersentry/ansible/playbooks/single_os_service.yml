@@ -1,0 +1,22 @@
+---
+- name: Control LayerSentry Single-OS provider service
+  hosts: layersentry_single_os
+  gather_facts: false
+  become: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require supported service action and unit
+      ansible.builtin.assert:
+        that:
+          - layersentry_provider in ['postgresql', 'mysql', 'mariadb', 'redis', 'valkey', 'nginx', 'apache-httpd', 'tomcat']
+          - layersentry_action in ['start', 'stop', 'restart']
+          - layersentry_service_unit | length > 0
+          - layersentry_operation_id == layersentry_request.operation_id
+          - layersentry_service_id == layersentry_request.service_id
+        fail_msg: Unsupported Single-OS service action.
+
+    - name: Apply requested provider systemd state
+      ansible.builtin.systemd_service:
+        name: "{{ layersentry_service_unit }}"
+        enabled: "{{ layersentry_action != 'stop' }}"
+        state: "{{ 'started' if layersentry_action == 'start' else ('stopped' if layersentry_action == 'stop' else 'restarted') }}"

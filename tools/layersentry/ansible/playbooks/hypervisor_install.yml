@@ -1,0 +1,89 @@
+---
+- name: LayerSentry KVM hypervisor fresh installation
+  hosts: layersentry_hypervisors
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  serial: 1
+
+  pre_tasks:
+    - name: Record immutable operation identity for this run
+      ansible.builtin.set_fact:
+        layersentry_hypervisor_operation:
+          operation_uuid: "{{ layersentry_operation_uuid }}"
+          release_id: "{{ layersentry_hypervisor_release_id }}"
+          host_profile: "{{ layersentry_hypervisor_profile }}"
+          cloudstack_version: "{{ layersentry_cloudstack_version }}"
+      no_log: true
+
+    - name: Validate operation UUID
+      ansible.builtin.assert:
+        that:
+          - layersentry_operation_uuid is string
+          - layersentry_operation_uuid is match('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$')
+        fail_msg: A valid controller-issued operation UUID is required before host mutation.
+
+  roles:
+    - role: hypervisor_preflight
+    - role: hypervisor_base
+    - role: selinux
+    - role: network_bridge
+    - role: firewall
+
+  post_tasks:
+    - name: Enable and start CloudStack agent only after host security/network reconciliation
+      ansible.builtin.service:
+        name: cloudstack-agent
+        enabled: true
+        state: started
+
+    - name: Refresh package facts for installation evidence
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Verify exact requested package identities are installed
+      ansible.builtin.assert:
+        that:
+          - (item | regex_replace('-[0-9].*$', '')) in ansible_facts.packages
+        fail_msg: "Requested package identity was not observed after installation: {{ item }}"
+      loop: "{{ layersentry_hypervisor_packages }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Refresh service facts after CloudStack-agent activation
+      ansible.builtin.service_facts:
+
+    - name: Require CloudStack agent running after staged host reconciliation
+      ansible.builtin.assert:
+        that:
+          - "'cloudstack-agent.service' in ansible_facts.services"
+          - ansible_facts.services['cloudstack-agent.service'].state == 'running'
+        fail_msg: CloudStack agent failed to enter running state after network/security reconciliation.
+
+    - name: Capture managed configuration fingerprints
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        checksum_algorithm: sha256
+      loop:
+        - /etc/selinux/config
+        - /etc/libvirt/libvirtd.conf
+        - /etc/cloudstack/agent/agent.properties
+      register: layersentry_hypervisor_config_stats
+      changed_when: false
+
+    - name: Publish non-secret installation evidence facts to controller output
+      ansible.builtin.set_stats:
+        data:
+          layersentry_hypervisor_evidence:
+            operation_uuid: "{{ layersentry_operation_uuid }}"
+            release_id: "{{ layersentry_hypervisor_release_id }}"
+            host_profile: "{{ layersentry_hypervisor_profile }}"
+            cloudstack_version: "{{ layersentry_cloudstack_version }}"
+            host: "{{ inventory_hostname }}"
+            selinux_mode: "{{ ansible_facts.selinux.mode }}"
+            management_bridge: "{{ layersentry_management_bridge }}"
+            bridges: "{{ layersentry_hypervisor_bridges | map(attribute='name') | list }}"
+            firewall_zone: "{{ layersentry_hypervisor_firewall.zone }}"
+            config_fingerprints: "{{ layersentry_hypervisor_config_stats.results | map(attribute='stat') | selectattr('exists', 'defined') | list }}"
+        per_host: true
+        aggregate: false

@@ -1,0 +1,11 @@
+[Unit]
+Description=LayerSentry Single-OS maintenance scheduler
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=10m
+Unit=layersentry-maintenance.service
+
+[Install]
+WantedBy=timers.target

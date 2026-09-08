@@ -1,0 +1,38 @@
+[Unit]
+Description=LayerSentry Kubernetes browser API
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/layersentry/k8s/runtime.json
+
+[Service]
+Type=simple
+User=layersentry-k8s
+Group=layersentry-k8s
+UMask=0077
+Environment=PYTHONPATH=/usr/lib/layersentry/k8s
+Environment=LAYERSENTRY_K8S_CONFIG=/etc/layersentry/k8s/runtime.json
+RuntimeDirectory=layersentry-k8s
+RuntimeDirectoryMode=0750
+ExecStartPre=/usr/bin/python3 /usr/lib/layersentry/k8s/layersentry_k8s_controller.py --config /etc/layersentry/k8s/runtime.json check-config
+ExecStart=/usr/bin/python3 -m gunicorn --workers 2 --threads 4 --timeout 60 --graceful-timeout 30 --bind unix:/run/layersentry-k8s/bff.sock --umask 007 --access-logfile - --error-logfile - 'controller.runtime:create_application()'
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGTERM
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/lib/layersentry/k8s /run/layersentry-k8s
+ReadOnlyPaths=/etc/layersentry/k8s /run/credentials/layersentry-k8s
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,135 @@
+---
+- name: Require supported key-value immutable plan
+  ansible.builtin.assert:
+    that:
+      - layersentry_provider in ['redis', 'valkey']
+      - layersentry_request.topology == 'standalone'
+      - layersentry_repository_id == 'appstream'
+      - layersentry_resolved_version | length > 0
+      - layersentry_secrets_b64.admin_password | default('') | length > 0
+    fail_msg: Redis/Valkey Ansible execution received an unsupported or incomplete plan.
+  no_log: true
+
+- name: Read existing key-value owner marker
+  ansible.builtin.slurp:
+    src: "/var/lib/layersentryd/state/{{ layersentry_provider }}-owner"
+  register: layersentry_kv_owner
+  failed_when: false
+  changed_when: false
+
+- name: Refuse a foreign key-value service owner
+  ansible.builtin.assert:
+    that:
+      - layersentry_kv_owner.failed | default(false) or ((layersentry_kv_owner.content | b64decode | trim) == layersentry_service_id)
+    fail_msg: The selected key-value service is already owned by another LayerSentry service.
+
+- name: Persist key-value service owner before mutation
+  ansible.builtin.copy:
+    content: "{{ layersentry_service_id }}\n"
+    dest: "/var/lib/layersentryd/state/{{ layersentry_provider }}-owner"
+    owner: layersentry
+    group: layersentry
+    mode: '0600'
+
+- name: Resolve key-value provider contract
+  ansible.builtin.set_fact:
+    layersentry_kv_package: "{{ 'redis' if layersentry_provider == 'redis' else 'valkey' }}"
+    layersentry_kv_user: "{{ 'redis' if layersentry_provider == 'redis' else 'valkey' }}"
+    layersentry_kv_main_conf: "{{ '/etc/redis/redis.conf' if layersentry_provider == 'redis' else '/etc/valkey/valkey.conf' }}"
+    layersentry_kv_config_dir: "{{ '/etc/redis' if layersentry_provider == 'redis' else '/etc/valkey' }}"
+    layersentry_kv_data_root: "{{ '/var/lib/redis' if layersentry_provider == 'redis' else '/var/lib/valkey' }}"
+    layersentry_kv_external_root: "{{ layersentry_paths['database-data'] | default('') }}"
+
+- name: Derive key-value provider data paths
+  ansible.builtin.set_fact:
+    layersentry_kv_vendor_data: "{{ layersentry_kv_data_root }}/layersentry-{{ layersentry_service_id }}"
+    layersentry_kv_external_data: "{{ (layersentry_kv_external_root ~ '/data') if layersentry_kv_external_root else '' }}"
+    layersentry_kv_managed_conf: "{{ layersentry_kv_config_dir }}/layersentry-{{ layersentry_service_id }}.conf"
+
+- name: Reject customer mount root that already ends in data
+  ansible.builtin.assert:
+    that:
+      - not layersentry_kv_external_root.endswith('/data')
+    fail_msg: database-data mount must be a filesystem/LV root; LayerSentry creates its data child.
+
+- name: Install exact Redis or Valkey NEVRA
+  ansible.builtin.dnf:
+    name: "{{ layersentry_resolved_version }}"
+    state: present
+    install_weak_deps: false
+    disablerepo: '*'
+    enablerepo: "{{ layersentry_repository_id }}"
+    disable_gpg_check: false
+
+- name: Ensure provider vendor data directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_kv_vendor_data }}"
+    state: directory
+    owner: "{{ layersentry_kv_user }}"
+    group: "{{ layersentry_kv_user }}"
+    mode: '0750'
+
+- name: Ensure external key-value data directory exists
+  ansible.builtin.file:
+    path: "{{ layersentry_kv_external_data }}"
+    state: directory
+    owner: "{{ layersentry_kv_user }}"
+    group: "{{ layersentry_kv_user }}"
+    mode: '0750'
+  when: layersentry_kv_external_data | length > 0
+
+- name: Persist SELinux equivalence for external key-value root
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -a, -e, "{{ layersentry_kv_data_root }}", "{{ layersentry_kv_external_root }}"]
+  register: layersentry_kv_semanage_add
+  failed_when: false
+  changed_when: layersentry_kv_semanage_add.rc == 0
+  when:
+    - layersentry_kv_external_root | length > 0
+    - layersentry_kv_external_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Reconcile existing key-value SELinux equivalence
+  ansible.builtin.command:
+    argv: [/usr/sbin/semanage, fcontext, -m, -e, "{{ layersentry_kv_data_root }}", "{{ layersentry_kv_external_root }}"]
+  when:
+    - layersentry_kv_semanage_add is defined
+    - layersentry_kv_semanage_add.rc | default(0) != 0
+  changed_when: false
+
+- name: Apply key-value SELinux labels to external root
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -RF, "{{ layersentry_kv_external_root }}"]
+  changed_when: false
+  when:
+    - layersentry_kv_external_root | length > 0
+    - layersentry_kv_external_root is match('^/(data|srv|opt/layersentry-data)(/|$)')
+
+- name: Persist external data bind into provider-standard directory
+  layersentry_bind_mount:
+    source: "{{ layersentry_kv_external_data }}"
+    target: "{{ layersentry_kv_vendor_data }}"
+    state: present
+  when: layersentry_kv_external_data | length > 0
+
+- name: Install key-value managed configuration with SHA-256 ACL verifier
+  ansible.builtin.template:
+    src: layersentry.conf.j2
+    dest: "{{ layersentry_kv_managed_conf }}"
+    owner: root
+    group: "{{ layersentry_kv_user }}"
+    mode: '0640'
+  no_log: true
+
+- name: Ensure provider main config includes LayerSentry managed config
+  ansible.builtin.lineinfile:
+    path: "{{ layersentry_kv_main_conf }}"
+    line: "include {{ layersentry_kv_managed_conf }}"
+    insertafter: EOF
+    state: present
+    owner: root
+    mode: '0644'
+
+- name: Restore key-value configuration contexts
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -F, "{{ layersentry_kv_main_conf }}", "{{ layersentry_kv_managed_conf }}"]
+  changed_when: false

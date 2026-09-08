@@ -16,6 +16,7 @@
 // under the License.
 
 import { shallowRef, defineAsyncComponent } from 'vue'
+import { isLayersentryKvmProfile } from '@/config/productProfile'
 
 export default {
   name: 'config',
@@ -277,7 +278,9 @@ export default {
       permission: ['listGuestOsMapping'],
       columns: ['hypervisor', 'hypervisorversion', 'osdisplayname', 'osnameforhypervisor'],
       details: ['hypervisor', 'hypervisorversion', 'osdisplayname', 'osnameforhypervisor', 'isuserdefined'],
-      filters: ['all', 'kvm', 'vmware', 'xenserver', 'lxc', 'ovm3'],
+      filters: () => isLayersentryKvmProfile()
+        ? ['all', 'kvm']
+        : ['all', 'kvm', 'vmware', 'xenserver', 'lxc', 'ovm3'],
       searchFilters: ['osdisplayname', 'osnameforhypervisor', 'hypervisor', 'hypervisorversion'],
       actions: [
         {

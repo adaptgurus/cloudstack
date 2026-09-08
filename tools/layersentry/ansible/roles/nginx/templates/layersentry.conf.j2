@@ -1,0 +1,7 @@
+server {
+    listen {{ layersentry_request.network.listen_address }}:{{ layersentry_request.network.port }};
+    server_name _;
+    root {{ layersentry_app_root }};
+    location = /__layersentry_health { access_log off; return 204; }
+    location / { try_files $uri $uri/ =404; }
+}

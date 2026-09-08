@@ -263,6 +263,7 @@
 
 import { ref, reactive, toRaw } from 'vue'
 import { getAPI } from '@/api'
+import { filterProductHypervisors, isLayersentryKvmProfile } from '@/config/productProfile'
 
 export default {
   props: {
@@ -398,7 +399,7 @@ export default {
       if (this.isEdgeZone) {
         return 'KVM'
       }
-      if (this.prefillContent.hypervisor) {
+      if (this.prefillContent.hypervisor && (!isLayersentryKvmProfile() || this.prefillContent.hypervisor === 'KVM')) {
         return this.prefillContent.hypervisor
       } else if (this.hypervisors && this.hypervisors.length > 0) {
         return this.hypervisors[0].name
@@ -482,8 +483,8 @@ export default {
     },
     fetchData () {
       getAPI('listHypervisors').then(json => {
-        this.hypervisors = json.listhypervisorsresponse.hypervisor
-        if ('listSimulatorHAStateTransitions' in this.$store.getters.apis) {
+        this.hypervisors = filterProductHypervisors(json.listhypervisorsresponse.hypervisor)
+        if (!isLayersentryKvmProfile() && 'listSimulatorHAStateTransitions' in this.$store.getters.apis) {
           this.hypervisors.push({ name: 'Simulator' })
         }
         this.form.hypervisor = this.currentHypervisor

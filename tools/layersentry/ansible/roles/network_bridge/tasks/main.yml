@@ -1,0 +1,199 @@
+---
+- name: Validate hypervisor bridge intent
+  ansible.builtin.assert:
+    that:
+      - layersentry_hypervisor_bridges is sequence
+      - item.name is match('^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$')
+      - item.mode in ['validate-existing', 'manage-dedicated']
+      - item.mtu | int >= 1280
+      - item.mtu | int <= 9216
+      - item.mode != 'manage-dedicated' or item.uplink is defined
+      - item.mode != 'manage-dedicated' or item.uplink is match('^[A-Za-z0-9][A-Za-z0-9_.:-]{0,62}$')
+      - item.mode != 'manage-dedicated' or item.uplink != item.name
+      - item.mode != 'manage-dedicated' or item.uplink != (ansible_default_ipv4.interface | default(''))
+    fail_msg: Hypervisor bridge intent is invalid or attempts to enslave the active default-route interface.
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.name | default('invalid') }}"
+
+- name: Collect NetworkManager service state
+  ansible.builtin.service_facts:
+
+- name: Require NetworkManager active
+  ansible.builtin.assert:
+    that:
+      - "'NetworkManager.service' in ansible_facts.services"
+      - ansible_facts.services['NetworkManager.service'].state == 'running'
+    fail_msg: NetworkManager must be active for the LayerSentry Rocky 9 network profile.
+
+- name: Inspect requested bridge interfaces
+  ansible.builtin.stat:
+    path: "/sys/class/net/{{ item.name }}"
+  register: layersentry_bridge_stats_before
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Require validate-existing bridges to exist
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "Required pre-existing bridge is missing: {{ item.item.name }}"
+  when: item.item.mode == 'validate-existing'
+  loop: "{{ layersentry_bridge_stats_before.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Inspect dedicated bridge uplinks
+  ansible.builtin.stat:
+    path: "/sys/class/net/{{ item.uplink }}"
+  register: layersentry_bridge_uplinks
+  when: item.mode == 'manage-dedicated'
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.uplink | default('not-managed') }}"
+
+- name: Require dedicated bridge uplinks to exist
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "Dedicated LayerSentry bridge uplink is missing: {{ item.item.uplink }}"
+  when:
+    - not (item.skipped | default(false))
+  loop: "{{ layersentry_bridge_uplinks.results }}"
+  loop_control:
+    label: "{{ item.item.uplink | default('not-managed') }}"
+
+- name: Install managed bridge NetworkManager keyfiles
+  ansible.builtin.template:
+    src: bridge.nmconnection.j2
+    dest: "/etc/NetworkManager/system-connections/layersentry-bridge-{{ item.name }}.nmconnection"
+    owner: root
+    group: root
+    mode: '0600'
+  when: item.mode == 'manage-dedicated'
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install managed uplink NetworkManager keyfiles
+  ansible.builtin.template:
+    src: bridge-uplink.nmconnection.j2
+    dest: "/etc/NetworkManager/system-connections/layersentry-uplink-{{ item.uplink }}-{{ item.name }}.nmconnection"
+    owner: root
+    group: root
+    mode: '0600'
+  when: item.mode == 'manage-dedicated'
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.uplink | default('not-managed') }}"
+
+- name: Reload NetworkManager connection profiles
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/nmcli
+      - connection
+      - reload
+  changed_when: false
+  when: layersentry_hypervisor_bridges | selectattr('mode', 'equalto', 'manage-dedicated') | list | length > 0
+
+- name: Inspect managed bridge active connection
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/nmcli
+      - --terse
+      - --fields
+      - GENERAL.CONNECTION
+      - device
+      - show
+      - "{{ item.name }}"
+  register: layersentry_bridge_connections
+  failed_when: false
+  changed_when: false
+  when: item.mode == 'manage-dedicated'
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Activate managed bridge connections when needed
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/nmcli
+      - connection
+      - up
+      - "layersentry-bridge-{{ item.item.name }}"
+  when:
+    - not (item.skipped | default(false))
+    - item.rc != 0 or ('layersentry-bridge-' ~ item.item.name) not in item.stdout
+  loop: "{{ layersentry_bridge_connections.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  changed_when: true
+
+- name: Inspect managed uplink active connection
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/nmcli
+      - --terse
+      - --fields
+      - GENERAL.CONNECTION
+      - device
+      - show
+      - "{{ item.uplink }}"
+  register: layersentry_uplink_connections
+  failed_when: false
+  changed_when: false
+  when: item.mode == 'manage-dedicated'
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.uplink | default('not-managed') }}"
+
+- name: Activate managed uplink connections when needed
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/nmcli
+      - connection
+      - up
+      - "layersentry-uplink-{{ item.item.uplink }}-{{ item.item.name }}"
+  when:
+    - not (item.skipped | default(false))
+    - item.rc != 0 or ('layersentry-uplink-' ~ item.item.uplink ~ '-' ~ item.item.name) not in item.stdout
+  loop: "{{ layersentry_uplink_connections.results }}"
+  loop_control:
+    label: "{{ item.item.uplink }}"
+  changed_when: true
+
+- name: Inspect bridge interfaces after reconciliation
+  ansible.builtin.stat:
+    path: "/sys/class/net/{{ item.name }}"
+  register: layersentry_bridge_stats_after
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Require all requested bridges after reconciliation
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "Requested bridge is absent after reconciliation: {{ item.item.name }}"
+  loop: "{{ layersentry_bridge_stats_after.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Read requested bridge MTUs
+  ansible.builtin.slurp:
+    src: "/sys/class/net/{{ item.name }}/mtu"
+  register: layersentry_bridge_mtus
+  changed_when: false
+  loop: "{{ layersentry_hypervisor_bridges }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Require exact bridge MTUs
+  ansible.builtin.assert:
+    that:
+      - (item.content | b64decode | trim | int) == (item.item.mtu | int)
+    fail_msg: "Bridge MTU does not match signed intent: {{ item.item.name }}"
+  loop: "{{ layersentry_bridge_mtus.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"

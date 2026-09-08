@@ -1,0 +1,51 @@
+---
+- name: Require B1 libvirt runtime packages in signed hypervisor intent
+  ansible.builtin.assert:
+    that:
+      - (layersentry_hypervisor_packages | select('match', item.pattern) | list | length) == 1
+    fail_msg: >-
+      Signed hypervisor package intent must contain exactly one version-pinned
+      {{ item.name }} RPM identity before control-plane VM mutation.
+  loop:
+    - name: virt-install
+      pattern: '^virt-install-[0-9]'
+    - name: python3-libvirt
+      pattern: '^python3-libvirt-[0-9]'
+    - name: python3-lxml
+      pattern: '^python3-lxml-[0-9]'
+    - name: python3-pycdlib
+      pattern: '^python3-pycdlib-[0-9]'
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Collect installed package facts for B1 module prerequisites
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Require installed B1 libvirt module prerequisite packages
+  ansible.builtin.assert:
+    that:
+      - item in ansible_facts.packages
+      - ansible_facts.packages[item] | length > 0
+    fail_msg: >-
+      Required control-plane VM runtime package is not installed: {{ item }}.
+      Re-run the signed hypervisor installation before B1; do not fetch dependencies dynamically.
+  loop:
+    - virt-install
+    - python3-libvirt
+    - python3-lxml
+    - python3-pycdlib
+
+- name: Inspect virt-install executable supplied by the signed RPM set
+  ansible.builtin.stat:
+    path: /usr/bin/virt-install
+    follow: false
+  register: layersentry_virt_install_binary
+
+- name: Require usable virt-install executable before libvirt mutation
+  ansible.builtin.assert:
+    that:
+      - layersentry_virt_install_binary.stat.exists
+      - layersentry_virt_install_binary.stat.isreg | default(false)
+      - layersentry_virt_install_binary.stat.executable | default(false)
+    fail_msg: /usr/bin/virt-install is absent or not executable after signed hypervisor installation.

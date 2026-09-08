@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly PROGRAM="${0##*/}"
+readonly STATE_DIR="/var/lib/layersentry/single-os-hardening"
+readonly SSH_DROPIN="/etc/ssh/sshd_config.d/70-layersentry-single-os.conf"
+readonly SYSCTL_DROPIN="/etc/sysctl.d/70-layersentry-single-os.conf"
+readonly MGMT_ZONE="layersentry-management"
+
+usage() {
+  cat >&2 <<EOF
+usage:
+  $PROGRAM apply --management-cidr CIDR [--allow-lab-sudo-user USER]
+  $PROGRAM verify --management-cidr CIDR [--allow-lab-sudo-user USER]
+
+The lab sudo exception is only for the disposable Hyper-V acceptance VM. It is
+not a production appliance default and is reported as a verification exception.
+EOF
+}
+
+die() { echo "$PROGRAM: $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
+
+[[ $# -gt 0 ]] || { usage; exit 2; }
+action="$1"; shift
+management_cidr=""
+lab_sudo_user=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --management-cidr)
+      [[ $# -ge 2 ]] || die "--management-cidr requires a value"
+      management_cidr="$2"; shift 2 ;;
+    --allow-lab-sudo-user)
+      [[ $# -ge 2 ]] || die "--allow-lab-sudo-user requires a value"
+      lab_sudo_user="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+[[ "$action" == apply || "$action" == verify ]] || { usage; exit 2; }
+[[ -n "$management_cidr" ]] || die "--management-cidr is required so SSH is never opened globally"
+
+validate_cidr() {
+  python3 - "$management_cidr" <<'PY'
+import ipaddress, sys
+try:
+    ipaddress.ip_network(sys.argv[1], strict=False)
+except ValueError as exc:
+    raise SystemExit(f"invalid management CIDR: {exc}")
+PY
+}
+
+preflight() {
+  [[ -r /etc/os-release ]] || die "cannot identify operating system"
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  [[ "${ID:-}" == rocky && "${VERSION_ID%%.*}" == 9 ]] || die "requires Rocky Linux 9"
+  need python3
+  validate_cidr
+}
+
+write_atomic() {
+  local target="$1" mode="$2" tmp
+  tmp="$(mktemp "${target}.XXXXXX")"
+  cat >"$tmp"
+  chmod "$mode" "$tmp"
+  chown root:root "$tmp"
+  mv -fT -- "$tmp" "$target"
+}
+
+unit_exists() {
+  systemctl list-unit-files --type=service --type=socket --no-legend 2>/dev/null | awk '{print $1}' | grep -Fxq "$1"
+}
+
+apply_hardening() {
+  [[ $EUID -eq 0 ]] || die "apply requires root"
+  preflight
+  need dnf; need systemctl
+
+  # Keep the base small: install security/management prerequisites only.
+  dnf -y install firewalld audit policycoreutils openssh-server chrony python3 >/dev/null
+  need firewall-cmd; need getenforce; need setenforce; need sshd; need sysctl
+
+  # Fail closed if SELinux was disabled at boot. We never work around policy by
+  # disabling enforcement; a disabled system must be rebuilt/relabelled first.
+  if [[ "$(getenforce)" == Disabled ]]; then
+    die "SELinux is Disabled; rebuild/relabel with SELinux enabled instead of weakening the baseline"
+  fi
+  sed -ri 's/^SELINUX=.*/SELINUX=enforcing/' /etc/selinux/config
+  setenforce 1
+  [[ "$(getenforce)" == Enforcing ]] || die "failed to enforce SELinux"
+
+  install -d -m 0755 /etc/ssh/sshd_config.d /etc/sysctl.d
+  write_atomic "$SSH_DROPIN" 0644 <<'EOF'
+# LayerSentry Single-OS appliance SSH baseline.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+X11Forwarding no
+ClientAliveInterval 300
+ClientAliveCountMax 2
+EOF
+
+  write_atomic "$SYSCTL_DROPIN" 0644 <<'EOF'
+# LayerSentry Single-OS guest baseline: safe host-level protections that do not
+# encode database-specific tuning. Product providers own workload tuning.
+fs.protected_hardlinks = 1
+fs.protected_symlinks = 1
+fs.protected_fifos = 2
+fs.protected_regular = 2
+kernel.dmesg_restrict = 1
+kernel.kptr_restrict = 2
+kernel.randomize_va_space = 2
+kernel.yama.ptrace_scope = 1
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.tcp_syncookies = 1
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv6.conf.default.accept_redirects = 0
+EOF
+  sysctl --system >/dev/null
+
+  sshd -t || die "generated SSH configuration is invalid"
+
+  systemctl enable --now firewalld >/dev/null
+  if ! firewall-cmd --permanent --get-zones | tr ' ' '\n' | grep -Fxq "$MGMT_ZONE"; then
+    firewall-cmd --permanent --new-zone="$MGMT_ZONE" >/dev/null
+  fi
+  firewall-cmd --permanent --zone="$MGMT_ZONE" --set-target=DROP >/dev/null
+  firewall-cmd --permanent --zone="$MGMT_ZONE" --add-source="$management_cidr" >/dev/null
+  firewall-cmd --permanent --zone="$MGMT_ZONE" --add-service=ssh >/dev/null
+  firewall-cmd --set-default-zone=drop >/dev/null
+  firewall-cmd --reload >/dev/null
+
+  systemctl enable --now sshd chronyd >/dev/null
+  systemctl enable auditd >/dev/null
+  systemctl start auditd >/dev/null 2>&1 || true
+
+  # Services not needed by the appliance are disabled if present. We do not
+  # disable storage/network services generically because providers may need them.
+  for unit in cups.service avahi-daemon.service cockpit.socket; do
+    if unit_exists "$unit"; then
+      systemctl disable --now "$unit" >/dev/null 2>&1 || true
+    fi
+  done
+
+  if [[ -n "$lab_sudo_user" ]]; then
+    id "$lab_sudo_user" >/dev/null 2>&1 || die "lab sudo user does not exist: $lab_sudo_user"
+    [[ "$lab_sudo_user" != root ]] || die "lab sudo user must be non-root"
+    install -d -m 0750 /etc/sudoers.d
+    printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$lab_sudo_user" >"/etc/sudoers.d/90-layersentry-disposable-lab"
+    chmod 0440 /etc/sudoers.d/90-layersentry-disposable-lab
+    visudo -cf /etc/sudoers.d/90-layersentry-disposable-lab >/dev/null
+  else
+    rm -f /etc/sudoers.d/90-layersentry-disposable-lab
+  fi
+
+  install -d -o root -g root -m 0700 "$STATE_DIR"
+  {
+    printf 'applied_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'management_cidr=%s\n' "$management_cidr"
+    printf 'lab_sudo_exception=%s\n' "${lab_sudo_user:-none}"
+  } >"$STATE_DIR/last-apply"
+  chmod 0600 "$STATE_DIR/last-apply"
+
+  systemctl reload sshd
+  echo "APPLY_OK profile=layersentry-single-os-rocky9-v1 management_cidr=$management_cidr"
+}
+
+check_sysctl() {
+  local key="$1" expected="$2" actual
+  actual="$(sysctl -n "$key" 2>/dev/null || true)"
+  [[ "$actual" == "$expected" ]] || { echo "FAIL sysctl=$key expected=$expected actual=${actual:-missing}"; return 1; }
+}
+
+verify_hardening() {
+  preflight
+  need firewall-cmd; need getenforce; need systemctl; need sshd; need sysctl
+  local failures=0 effective
+
+  [[ "$(getenforce)" == Enforcing ]] || { echo "FAIL selinux_not_enforcing"; failures=1; }
+  grep -Eq '^SELINUX=enforcing$' /etc/selinux/config || { echo "FAIL selinux_persistent_config"; failures=1; }
+
+  systemctl is-active --quiet firewalld || { echo "FAIL firewalld_not_active"; failures=1; }
+  systemctl is-enabled --quiet firewalld || { echo "FAIL firewalld_not_enabled"; failures=1; }
+  [[ "$(firewall-cmd --get-default-zone 2>/dev/null)" == drop ]] || { echo "FAIL firewalld_default_zone_not_drop"; failures=1; }
+  firewall-cmd --permanent --zone="$MGMT_ZONE" --query-source="$management_cidr" >/dev/null 2>&1 || { echo "FAIL management_source_missing"; failures=1; }
+  firewall-cmd --permanent --zone="$MGMT_ZONE" --query-service=ssh >/dev/null 2>&1 || { echo "FAIL management_ssh_missing"; failures=1; }
+
+  effective="$(sshd -T 2>/dev/null)"
+  grep -Eq '^permitrootlogin no$' <<<"$effective" || { echo "FAIL ssh_root_login"; failures=1; }
+  grep -Eq '^passwordauthentication no$' <<<"$effective" || { echo "FAIL ssh_password_auth"; failures=1; }
+  grep -Eq '^kbdinteractiveauthentication no$' <<<"$effective" || { echo "FAIL ssh_kbdinteractive"; failures=1; }
+
+  for spec in \
+    'fs.protected_hardlinks 1' 'fs.protected_symlinks 1' \
+    'kernel.dmesg_restrict 1' 'kernel.kptr_restrict 2' \
+    'kernel.randomize_va_space 2' 'kernel.yama.ptrace_scope 1' \
+    'net.ipv4.conf.all.accept_redirects 0' 'net.ipv4.conf.default.accept_redirects 0' \
+    'net.ipv4.conf.all.send_redirects 0' 'net.ipv4.conf.default.send_redirects 0' \
+    'net.ipv4.tcp_syncookies 1' 'net.ipv6.conf.all.accept_redirects 0'; do
+    # shellcheck disable=SC2086
+    check_sysctl $spec || failures=1
+  done
+
+  for service in sshd firewalld chronyd; do
+    systemctl is-active --quiet "$service" || { echo "FAIL service_not_active=$service"; failures=1; }
+    systemctl is-enabled --quiet "$service" || { echo "FAIL service_not_enabled=$service"; failures=1; }
+  done
+
+  if [[ -n "$lab_sudo_user" ]]; then
+    [[ -f /etc/sudoers.d/90-layersentry-disposable-lab ]] || { echo "FAIL declared_lab_sudo_exception_missing"; failures=1; }
+    echo "WARN disposable_lab_sudo_exception=$lab_sudo_user production_certification=false"
+  elif [[ -e /etc/sudoers.d/90-layersentry-disposable-lab ]]; then
+    echo "FAIL undeclared_lab_sudo_exception_present"; failures=1
+  fi
+
+  [[ -f "$SSH_DROPIN" && ! -L "$SSH_DROPIN" ]] || { echo "FAIL ssh_dropin_missing_or_symlink"; failures=1; }
+  [[ -f "$SYSCTL_DROPIN" && ! -L "$SYSCTL_DROPIN" ]] || { echo "FAIL sysctl_dropin_missing_or_symlink"; failures=1; }
+  [[ "$(stat -c '%U:%G:%a' "$SSH_DROPIN" 2>/dev/null)" == root:root:644 ]] || { echo "FAIL ssh_dropin_permissions"; failures=1; }
+  [[ "$(stat -c '%U:%G:%a' "$SYSCTL_DROPIN" 2>/dev/null)" == root:root:644 ]] || { echo "FAIL sysctl_dropin_permissions"; failures=1; }
+
+  if [[ $failures -ne 0 ]]; then
+    die "hardening verification failed"
+  fi
+  echo "VERIFY_OK profile=layersentry-single-os-rocky9-v1 management_cidr=$management_cidr"
+}
+
+case "$action" in
+  apply) apply_hardening ;;
+  verify) verify_hardening ;;
+esac

@@ -1,0 +1,52 @@
+---
+- name: Import repository signing keys
+  ansible.builtin.rpm_key:
+    key: "{{ item.gpgkey }}"
+    fingerprint: "{{ item.gpg_fingerprint }}"
+    state: present
+  loop: "{{ layersentry_hypervisor_repositories }}"
+  loop_control:
+    label: "{{ item.id }}"
+
+- name: Configure immutable LayerSentry release repositories
+  ansible.builtin.yum_repository:
+    name: "{{ item.id }}"
+    description: "LayerSentry managed repository {{ item.id }}"
+    baseurl: "{{ item.baseurl }}"
+    enabled: true
+    gpgcheck: true
+    repo_gpgcheck: true
+    gpgkey: "{{ item.gpgkey }}"
+    sslverify: true
+    metadata_expire: -1
+    state: present
+  loop: "{{ layersentry_hypervisor_repositories }}"
+  loop_control:
+    label: "{{ item.id }}"
+
+- name: Install exact hypervisor release package identities
+  ansible.builtin.dnf:
+    name: "{{ layersentry_hypervisor_packages }}"
+    state: present
+    update_only: false
+    allow_downgrade: false
+    disable_gpg_check: false
+
+- name: Ensure libvirt service is enabled and running
+  ansible.builtin.service:
+    name: libvirtd
+    enabled: true
+    state: started
+
+- name: Refresh service state for post-install evidence
+  ansible.builtin.service_facts:
+
+- name: Verify base services and security before network mutation
+  ansible.builtin.assert:
+    that:
+      - "'libvirtd.service' in ansible_facts.services"
+      - ansible_facts.services['libvirtd.service'].state == 'running'
+      - "'firewalld.service' in ansible_facts.services"
+      - ansible_facts.services['firewalld.service'].state == 'running'
+      - ansible_facts.selinux.mode == 'enforcing'
+    fail_msg: Hypervisor base installation did not satisfy the pre-network security/service gate.

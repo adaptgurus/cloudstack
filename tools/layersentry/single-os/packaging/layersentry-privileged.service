@@ -1,0 +1,33 @@
+[Unit]
+Description=LayerSentry Single-OS privileged execution helper
+After=local-fs.target firewalld.service
+Before=layersentryd.service layersentry-maintenance.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/layersentryd privileged-helper
+Restart=on-failure
+RestartSec=3s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+# DNF/RPM legitimately mutate /usr, /etc and provider-owned system paths. Do not
+# use ProtectSystem=full/strict or an unproven capability bounding set here and
+# then weaken it ad hoc. The reviewed typed helper protocol is the mutation
+# boundary; the unprivileged API process retains the stronger filesystem sandbox.
+ProtectSystem=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

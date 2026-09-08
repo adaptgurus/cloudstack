@@ -1,0 +1,26 @@
+---
+- name: Refuse destructive MySQL-family uninstall through normal lifecycle
+  ansible.builtin.assert:
+    that:
+      - not (layersentry_destroy_data | default(false) | bool)
+    fail_msg: Database data destruction requires a separately reviewed operation.
+
+- name: Remove LayerSentry MySQL-family configuration
+  ansible.builtin.file:
+    path: "/etc/my.cnf.d/99-layersentry-{{ layersentry_provider }}.cnf"
+    state: absent
+
+- name: Remove service-owned TLS material
+  ansible.builtin.file:
+    path: "/var/lib/mysql/layersentry-{{ layersentry_service_id }}"
+    state: absent
+
+- name: Remove legacy MySQL-family ownership marker if present
+  ansible.builtin.file:
+    path: /var/lib/layersentryd/state/mysql-family-owner
+    state: absent
+
+- name: Remove MySQL-family server package while preserving data roots
+  ansible.builtin.dnf:
+    name: "{{ 'mysql-server' if layersentry_provider == 'mysql' else 'mariadb-server' }}"
+    state: absent
