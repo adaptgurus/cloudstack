@@ -130,3 +130,17 @@ class QualificationTest(unittest.TestCase):
         self.assertNotIn('deployVirtualMachine',actor.capabilities)
         with patch.object(Client,'call',return_value={'project':[]}):
             with self.assertRaises(AuthenticationError):q.operator_actor(Client())
+
+    def test_explicit_release_revision_preserves_request_and_audit(self):
+        self.build();old=deepcopy(self.context)
+        self.release.write_text(json.dumps(MANIFEST,indent=2))
+        self.context['releaseSha256']=hashlib.sha256(self.release.read_bytes()).hexdigest()
+        self.path.write_text(json.dumps(self.context))
+        q=FirstClusterQualification(self.path,self.release,self.store,previous_context=old)
+        q.validate_request(self.request)
+        with self.store._connect() as connection:
+            self.assertEqual(connection.execute('SELECT count(*) FROM qualification_revisions').fetchone()[0],1)
+        old=deepcopy(self.context);self.context['idempotencyKey']='changed-idempotency-key'
+        self.path.write_text(json.dumps(self.context))
+        with self.assertRaises(InvalidRequestError):
+            FirstClusterQualification(self.path,self.release,self.store,previous_context=old)

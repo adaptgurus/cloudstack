@@ -30,6 +30,8 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("check-config")
     subparsers.add_parser("retire-qualification")
+    revise = subparsers.add_parser("revise-qualification-release")
+    revise.add_argument("--previous-context", required=True)
     create = subparsers.add_parser("qualify-create")
     create.add_argument("--request", required=True)
     reconcile = subparsers.add_parser("reconcile")
@@ -49,6 +51,17 @@ def main() -> int:
                 "blockers": list(contract.readiness.blockers),
             }, sort_keys=True))
             return 0 if contract.readiness.deployable else 2
+        if args.command == "revise-qualification-release":
+            from pathlib import Path
+            from controller.qualification import FirstClusterQualification
+            from controller.store import SagaStore
+            config = load_runtime_config(args.config)
+            if config.qualification_path is None:
+                raise InvalidRequestError("qualification context is required")
+            FirstClusterQualification(config.qualification_path, config.release_manifest,
+                SagaStore(config.state_database), previous_context=json.loads(Path(args.previous_context).read_text()))
+            print(json.dumps({"status": "QUALIFICATION_RELEASE_REVISED", "requestChanged": False}))
+            return 0
         if args.command == "retire-qualification":
             from controller.store import SagaStore
             config = load_runtime_config(args.config)

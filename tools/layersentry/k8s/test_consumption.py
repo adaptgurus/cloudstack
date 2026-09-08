@@ -102,8 +102,10 @@ class ConsumptionTests(unittest.TestCase):
         cp=next(x['spec'] for x in docs if x['kind']=='RKE2ControlPlane')
         worker=next(x['spec']['template']['spec'] for x in docs if x['kind']=='RKE2ConfigTemplate')
         for spec in (cp,worker):
-            self.assertIs(spec['airGapped'],True)
-            self.assertEqual(spec['airGappedChecksum'],LOCK['rke2Artifacts']['assets'][0]['sha256'])
+            self.assertIs(spec['agentConfig']['airGapped'],True)
+            self.assertEqual(spec['agentConfig']['airGappedChecksum'],LOCK['rke2Artifacts']['assets'][0]['sha256'])
+            self.assertNotIn('airGapped',spec)
+            self.assertNotIn('airGappedChecksum',spec)
             command=spec['preRKE2Commands'][0]
             self.assertNotIn('get.rke2.io',command);self.assertNotIn('latest',command)
             for item in LOCK['rke2Artifacts']['assets']:
@@ -118,7 +120,7 @@ class ConsumptionTests(unittest.TestCase):
     def test_ordinary_project_unchanged_and_wrong_cni_rejected(self):
         docs=build_cluster_resources(request(),resolved())
         cp=next(x['spec'] for x in docs if x['kind']=='RKE2ControlPlane')
-        self.assertFalse(cp['airGapped']);self.assertNotIn('preRKE2Commands',cp)
+        self.assertFalse(cp['agentConfig']['airGapped']);self.assertNotIn('preRKE2Commands',cp)
         self.assertEqual(cp['serverConfig']['cni'],'cilium')
         with self.assertRaisesRegex(InvalidRequestError,'CNI'):
             build_cluster_resources(request(project_id=LOCK['projectId']),resolved(project_id=LOCK['projectId'],control_plane_template_id=LOCK['template']['id'],worker_template_ids={'workers':LOCK['template']['id']}))

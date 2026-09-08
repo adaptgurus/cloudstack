@@ -38,7 +38,7 @@ def fingerprint(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 class FirstClusterQualification:
-    def __init__(self, path, release_path, store):
+    def __init__(self, path, release_path, store, *, previous_context=None):
         self.path = Path(path)
         self.release_path = Path(release_path)
         if (not self.path.is_absolute() or self.path.is_symlink() or not self.path.is_file()
@@ -57,6 +57,12 @@ class FirstClusterQualification:
             raise InvalidRequestError("qualification digest invalid")
         self.store = store
         self.check()
+        if previous_context is not None:
+            old = dict(previous_context); new = dict(self.context)
+            old.pop("releaseSha256", None); new.pop("releaseSha256", None)
+            if old != new:
+                raise InvalidRequestError("qualification revision may only change release identity")
+            self.store.revise_qualification_release(fingerprint(previous_context), fingerprint(self.context))
         self.store.bind_qualification(fingerprint(self.context))
 
     def check(self):

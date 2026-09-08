@@ -56,6 +56,16 @@ class SagaStore:
                 raise ConflictError("qualification journal is bound or retired")
             connection.commit()
 
+    def revise_qualification_release(self, previous, current):
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            changed = connection.execute("UPDATE qualification_binding SET identity=? WHERE id=1 AND identity=? AND retired=0", (current, previous)).rowcount
+            if changed != 1:
+                raise ConflictError("qualification revision does not match active journal")
+            connection.execute("CREATE TABLE IF NOT EXISTS qualification_revisions (previous TEXT, current TEXT, observed_at TEXT)")
+            connection.execute("INSERT INTO qualification_revisions VALUES (?,?,?)", (previous, current, _now()))
+            connection.commit()
+
     def retire_qualification(self):
         with self._connect() as connection:
             connection.execute("UPDATE qualification_binding SET retired=1 WHERE id=1")

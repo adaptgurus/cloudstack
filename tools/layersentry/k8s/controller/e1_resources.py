@@ -123,8 +123,8 @@ def qualification_bootstrap(lock):
         "mv -T \"$tmp/99-layersentry-qualification.yaml\" /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml",
     ]
     script = "\n".join(commands)
-    return {"airGapped": True,
-            "airGappedChecksum": assets["assets"][0]["sha256"],
+    return {"agentConfig": {"airGapped": True,
+            "airGappedChecksum": assets["assets"][0]["sha256"]},
             # Exit the surrounding cloud-init runcmd script too, not merely a child.
             "preRKE2Commands": ["sh -eu -c " + shlex.quote(script) + " || exit 1"],
             "privateRegistriesConfig": {"mirrors": {
@@ -208,9 +208,10 @@ def build_cluster_resources(
                 "registrationMethod": "control-plane-endpoint",
                 "rolloutStrategy": {"type": "RollingUpdate", "rollingUpdate": {"maxSurge": 1}},
                 "gzipUserData": False,
-                "airGapped": request.air_gapped,
                 **bootstrap,
                 "agentConfig": {
+                    "airGapped": request.air_gapped,
+                    **bootstrap.get("agentConfig", {}),
                     "nodeName": "{{ ds.meta_data.local_hostname }}",
                     "kubelet": {"extraArgs": ["provider-id=cloudstack:///{{ ds.meta_data.instance_id }}"]},
                     "enableContainerdSElinux": True,
@@ -269,9 +270,10 @@ def build_cluster_resources(
                 "metadata": _metadata(bootstrap_name, resolved),
                 "spec": {"template": {"spec": {
                     "gzipUserData": False,
-                    "airGapped": request.air_gapped,
-                    **bootstrap,
+                        **bootstrap,
                     "agentConfig": {
+                    "airGapped": request.air_gapped,
+                    **bootstrap.get("agentConfig", {}),
                         "nodeName": "{{ ds.meta_data.local_hostname }}",
                         "kubelet": {"extraArgs": ["provider-id=cloudstack:///{{ ds.meta_data.instance_id }}"]},
                         "enableContainerdSElinux": True,
