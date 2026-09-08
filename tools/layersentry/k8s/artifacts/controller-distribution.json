@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "sourceCommit": "6f36134574fabdb24ba00ab0c3604d217af6409b",
+  "sourceCommit": "765f29fdc030a33ed4e647b7589c3f04d9969374",
   "distribution": "systemd-filesystem",
   "files": [
     {
@@ -37,7 +37,7 @@
       "path": "controller/components.py",
       "installedPath": "/usr/lib/layersentry/k8s/controller/components.py",
       "mode": "0644",
-      "sha256": "6f1781f53573e3276982c8d2a0c3acb990c848864bbef3e6dc4ba624eaaba5ac"
+      "sha256": "e49002ccd26fee821cc04391aae46ea00d4906540acdd28e5a640351e1346c68"
     },
     {
       "path": "controller/e1_executor.py",
@@ -118,10 +118,10 @@
       "sha256": "040aaf2d3450c03d88d942e338d8bdfd837a4f077bb73bcb4126c618b70eea4a"
     }
   ],
-  "treeSha256": "cd0af9a690220025b1e4e198793270738776e4e6a07850f238038391d0afe25c",
+  "treeSha256": "b874fd41f4a47e7a8efe7e1c5c04b76018219e387dcd2a56149146ae766f3efd",
   "runtimeDependencyLock": {
     "path": "tools/layersentry/k8s/artifacts/runtime-dependencies.json",
-    "sha256": "85419098568f1bceeb3f7ef2d02388840fceda55b2a3f9ef72ede6526d9198e3"
+    "sha256": "9abf753b875501ea4e970d0ccc5fc8b9e6558ad10cc46da48baffa0cab177bf3"
   },
   "runtimeIdentity": {},
   "releaseMetadata": "Install the release manifest and referenced artifact locks from the exact release commit separately; never copy runtime credentials from Git."
