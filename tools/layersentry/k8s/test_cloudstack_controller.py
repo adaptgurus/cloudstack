@@ -16,6 +16,13 @@
 # limitations under the License.
 
 import json
+import base64
+import hashlib
+import hmac
+import ssl
+import urllib.error
+from dataclasses import replace
+from unittest.mock import patch
 import os
 import tempfile
 import unittest
@@ -60,10 +67,13 @@ class RecordingOpener:
 
 class InventoryClient:
     def __init__(self, rules=None):
-        self.rules = rules or [
+        self.rules = rules if rules is not None else [
             {"id": "lb-6443", "publicport": "6443", "networkid": "network-1", "state": "Active"},
             {"id": "lb-9345", "publicport": "9345", "networkid": "network-1", "state": "Active"},
         ]
+
+        self.rules = [{"projectid": "project-1", "publicipid": "public-ip-1", "protocol": "tcp",
+                       "privateport": rule["publicport"], **rule} for rule in self.rules]
 
     def call(self, command, params):
         resource_id = params.get("id")
@@ -73,19 +83,19 @@ class InventoryClient:
             return {"zone": [{"id": resource_id, "name": "site-one", "allocationstate": "Enabled"}]}
         if command == "listNetworks":
             return {"network": [{
-                "id": resource_id, "name": "network-one", "zoneid": "zone-1", "state": "Implemented",
+                "id": resource_id, "name": "network-one", "zoneid": "zone-1", "state": "Implemented", "projectid": params.get("projectid"),
             }]}
         if command == "listServiceOfferings":
             return {"serviceoffering": [{"id": resource_id, "name": "compute", "issystem": False}]}
         if command == "listTemplates":
-            return {"template": [{"id": resource_id, "name": "rke2", "isready": True, "hypervisor": "KVM"}]}
+            return {"template": [{"id": resource_id, "name": "rke2", "isready": True, "hypervisor": "KVM", "zoneid": "zone-1"}]}
         if command == "listPublicIpAddresses":
             return {"publicipaddress": [{
                 "id": resource_id, "ipaddress": "192.0.2.10", "projectid": params.get("projectid"),
-                "zoneid": "zone-1", "state": "Allocated",
+                "zoneid": "zone-1", "state": "Allocated", "associatednetworkid": "network-1",
             }]}
         if command == "listLoadBalancerRules":
-            return {"loadbalancerrule": self.rules}
+            return {"loadbalancerrule": self.rules, "count": len(self.rules)}
         raise AssertionError(command)
 
 
@@ -189,6 +199,135 @@ class CloudStackControllerTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(InvalidRequestError, "namespace prefix"):
             CloudStackResolver(InventoryClient(), bad).resolve_cluster(request())
+
+    def test_reserved_params_cannot_override_read_only_command(self):
+        client = CloudStackClient(self.credential_config())
+        for params in ({"command": "deployVirtualMachine"}, {"Command": "deployVirtualMachine"},
+                       {"apikey": "stolen"}, {"signatureversion": "1"}, {"expires": "never"},
+                       {"response": "xml"}, {"id": {"nested": "object"}}):
+            with self.subTest(params=params), self.assertRaises(InvalidRequestError):
+                client._signed_query("listZones", params)
+        for command in ("deployVirtualMachine", "destroyVirtualMachine", "createKubernetesCluster"):
+            with self.assertRaises(InvalidRequestError):
+                client._signed_query(command, {})
+
+    def test_hmac_signature_matches_cloudstack_canonical_form(self):
+        client = CloudStackClient(self.credential_config(), lambda: datetime(2026, 9, 6, tzinfo=timezone.utc))
+        actual = urllib.parse.parse_qs(client._signed_query("listZones", {"id": "A B+"}))
+        signature = actual.pop("signature")[0]
+        canonical = "&".join(f"{key}={urllib.parse.quote(actual[key][0], safe='')}" for key in sorted(actual)).lower()
+        expected = base64.b64encode(hmac.new(b"secret-key", canonical.encode(), hashlib.sha1).digest()).decode()
+        self.assertEqual(signature, expected)
+
+    def test_tls_http_timeout_and_redirect_policy(self):
+        config = self.credential_config()
+        for config_bad in (replace(config, endpoint="http://cloud.example/client/api"),
+                           replace(config, timeout_seconds=0), replace(config, timeout_seconds=True),
+                           replace(config, endpoint="https://cloud.example:invalid/client/api")):
+            with self.assertRaises(InvalidRequestError):
+                CloudStackClient(config_bad)
+        CloudStackClient(replace(config, endpoint="http://cloud.example/client/api", allow_insecure_http=True))
+        client = CloudStackClient(config)
+        handler = next(item for item in client.opener.handlers if isinstance(item, __import__('urllib.request').request.HTTPSHandler))
+        self.assertEqual(handler._context.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(handler._context.check_hostname)
+        from controller.cloudstack import _NoRedirect
+        self.assertIsNone(_NoRedirect().redirect_request(None, None, 302, None, None, "https://evil.example"))
+        with patch("controller.cloudstack.ssl.create_default_context", wraps=ssl.create_default_context) as create:
+            CloudStackClient(config)
+            create.assert_called_once_with(cafile=None)
+
+    def test_credential_rotation_rechecks_mode_and_rejects_symlink(self):
+        config = self.credential_config()
+        client = CloudStackClient(config)
+        config.secret_key_file.chmod(0o644)
+        with self.assertRaisesRegex(InvalidRequestError, "0600"):
+            client._signed_query("listZones", {})
+        config.secret_key_file.chmod(0o600)
+        config.api_key_file.unlink()
+        config.api_key_file.symlink_to(config.secret_key_file)
+        with self.assertRaises(InvalidRequestError):
+            client._signed_query("listZones", {})
+
+    def test_transport_failures_are_bounded_and_sanitized(self):
+        client = CloudStackClient(self.credential_config())
+        for raw in (b"[]", b"null", b"{", b"x" * (4 * 1024 * 1024 + 1),
+                    b'{"listzonesresponse":{},"listzonesresponse":{}}',
+                    b'{"errorresponse":{"errorcode":"secret-key","errortext":"api-key"}}',
+                    b'{"listzonesresponse":{"errorcode":401,"errortext":"secret-key"}}'):
+            with self.subTest(raw=raw[:40]):
+                response = FakeResponse({})
+                response.payload = raw
+                with patch.object(client.opener, "open", return_value=response):
+                    with self.assertRaises(InvalidRequestError) as caught:
+                        client.call("listZones")
+                self.assertNotIn("secret-key", str(caught.exception))
+                self.assertNotIn("api-key", str(caught.exception))
+        with patch.object(client.opener, "open", side_effect=urllib.error.URLError("secret-key")):
+            with self.assertRaises(InvalidRequestError) as caught:
+                client.call("listZones")
+            self.assertTrue(caught.exception.__suppress_context__)
+            self.assertIsNone(caught.exception.__cause__)
+
+    def test_resolver_rejects_unhealthy_and_foreign_resources(self):
+        for command, collection, changes in (
+            ("listProjects", "project", {"state": "Disabled"}),
+            ("listZones", "zone", {"allocationstate": "Disabled"}),
+            ("listNetworks", "network", {"projectid": "foreign"}),
+            ("listNetworks", "network", {"zoneid": "foreign"}),
+            ("listNetworks", "network", {"state": "Allocated"}),
+            ("listServiceOfferings", "serviceoffering", {"issystem": True}),
+            ("listTemplates", "template", {"hypervisor": "VMware"}),
+            ("listTemplates", "template", {"zoneid": "foreign"}),
+            ("listPublicIpAddresses", "publicipaddress", {"associatednetworkid": "foreign"}),
+            ("listPublicIpAddresses", "publicipaddress", {"zoneid": "foreign"}),
+        ):
+            class Bad(InventoryClient):
+                def call(self, cmd, params):
+                    result = super().call(cmd, params)
+                    if cmd == command:
+                        result[collection][0].update(changes)
+                    return result
+            with self.subTest(command=command, changes=changes), self.assertRaises(InvalidRequestError):
+                CloudStackResolver(Bad(), profile()).resolve_cluster(request())
+
+    def test_endpoint_requires_both_active_ports_and_exact_scope(self):
+        for port in ("6443", "9345"):
+            for change in ({"state": "Add"}, {"privateport": "443"}, {"protocol": "udp"}):
+                client = InventoryClient()
+                next(rule for rule in client.rules if rule["publicport"] == port).update(change)
+                resolver = CloudStackResolver(client, profile())
+                self.assertFalse(resolver.verify_endpoints(resolver.resolve_cluster(request()))["endpoint" + port])
+            client = InventoryClient()
+            client.rules = [rule for rule in client.rules if rule["publicport"] != port]
+            resolver = CloudStackResolver(client, profile())
+            self.assertFalse(resolver.verify_endpoints(resolver.resolve_cluster(request()))["endpoint" + port])
+            client.rules.append(dict(client.rules[0], id="duplicate"))
+            with self.assertRaisesRegex(InvalidRequestError, "ambiguous"):
+                resolver.verify_endpoints(resolver.resolve_cluster(request()))
+        for field in ("projectid", "networkid", "publicipid"):
+            client = InventoryClient()
+            client.rules[0][field] = "foreign"
+            resolver = CloudStackResolver(client, profile())
+            with self.assertRaisesRegex(InvalidRequestError, "scope"):
+                resolver.verify_endpoints(resolver.resolve_cluster(request()))
+
+    def test_exact_vm_observation_is_scoped_and_does_not_return_secrets(self):
+        client = InventoryClient()
+        resolver = CloudStackResolver(client, profile())
+        resolved = resolver.resolve_cluster(request())
+        vm = {"id": "vm-1", "projectid": "project-1", "zoneid": "zone-1", "state": "Running", "password": "synthetic"}
+        with patch.object(client, "call", return_value={"virtualmachine": [vm], "count": 1}):
+            self.assertEqual(resolver.observe_vm("vm-1", resolved), {"id": "vm-1", "state": "Running"})
+            vm["projectid"] = "foreign"
+            with self.assertRaisesRegex(InvalidRequestError, "scope"):
+                resolver.observe_vm("vm-1", resolved)
+            vm["projectid"] = "project-1"
+            vm["id"] = "different"
+            with self.assertRaisesRegex(InvalidRequestError, "ambiguous"):
+                resolver.observe_vm("vm-1", resolved)
+        with patch.object(client, "call", return_value={"count": 0}):
+            self.assertEqual(resolver.observe_vm("vm-1", resolved)["state"], "ABSENT")
 
     def test_credentials_with_broad_permissions_are_rejected(self):
         config = self.credential_config()
