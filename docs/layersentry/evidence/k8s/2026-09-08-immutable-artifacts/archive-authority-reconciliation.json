@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "status": "SOURCE_VERIFIED",
+  "release": "v1.36.4+rke2r1",
+  "archiveSha256": "03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb",
+  "verification": {
+    "freshOfficialChecksumFileVerified": true,
+    "binaryAndArchiveEntriesVerified": true,
+    "cachedArchiveBytesRehashed": true,
+    "blobHashesVerified": 124,
+    "requiredLinuxAmd64ImageClosuresVerified": 16,
+    "dockerLegacyAndOciIdentitiesAgree": true
+  },
+  "authority": "Official checksum-verified release archive; public registry observations are non-authoritative for this air-gapped qualification lane.",
+  "historicalEvidenceRetained": true,
+  "controllerRuntimeBlocker": "Controller acceptance host identity not supplied",
+  "observationCommand": "/usr/bin/python3 -I -B collect-runtime-host.py --dedicated-controller-host",
+  "observationScript": "tools/layersentry/k8s/artifacts/collect-runtime-host.py",
+  "collectorExecutedOnHost": false,
+  "liveMutationPerformed": false,
+  "liveQualificationFlagsChanged": false
+}

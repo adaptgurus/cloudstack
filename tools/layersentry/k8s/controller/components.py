@@ -199,16 +199,35 @@ def _rke2_consumption(manifest, blockers, artifact_root):
         assets = rke2_artifacts(qualification_template(manifest, artifact_root))
         proof = read_artifact_lock(assets.get("imageProof"),
             "tools/layersentry/k8s/artifacts/rke2-image-proof.json", artifact_root)
+        release = proof.get("releaseArchiveIdentity", {})
         rows = proof.get("images")
-        if (proof.get("archiveSha256") != _RKE2_HASHES["rke2-images.linux-amd64.tar.zst"]
+        required = assets.get("requiredImages")
+        if (proof.get("status") != "PASS"
+                or proof.get("qualificationSource") != "official-rke2-release-archive"
+                or release.get("sha256") != _RKE2_HASHES["rke2-images.linux-amd64.tar.zst"]
+                or release.get("checksumFileSha256") != _RKE2_HASHES["sha256sum-amd64.txt"]
+                or release.get("binarySha256") != _RKE2_HASHES["rke2.linux-amd64.tar.gz"]
+                or release.get("url") != assets["assets"][2]["url"]
+                or release.get("version") != assets["version"]
+                or release.get("architecture") != assets["architecture"]
+                or proof.get("blobIntegrity", {}).get("allBlobHashesVerified") is not True
+                or proof.get("blobIntegrity", {}).get("requiredAmd64ClosuresVerified") is not True
+                or not isinstance(required, list) or len(required) != 16 or len(set(required)) != 16
                 or not isinstance(rows, list) or len(rows) != 16
-                or len({row["image"] for row in rows}) != 16
-                or any(row.get("expected") != row.get("archive")
-                       or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(row.get("expected", "")))
-                       for row in rows)):
-            raise InvalidRequestError("RKE2 archive image identity mismatch")
+                or {row["reference"] for row in rows} != set(required)):
+            raise InvalidRequestError("RKE2 release archive proof invalid")
+        for row in rows:
+            identity = row["archiveContainedImageIdentity"]
+            digests = [identity["indexDigest"], identity["manifestDigest"], identity["configDigest"]]
+            layers = identity.get("layerDigests")
+            if (identity.get("platform") != "linux/amd64" or not isinstance(layers, list) or not layers
+                    or any(not isinstance(d, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", d)
+                           for d in digests + layers)):
+                raise InvalidRequestError("RKE2 archive-contained identity invalid")
+        # Registry tags are observations only. The checksum-verified release archive
+        # and its verified linux/amd64 descriptor closures own air-gap consumption.
     except (InvalidRequestError, OSError, ValueError, TypeError, KeyError, AttributeError):
-        blockers.append("RKE2 archive consumption identity is unresolved or mismatched")
+        blockers.append("RKE2 release archive consumption proof is invalid")
 
 
 def _controller_distribution(manifest, blockers, artifact_root):
@@ -266,6 +285,9 @@ def _controller_distribution(manifest, blockers, artifact_root):
     try:
         runtime = read_artifact_lock(receipt.get("runtimeDependencyLock"),
             "tools/layersentry/k8s/artifacts/runtime-dependencies.json", root)
+        if runtime.get("acceptanceHostSupplied") is False:
+            blockers.append("Controller acceptance host identity not supplied")
+            return
         identity = receipt.get("runtimeIdentity", {})
         python, gunicorn = runtime.get("python", {}), runtime.get("gunicorn", {})
         if (runtime.get("status") != "PINNED" or runtime.get("architecture") != "x86_64"

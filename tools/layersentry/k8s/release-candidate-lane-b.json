@@ -45,9 +45,9 @@
   },
   "fluxCatalog": {
     "repository": "https://github.com/adaptgurus/layersentry-flux-catalog.git",
-    "commit": "8bc33753011555553736bfb73f281cf917bb5842",
+    "commit": "7b0aa81eacda8043090ea945c98bf87ac3b205cc",
     "contentDigestVerified": true,
-    "contentSha256": "5159e45a47ada5712b313973fda057f8c86f87e18a8ae3093541bb6810efbaa4"
+    "contentSha256": "cc0948a731142a37b5fc3ec599dec0c511d28f1a0974bdda3c78e20ff6008a81"
   },
   "architecture": {
     "infrastructureOwner": "CloudStack",
@@ -87,7 +87,7 @@
   ],
   "qualificationArtifactLock": {
     "path": "tools/layersentry/k8s/artifacts/qualification-lock.json",
-    "sha256": "d26f9bdfa62879cb7a46763beec7f8a7edcd8947d4161fa80ac723c1a8c276b4"
+    "sha256": "d687dc7990e6cc1c73b827d006591f75de7435eac9961ae2afa41a91e637a07f"
   },
   "managementArtifactLock": {
     "path": "tools/layersentry/k8s/artifacts/management-lock.json",

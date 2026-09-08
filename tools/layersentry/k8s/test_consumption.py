@@ -138,8 +138,8 @@ class ConsumptionTests(unittest.TestCase):
             self.assertNotEqual(result.returncode,0);self.assertTrue((root/'curl-called').exists());self.assertFalse((root/'continued').exists())
             self.assertFalse((root/'opt/install.sh').exists())
 
-    def test_real_archive_mismatch_remains_explicit_blocker(self):
-        self.assertIn('RKE2 archive consumption identity is unresolved or mismatched',evaluate_component_readiness(MANIFEST).blockers)
+    def test_verified_release_archive_divergence_is_not_a_blocker(self):
+        self.assertNotIn('RKE2 release archive consumption proof is invalid',evaluate_component_readiness(MANIFEST).blockers)
         self.assertTrue(all(v is False for v in MANIFEST['hardGates'].values()))
 
     def test_candidate_rollout_is_a_plan_not_an_applied_identity_pin(self):

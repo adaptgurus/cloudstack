@@ -85,7 +85,7 @@ class ComponentReadinessTest(unittest.TestCase):
             candidate["hardGates"][gate] = True
         result = evaluate_component_readiness(candidate)
         self.assertFalse(result.deployable)
-        self.assertIn("RKE2 archive consumption identity is unresolved or mismatched", result.blockers)
+        self.assertTrue(any("Controller" in b for b in result.blockers))
         with self.assertRaises(InvalidRequestError):
             result.require_deployable()
 

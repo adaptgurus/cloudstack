@@ -38,7 +38,25 @@
     ],
     "imageProof": {
       "path": "tools/layersentry/k8s/artifacts/rke2-image-proof.json",
-      "sha256": "e76c5315b65a8c94e6e9761b97652c9a305beaba1bf8e07eb8dee12b27cce1d4"
-    }
+      "sha256": "46842d7101b7665ceed1fba4821e53dfdad1213fa470c3a30fabd2281a89939c"
+    },
+    "requiredImages": [
+      "docker.io/rancher/hardened-addon-resizer:1.8.23-build20260819",
+      "docker.io/rancher/hardened-calico:v3.32.1-build20260827",
+      "docker.io/rancher/hardened-cluster-autoscaler:v1.10.3-build20260819",
+      "docker.io/rancher/hardened-coredns:v1.14.7-build20260819",
+      "docker.io/rancher/hardened-dns-node-cache:1.26.8-build20260819",
+      "docker.io/rancher/hardened-etcd:v3.6.14-k3s1-build20260819",
+      "docker.io/rancher/hardened-flannel:v0.28.9-build20260819",
+      "docker.io/rancher/hardened-k8s-metrics-server:v0.9.0-build20260819",
+      "docker.io/rancher/hardened-kubernetes:v1.36.4-rke2r1-build20260821",
+      "docker.io/rancher/hardened-snapshot-controller:v8.6.0-build20260819",
+      "docker.io/rancher/hardened-traefik:v3.7.11-build20260819",
+      "docker.io/rancher/klipper-helm:v0.13.3-build20260820",
+      "docker.io/rancher/klipper-lb:v0.4.17",
+      "docker.io/rancher/mirrored-pause:3.10.2",
+      "docker.io/rancher/rke2-cloud-provider:v1.36.4-0.20260817193921-a2fc9574e060-build20260820",
+      "docker.io/rancher/rke2-runtime:v1.36.4-rke2r1"
+    ]
   }
 }

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "status": "BLOCKED",
-  "reason": "Intended Rocky/systemd deployment host not identified; Python and Gunicorn installed package identities cannot be measured. No package or deployment platform invented.",
+  "reason": "Controller acceptance host identity not supplied",
   "architecture": "x86_64",
   "os": null,
   "python": null,
@@ -39,5 +39,22 @@
     "nonStdlibProductImports": [],
     "systemdExternalModule": "gunicorn",
     "gunicornTransitiveDependencies": "UNKNOWN until exact installed package is selected and audited"
+  },
+  "acceptanceHostSupplied": false,
+  "acceptanceHostContract": {
+    "osFamily": "Rocky Linux",
+    "osMajor": 9,
+    "architecture": "x86_64",
+    "role": "dedicated LayerSentry management/controller host",
+    "prohibitedRoles": [
+      "CloudStack KVM hypervisor",
+      "RKE2 workload node",
+      "WSL development environment",
+      "Docker build runner",
+      "kind node"
+    ],
+    "prohibitedHostAddresses": [
+      "10.10.10.14"
+    ]
   }
 }

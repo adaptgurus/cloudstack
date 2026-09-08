@@ -1,140 +1,309 @@
 {
   "schemaVersion": "1.0",
-  "archiveSha256": "03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb",
+  "status": "PASS",
+  "qualificationSource": "official-rke2-release-archive",
+  "releaseArchiveIdentity": {
+    "version": "v1.36.4+rke2r1",
+    "architecture": "amd64",
+    "url": "https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/rke2-images.linux-amd64.tar.zst",
+    "filename": "rke2-images.linux-amd64.tar.zst",
+    "sha256": "03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb",
+    "bytes": 801412840,
+    "checksumFileUrl": "https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/sha256sum-amd64.txt",
+    "checksumFileSha256": "8e12805c4bda79bec2fd20c89f705af3cb2ed11ea8854dc4937fca41b124b57a",
+    "binarySha256": "7bcbd3167d6947e1d79cdf722acdc740b28021fefb50dd5b974a1980776d4079"
+  },
+  "blobIntegrity": {
+    "allBlobHashesVerified": true,
+    "blobCount": 124,
+    "requiredAmd64ClosuresVerified": true
+  },
   "images": [
     {
-      "image": "docker.io/rancher/hardened-addon-resizer:1.8.23-build20260819",
-      "expected": "sha256:8026310fc44d985bf7c02434ad11d5f826a1aa1567606eea121b24ba9b3b0590",
-      "archive": "sha256:8026310fc44d985bf7c02434ad11d5f826a1aa1567606eea121b24ba9b3b0590",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-addon-resizer:1.8.23-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:8026310fc44d985bf7c02434ad11d5f826a1aa1567606eea121b24ba9b3b0590",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:c8963f9325ba796dcda86504dd9a0c812202065e1a371bcffd0ee337a5a1d727",
+        "configDigest": "sha256:35981d2061fa7718660bce82638af880ce07a4ac2f877feaaf636af4a0f0da22",
+        "layerDigests": [
+          "sha256:27fba02b2be33972581aacc0c57ddea278a048273569452ab974e6a5798553c3"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:8026310fc44d985bf7c02434ad11d5f826a1aa1567606eea121b24ba9b3b0590",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-calico:v3.32.1-build20260827",
-      "expected": "sha256:a86f731f4fceb583a5eb305276c4943a88fd3f887d26165acf0cea917e6408e2",
-      "archive": "sha256:a86f731f4fceb583a5eb305276c4943a88fd3f887d26165acf0cea917e6408e2",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-calico:v3.32.1-build20260827",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:a86f731f4fceb583a5eb305276c4943a88fd3f887d26165acf0cea917e6408e2",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:4ffec5030e65ca2b32a3f7484d7f627a259e0eca8bed26ab1551ce4fa93dcba4",
+        "configDigest": "sha256:78c700151e18e509b21002c1625f51c69fe977810deaedba88c483c3888c5a34",
+        "layerDigests": [
+          "sha256:9b58369a7b570d131262b6981c7751404d554a29c3962e245da8a87bc943f753",
+          "sha256:abfb9b4c84765a712d014256165a7be33bbd3d28b6083eb39584726a327be653",
+          "sha256:80ff136b2cf92ea9e02e5dced5c63b5898dc6ee494defbdf5bb8ba6b049be573",
+          "sha256:3c98b3dddd2edf72691799533056ad7a64f9afc2ed14ceacae66b6b26f8a34e7",
+          "sha256:c4fde686886011423f99d8a7ea6bf7d86213b713cb68df769f35eb66479e7465",
+          "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+          "sha256:86681b12c20cbe41349ecbe130c2cd6d13bfe42f375729a411dd7b5b6ff8739e"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:a86f731f4fceb583a5eb305276c4943a88fd3f887d26165acf0cea917e6408e2",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-cluster-autoscaler:v1.10.3-build20260819",
-      "expected": "sha256:c9b9b027e4d2cf1731311f9714f4aa633d37d7b0a72c9d3e6fc7a0594350d27c",
-      "archive": "sha256:c9b9b027e4d2cf1731311f9714f4aa633d37d7b0a72c9d3e6fc7a0594350d27c",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-cluster-autoscaler:v1.10.3-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:c9b9b027e4d2cf1731311f9714f4aa633d37d7b0a72c9d3e6fc7a0594350d27c",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:36de22bfba3c86d52a2b0fbb1710964289a6d369eb98416604bd399765208944",
+        "configDigest": "sha256:a891546d699680aa2551b58a8c8d17f7f04f94a5e0948f404da8733440e57a27",
+        "layerDigests": [
+          "sha256:0022dc3a57cd64d174bf0e9f0c87621c321e820eb690c134fe2113cde4efde81"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:c9b9b027e4d2cf1731311f9714f4aa633d37d7b0a72c9d3e6fc7a0594350d27c",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-coredns:v1.14.7-build20260819",
-      "expected": "sha256:e9435ef6526a98e8d01d98a85d23770859ca49028ebd282912ae5e76f92c0166",
-      "archive": "sha256:e9435ef6526a98e8d01d98a85d23770859ca49028ebd282912ae5e76f92c0166",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-coredns:v1.14.7-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:e9435ef6526a98e8d01d98a85d23770859ca49028ebd282912ae5e76f92c0166",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:905065e4b84f6f93c522940aea5ddedfa947a0ca7b1d4c4ccec8f7bb405d322b",
+        "configDigest": "sha256:65140e2a6365571ca597ab44d848f1cc687c2a6d6ff620a35f7ae9bece829e80",
+        "layerDigests": [
+          "sha256:9ca2cc5f5754a15fede6e40dd5a192d395b5c72ca627a090d267a8b8428ac7cb",
+          "sha256:b430b88ce75865f118934221417bc5a8cb86089045b504c4418ba6b35da0de2b"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:e9435ef6526a98e8d01d98a85d23770859ca49028ebd282912ae5e76f92c0166",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-dns-node-cache:1.26.8-build20260819",
-      "expected": "sha256:54a53cb983d47579a8e7cdcd9ae38bc58ff85c28c63fd26de02ce332d5f988ee",
-      "archive": "sha256:54a53cb983d47579a8e7cdcd9ae38bc58ff85c28c63fd26de02ce332d5f988ee",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-dns-node-cache:1.26.8-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:54a53cb983d47579a8e7cdcd9ae38bc58ff85c28c63fd26de02ce332d5f988ee",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:0941da5498f334c84cbfc6b650a6ba2aceb97b6973f2d062421a949437e624e9",
+        "configDigest": "sha256:ab6de70c9cab139711e9c5d436795eb81266677ebb5b0e22d4bbe8e39f461d47",
+        "layerDigests": [
+          "sha256:9ca2cc5f5754a15fede6e40dd5a192d395b5c72ca627a090d267a8b8428ac7cb",
+          "sha256:ca1b17a06620c79fcebc1661f9cccbb979bdeb4b77bbfef81baadc192c15b19c",
+          "sha256:20a8fea79fc27c99fc16dd107f86252aefa05721e0a92d332d8793e14e148213"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:54a53cb983d47579a8e7cdcd9ae38bc58ff85c28c63fd26de02ce332d5f988ee",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-etcd:v3.6.14-k3s1-build20260819",
-      "expected": "sha256:4f7ffbb3399c9f8137f5d0dd3ca0eddc7909e5d0155b35f1b0449baf96d61bfa",
-      "archive": "sha256:4f7ffbb3399c9f8137f5d0dd3ca0eddc7909e5d0155b35f1b0449baf96d61bfa",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-etcd:v3.6.14-k3s1-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:4f7ffbb3399c9f8137f5d0dd3ca0eddc7909e5d0155b35f1b0449baf96d61bfa",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:cc4c1059cb838f8556dd5658035e381c8aded7e36bfed851a7415a1a5e40d44a",
+        "configDigest": "sha256:e9c23857c72314d7134f84bfe40e2095c8cf8c195f8dafd559197e84377603b5",
+        "layerDigests": [
+          "sha256:6b44b0668222a052799068471ef8ca8b2bfec8ede63df4acf717a7554ad04916"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:4f7ffbb3399c9f8137f5d0dd3ca0eddc7909e5d0155b35f1b0449baf96d61bfa",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-flannel:v0.28.9-build20260819",
-      "expected": "sha256:8cf57d72f2db9ede62d85474b9241edc08f4fd0e11f340bb9c613e4fe292156e",
-      "archive": "sha256:8cf57d72f2db9ede62d85474b9241edc08f4fd0e11f340bb9c613e4fe292156e",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-flannel:v0.28.9-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:8cf57d72f2db9ede62d85474b9241edc08f4fd0e11f340bb9c613e4fe292156e",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:1197688b42c74bd1e87dcbcf02c4c8e67c6cd27b9393b05b6eac7bc3919ab9c0",
+        "configDigest": "sha256:fc80d0c9d539202621b400cb8ee78b45e92baf7d90eb66341ca3bd7d5eadc3c9",
+        "layerDigests": [
+          "sha256:221845e2b9ebe8890cf69361c9a1b4a1be97da480d3f3283db4b1b80c318c8c6",
+          "sha256:db93b7ce31bfd4f1d689bb15f12ad865d85cd58fd0992e72fc32d2096f5cec61",
+          "sha256:5da4cb754c670cc36c27d8b6cb3980cda87ca80d79512260a09f0ad484c11a2e",
+          "sha256:104b416e2cba714d1303a03919fb92d0ccf8481bbf283f84187e270a6e7f80b7",
+          "sha256:470fd9781f6bae6963b0957ff29728eb5f125334e6ac0af5124d7e12e7a436d2",
+          "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+          "sha256:17571ca31b811d900552142bdbc5ef3775af307b549ef4cc4303438e3a69312c"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:8cf57d72f2db9ede62d85474b9241edc08f4fd0e11f340bb9c613e4fe292156e",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-k8s-metrics-server:v0.9.0-build20260819",
-      "expected": "sha256:4935e86e846d75591113f64ad4e0402718a1eda08f6900a9325d54f1df64945c",
-      "archive": "sha256:4935e86e846d75591113f64ad4e0402718a1eda08f6900a9325d54f1df64945c",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-k8s-metrics-server:v0.9.0-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:4935e86e846d75591113f64ad4e0402718a1eda08f6900a9325d54f1df64945c",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:592c433d39015eab04bd4d02861b863307912d0a8dc6b076887f234748f2381c",
+        "configDigest": "sha256:fe3eda508f399ca56a285fe74ee1d4f0e0c0187086b5e90ce43e09f2b8bb2384",
+        "layerDigests": [
+          "sha256:e07c96f463961ee33d4b43b9bccd6dfebe792bb934ee4db6e730ab675608f662"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:4935e86e846d75591113f64ad4e0402718a1eda08f6900a9325d54f1df64945c",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-kubernetes:v1.36.4-rke2r1-build20260821",
-      "expected": "sha256:c8e5263407ac439de1dcdde98c7623efb9e17050715a80259d8bd5e81b5a9289",
-      "archive": "sha256:c8e5263407ac439de1dcdde98c7623efb9e17050715a80259d8bd5e81b5a9289",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-kubernetes:v1.36.4-rke2r1-build20260821",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:c8e5263407ac439de1dcdde98c7623efb9e17050715a80259d8bd5e81b5a9289",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:a288b9525b2a82f3bece8e2a0cb2daa24a2fa1d90cbf98a7511e157bcfb07335",
+        "configDigest": "sha256:85e666ce6214bb88a2d48f8568a63304e51117e284a487cf1635ec8051f4e6a3",
+        "layerDigests": [
+          "sha256:76cc5cf2deeaf05492aabf16e42461d203a5678688857cffc17ac244accbe6eb",
+          "sha256:4fbba342c3483eb5f6e695a8419d77c9fcb431c977ba01715488b025938587f7",
+          "sha256:bb5848d609e40384cf7d6443c6e399b3e63f8b6f7bd202a84aececb1b9810eb7",
+          "sha256:24cd175a2a3a86213731639a798c7dceac97d3a8437732a821807218ab46782b"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:c8e5263407ac439de1dcdde98c7623efb9e17050715a80259d8bd5e81b5a9289",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-snapshot-controller:v8.6.0-build20260819",
-      "expected": "sha256:8d5872d767f93393273cb1ecad81e4bc08af65311d206bc31ee8f48bc58e51c4",
-      "archive": "sha256:8d5872d767f93393273cb1ecad81e4bc08af65311d206bc31ee8f48bc58e51c4",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-snapshot-controller:v8.6.0-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:8d5872d767f93393273cb1ecad81e4bc08af65311d206bc31ee8f48bc58e51c4",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:84d09882fd38a7b305b35ef1d09c263b0924219d2a530c089b32149a991794fd",
+        "configDigest": "sha256:a0dba81baa93f10e362af5fe9eba1711880506e6d0e379bbd2b1b855c043b623",
+        "layerDigests": [
+          "sha256:4b7997165e511186bf9d616825d951bc11e5c143424cb8169d9c1c8e8c5300b1"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:8d5872d767f93393273cb1ecad81e4bc08af65311d206bc31ee8f48bc58e51c4",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/hardened-traefik:v3.7.11-build20260819",
-      "expected": "sha256:dff360a22c8a28c2af3e78b2b4cf09a6c8edc199e27eb9f7c417bfc1ac41078e",
-      "archive": "sha256:dff360a22c8a28c2af3e78b2b4cf09a6c8edc199e27eb9f7c417bfc1ac41078e",
-      "matches": true
+      "reference": "docker.io/rancher/hardened-traefik:v3.7.11-build20260819",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:dff360a22c8a28c2af3e78b2b4cf09a6c8edc199e27eb9f7c417bfc1ac41078e",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:69d07d641dae926027c5ffcd08a7bd3df3ccc163f1c65519ffa88814c7238df4",
+        "configDigest": "sha256:1c43a97d56d4b6728d4ab06bcafa351e3f70571467f2f8c9ba13e97a2f23b62a",
+        "layerDigests": [
+          "sha256:1e2163fe27ac7629ee3782ce8657ec263972f9523687d121a1390faf991ce70d",
+          "sha256:71db200c31f0c307d08eaf0f9300afc3ea801fb25607aa6655763749164d25e7",
+          "sha256:88f8285113db5248189ce0478274010b69f5bc2c55a1bee639f326114dd1b3a4",
+          "sha256:928551f84f09c1dec0484e7bc872a13f44f4bfc5f22726c5abab0fe030b27d51"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:dff360a22c8a28c2af3e78b2b4cf09a6c8edc199e27eb9f7c417bfc1ac41078e",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/klipper-helm:v0.13.3-build20260820",
-      "expected": "sha256:ba922718d919920b6b6168e3f55f8effa85032a38bf44d8cc5f4df79a2fe405d",
-      "archive": "sha256:ba922718d919920b6b6168e3f55f8effa85032a38bf44d8cc5f4df79a2fe405d",
-      "matches": true
+      "reference": "docker.io/rancher/klipper-helm:v0.13.3-build20260820",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:ba922718d919920b6b6168e3f55f8effa85032a38bf44d8cc5f4df79a2fe405d",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:2893fcbc460601bab023f405691fd4b17b1360bf5d9bcb06a347f0eaf6fc0df2",
+        "configDigest": "sha256:f1111f3230119632fba28fac87d3c653c3a7b6ed1342a3599f125630dc45f63b",
+        "layerDigests": [
+          "sha256:55afa1ecc21d2bb5e5045f32dafee56272ffd89860bac26f6c32123439af26a4",
+          "sha256:ecca62569ba71b11e5bf29e8886ea3422ca22d70161a518fede90a99c56c12d9",
+          "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+          "sha256:05fc9f36dc56773d63f502ca194102ca8bd399bd5d0daec8758db99baec64032",
+          "sha256:bac68132a0257e8bcc13ba0c78e65b386545902c9c3d4c3cab3df520c58f2602"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:ba922718d919920b6b6168e3f55f8effa85032a38bf44d8cc5f4df79a2fe405d",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/klipper-lb:v0.4.17",
-      "expected": "sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a",
-      "archive": "sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a",
-      "matches": true
+      "reference": "docker.io/rancher/klipper-lb:v0.4.17",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:d64ea02dfa3a29433a754fe59b56c6e1a05877528bdd6e20da587841ef22b0ac",
+        "configDigest": "sha256:eaa1212a2b4569c811bfa0ad5708428703ad3120a6dbae3b4353ec3cb36f36d2",
+        "layerDigests": [
+          "sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb",
+          "sha256:3c588108f3434dc16a873d50eaf47955fad38e92342798a058e9b59f6aec4302",
+          "sha256:213c88b9c154a26b0f09d065b4efd46ae5f182eafe04ae91e9efb47459e70ec9"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:910944bb0bd94f060a82a56ca1ea1c577d3e49b3473a093a47a985f32e92d94a",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/mirrored-pause:3.10.2",
-      "expected": "sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
-      "archive": "sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
-      "matches": true
+      "reference": "docker.io/rancher/mirrored-pause:3.10.2",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:412c4a7219cb8a299a37337f3d87810c5340095322e15594a1637785adad0f17",
+        "configDigest": "sha256:4a83b15d3ecfe0d916b2d0a7991bc2854a629b8097017c2ee1ff65b30ae4c07c",
+        "layerDigests": [
+          "sha256:81ede36234b06d9a16771d804ef81ea888e29f8c425a5269e3d55d34a1b128a8"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/rke2-cloud-provider:v1.36.4-0.20260817193921-a2fc9574e060-build20260820",
-      "expected": "sha256:95a33533d97b10502be19e4f3e60e7ce9c30f4879084709af96259a01253f044",
-      "archive": "sha256:95a33533d97b10502be19e4f3e60e7ce9c30f4879084709af96259a01253f044",
-      "matches": true
+      "reference": "docker.io/rancher/rke2-cloud-provider:v1.36.4-0.20260817193921-a2fc9574e060-build20260820",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:95a33533d97b10502be19e4f3e60e7ce9c30f4879084709af96259a01253f044",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:f4ff1d7a4a3824736044adca9cd0a55041f888d11d711500210c74d8aaa46950",
+        "configDigest": "sha256:fb747c65460917901f299b44ab1b4680ced5866c549c87d028f384cbe55fa782",
+        "layerDigests": [
+          "sha256:d097506b97ef70b1503d4562301a99fe4e7f23458fcf982cefcb416d71fe4aa8"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:95a33533d97b10502be19e4f3e60e7ce9c30f4879084709af96259a01253f044",
+        "matchesArchiveIndex": true
+      }
     },
     {
-      "image": "docker.io/rancher/rke2-runtime:v1.36.4-rke2r1",
-      "expected": "sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9",
-      "archive": "sha256:7956a28b1ebd803f58341ba88fed4c8bc878ec13226c2e55959ba5a88c21341e",
-      "matches": false
+      "reference": "docker.io/rancher/rke2-runtime:v1.36.4-rke2r1",
+      "archiveContainedImageIdentity": {
+        "indexDigest": "sha256:7956a28b1ebd803f58341ba88fed4c8bc878ec13226c2e55959ba5a88c21341e",
+        "platform": "linux/amd64",
+        "manifestDigest": "sha256:1577a9033d55d185f49102f1f1a7a8ededc5fa37522a58f7df34e46a6df23c6b",
+        "configDigest": "sha256:9756832fa908c78371cacab2a9c066bf1cc1b0d6b8adaf6cf74590dd7fcded04",
+        "layerDigests": [
+          "sha256:4df00268b5ff938f0d4fcf83bab4c977ad5073851c9ea94ac05f5d5919ed162b"
+        ]
+      },
+      "externalRegistryObservation": {
+        "digest": "sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9",
+        "matchesArchiveIndex": false
+      }
     }
   ],
-  "runtimePlatformComparison": {
-    "registry": {
-      "image": "docker.io/rancher/rke2-runtime@sha256:411f197f1085472909c6e5f7434b64f1bf78ac3f8b82fac5a4d86d7a0a831cd9",
-      "anonymousPullVerified": true,
-      "platform": "linux/amd64",
-      "platformManifest": "sha256:b259e466c7539f3b10209da1725c2176352a5cbb7adec9e3dafd9959585d4940",
-      "configDigest": "sha256:46bbc6d54afda36bb8be422fcc850feb33c6b5dd80707aa3f10e3a4f32148c20"
-    },
-    "archiveIndex": {
-      "schemaVersion": 2,
-      "mediaType": "application/vnd.oci.image.index.v1+json",
-      "manifests": [
-        {
-          "mediaType": "application/vnd.oci.image.manifest.v1+json",
-          "digest": "sha256:1577a9033d55d185f49102f1f1a7a8ededc5fa37522a58f7df34e46a6df23c6b",
-          "size": 482,
-          "platform": {
-            "architecture": "amd64",
-            "os": "linux"
-          }
-        },
-        {
-          "mediaType": "application/vnd.oci.image.manifest.v1+json",
-          "digest": "sha256:4a13cbb9474634d624cd90b85d4f02d64cffd894a0cda2dc03969519ab79349a",
-          "size": 836,
-          "annotations": {
-            "vnd.docker.reference.digest": "sha256:1577a9033d55d185f49102f1f1a7a8ededc5fa37522a58f7df34e46a6df23c6b",
-            "vnd.docker.reference.type": "attestation-manifest"
-          },
-          "platform": {
-            "architecture": "unknown",
-            "os": "unknown"
-          }
-        }
-      ]
-    }
-  },
-  "status": "BLOCKED_RUNTIME_IMAGE_MISMATCH"
+  "externalRegistryObservationsAreNonAuthoritative": true,
+  "historicalMismatchEvidence": "docs/layersentry/evidence/k8s/2026-09-08-immutable-artifacts/source-consumption-binding.json",
+  "liveQualified": false
 }

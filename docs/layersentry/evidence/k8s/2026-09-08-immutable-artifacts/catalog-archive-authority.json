@@ -1,0 +1,98 @@
+{
+  "commit": "7b0aa81eacda8043090ea945c98bf87ac3b205cc",
+  "contentSha256": "cc0948a731142a37b5fc3ec599dec0c511d28f1a0974bdda3c78e20ff6008a81",
+  "files": [
+    {
+      "path": ".github/workflows/publish.yml",
+      "mode": "100644",
+      "bytes": 2342,
+      "sha256": "99709b8757301d0ce5ccadc6924b7c9e734435bef1753b20be420871b0c5e751"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "bytes": 1762,
+      "sha256": "0fcf9841508710836fb3588412b9b7abc2485c093d462d855f3a6947d45d5496"
+    },
+    {
+      "path": "clusters/e1/kustomization.yaml",
+      "mode": "100644",
+      "bytes": 91,
+      "sha256": "80412e4321559048c7f3a6230f85421d84a04b6d322fa91d7094bc13bfc3a688"
+    },
+    {
+      "path": "clusters/e1/workload.yaml",
+      "mode": "100644",
+      "bytes": 425,
+      "sha256": "a846dbf19d2853072ed195f8ce185ec54770529e47cc10ecc38196964e34274f"
+    },
+    {
+      "path": "evidence/ccm.json",
+      "mode": "100644",
+      "bytes": 1171,
+      "sha256": "e854c59f93daaffaa24d6112b508ca2c0a4267d0ba5c3e4c6d98bf47dbea44a7"
+    },
+    {
+      "path": "evidence/csi.json",
+      "mode": "100644",
+      "bytes": 1228,
+      "sha256": "06a3e65aced191795aef3909d0446d57303603e078167043ee1e4a10d5ca06bf"
+    },
+    {
+      "path": "upstream-artifact-lock.json",
+      "mode": "100644",
+      "bytes": 12998,
+      "sha256": "4e64ae731836441011571b9be520f1821f0e0490b0249bd740b415f34629e843"
+    },
+    {
+      "path": "workload/ccm.yaml",
+      "mode": "100644",
+      "bytes": 3414,
+      "sha256": "7ffd16bbfaf799517c04d3318484fbe5aeadb34adb21e57c6359c71459564be9"
+    },
+    {
+      "path": "workload/csi-00-snapshot-crds.yaml",
+      "mode": "100644",
+      "bytes": 57074,
+      "sha256": "52cadf0a145f4d57e6076f82dc8d657dbce71d07d92cc9ba9a518beeef753f8f"
+    },
+    {
+      "path": "workload/csi-controller-deployment.yaml",
+      "mode": "100644",
+      "bytes": 8504,
+      "sha256": "5eeef28789e9e61a35db8750a2a8cf75a39da7a3879f78d825697b20a87493e7"
+    },
+    {
+      "path": "workload/csi-csidriver.yaml",
+      "mode": "100644",
+      "bytes": 222,
+      "sha256": "3f16362ffc09bc79b46f0d69a64254f7c5c607932e1a8a88cd835e841719a7bd"
+    },
+    {
+      "path": "workload/csi-node-daemonset.yaml",
+      "mode": "100644",
+      "bytes": 6187,
+      "sha256": "aa2a3a8521262335a137bfd8c5f23b0aa3f7bf4a975dcfbe0c4783f9d108d70d"
+    },
+    {
+      "path": "workload/csi-rbac.yaml",
+      "mode": "100644",
+      "bytes": 3519,
+      "sha256": "496153914fde7f02f1948a3240b47407a2cf7b12ebcd590b02568dc4ed684efd"
+    },
+    {
+      "path": "workload/kustomization.yaml",
+      "mode": "100644",
+      "bytes": 210,
+      "sha256": "c97e09d9cd6d299880a59ae8a36b309e516d9ad6ced7fd7768d34a82fd300b8d"
+    }
+  ],
+  "method": "SHA256 of canonical JSON list from git ls-tree -rz: path,mode,bytes,sha256(blob); sort_keys=True,separators=comma/colon",
+  "anonymousExactCommitCheckoutVerified": true,
+  "kustomizePathsVerified": [
+    "clusters/e1",
+    "workload"
+  ],
+  "repository": "https://github.com/adaptgurus/layersentry-flux-catalog.git",
+  "liveRemoteReconcile": false
+}
