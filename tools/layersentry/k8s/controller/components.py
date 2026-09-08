@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import urllib.parse
@@ -60,6 +61,7 @@ class ComponentReadiness:
     blockers: tuple[str, ...]
     ccm_image: str | None = None
     csi_image: str | None = None
+    capc_image: str | None = None
     flux_repository: str | None = None
     flux_commit: str | None = None
 
@@ -88,7 +90,87 @@ def _image(value: Any, name: str, blockers: list[str]) -> str | None:
     return value
 
 
-def evaluate_component_readiness(manifest: Mapping[str, Any]) -> ComponentReadiness:
+_MANAGEMENT_PATH = "tools/layersentry/k8s/artifacts/management-lock.json"
+_QUALIFICATION_PATH = "tools/layersentry/k8s/artifacts/qualification-lock.json"
+_MANAGEMENT_COMPONENTS = {
+    "capi": "1.13.5", "capc": "0.6.1", "caprke2-bootstrap": "0.25.2",
+    "caprke2-control-plane": "0.25.2", "cert-manager-controller": "1.21.1",
+    "cert-manager-cainjector": "1.21.1", "cert-manager-webhook": "1.21.1",
+    "coredns": "1.14.2", "management-node": "1.36.4",
+}
+
+
+def read_artifact_lock(binding, approved_path, artifact_root=None):
+    # Resolve a single approved installed path, never a caller-supplied path.
+    root = artifact_root if artifact_root is not None else Path(__file__).resolve().parents[1]
+    if (not isinstance(binding, Mapping) or binding.get("path") != approved_path
+            or not _SHA256.fullmatch(str(binding.get("sha256", "")))):
+        raise InvalidRequestError("artifact lock binding is invalid")
+    path = root / "artifacts" / Path(approved_path).name
+    if (path.is_symlink() or path.parent.is_symlink() or not path.is_file()
+            or path.stat().st_mode & 0o022 or path.stat().st_size > 1048576):
+        raise InvalidRequestError("artifact lock file is missing or unsafe")
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != binding["sha256"]:
+        raise InvalidRequestError("artifact lock SHA256 mismatch")
+    data = json.loads(raw, object_pairs_hook=_unique_object)
+    if not isinstance(data, Mapping) or data.get("schemaVersion") != "1.0":
+        raise InvalidRequestError("artifact lock schema is invalid")
+    return data
+
+
+def _management_lock(manifest, blockers, artifact_root):
+    try:
+        data = read_artifact_lock(manifest.get("managementArtifactLock"), _MANAGEMENT_PATH, artifact_root)
+        rows = data.get("components")
+        if not isinstance(rows, list) or len(rows) != len(_MANAGEMENT_COMPONENTS):
+            raise InvalidRequestError("required management components are missing or duplicated")
+        seen = set()
+        for row in rows:
+            if not isinstance(row, Mapping):
+                raise InvalidRequestError("management component is invalid")
+            name = row.get("name")
+            if (not isinstance(name, str) or name not in _MANAGEMENT_COMPONENTS or name in seen
+                    or row.get("version") != _MANAGEMENT_COMPONENTS[name]
+                    or not isinstance(row.get("image"), str) or not _IMAGE.fullmatch(row["image"])):
+                raise InvalidRequestError("management component identity is invalid")
+            if name == "capc" and row["image"] != manifest.get("capcDownstream", {}).get("image"):
+                raise InvalidRequestError("management CAPC image differs from release contract")
+            seen.add(name)
+    except (InvalidRequestError, OSError, ValueError, TypeError):
+        blockers.append("Management artifact lock is invalid")
+
+
+def qualification_template(manifest, artifact_root=None):
+    data = read_artifact_lock(manifest.get("qualificationArtifactLock"), _QUALIFICATION_PATH, artifact_root)
+    template = data.get("template")
+    uuid = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
+    if (not isinstance(template, Mapping)
+            or not uuid.fullmatch(str(data.get("projectId", "")))
+            or not uuid.fullmatch(str(template.get("id", "")))
+            or not _SHA256.fullmatch(str(template.get("qcow2Sha256", "")))
+            or type(template.get("virtualSize")) is not int or template["virtualSize"] <= 0
+            or not isinstance(template.get("name"), str) or not template["name"]
+            or data.get("rke2") != "v1.36.4+rke2r1" or data.get("cni") != "canal"):
+        raise InvalidRequestError("qualification template identity is invalid")
+    return data
+
+
+def validate_qualification_templates(project_id, template_ids, manifest=None, artifact_root=None):
+    """Bind the reserved qualification project before generating any CAPI objects.
+
+    This checks the locked artifact receipt, not a fresh measurement of CloudStack
+    QCOW2 bytes. Other projects retain normal production template validation.
+    """
+    root = artifact_root if artifact_root is not None else Path(__file__).resolve().parents[1]
+    if manifest is None:
+        manifest = json.loads((root / "release-candidate-lane-b.json").read_bytes(), object_pairs_hook=_unique_object)
+    lock = qualification_template(manifest, root)
+    if project_id == lock["projectId"] and set(template_ids) != {lock["template"]["id"]}:
+        raise InvalidRequestError("qualification template UUID differs from approved artifact lock")
+
+
+def evaluate_component_readiness(manifest: Mapping[str, Any], *, artifact_root: Path | None = None) -> ComponentReadiness:
     blockers: list[str] = []
     for key, expected in _EXACT_TUPLE.items():
         if manifest.get(key) != expected:
@@ -109,6 +191,12 @@ def evaluate_component_readiness(manifest: Mapping[str, Any]) -> ComponentReadin
     if not _SHA256.fullmatch(str(csi.get("patchSha256", ""))):
         blockers.append("CloudStack CSI downstream patch digest is unresolved")
 
+    capc_image = _image(capc.get("image"), "downstream CAPC", blockers)
+    _management_lock(manifest, blockers, artifact_root)
+    try:
+        qualification_template(manifest, artifact_root)
+    except (InvalidRequestError, OSError, ValueError, TypeError):
+        blockers.append("Qualification artifact lock is invalid")
     ccm_image = _image(ccm.get("image"), "CloudStack CCM", blockers)
     csi_image = _image(csi.get("image"), "downstream CloudStack CSI", blockers)
     if ccm.get("version") != "1.2.0" or not _COMMIT.fullmatch(str(ccm.get("upstreamCommit", ""))):
@@ -141,6 +229,8 @@ def evaluate_component_readiness(manifest: Mapping[str, Any]) -> ComponentReadin
     if not isinstance(commit, str) or not _COMMIT.fullmatch(commit):
         blockers.append("Flux catalog commit is unresolved")
         commit = None
+    if not isinstance(flux.get("contentSha256"), str) or not _SHA256.fullmatch(flux["contentSha256"]):
+        blockers.append("Flux catalog content SHA256 is unresolved")
     if flux.get("contentDigestVerified") is not True:
         blockers.append("Flux catalog content digest is not verified")
 
@@ -150,6 +240,7 @@ def evaluate_component_readiness(manifest: Mapping[str, Any]) -> ComponentReadin
     return ComponentReadiness(
         deployable=not blockers,
         blockers=tuple(blockers),
+        capc_image=capc_image,
         ccm_image=ccm_image,
         csi_image=csi_image,
         flux_repository=repository,

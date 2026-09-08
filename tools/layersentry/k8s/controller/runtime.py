@@ -192,7 +192,8 @@ def build_runtime(config_path: Path | str) -> ControllerRuntime:
         path=config.flux_path,
         source_namespace=config.flux_namespace,
     )
-    executor = E1Executor(kubernetes, resolver, contract.gates, flux)
+    executor = E1Executor(kubernetes, resolver, contract.gates, flux,
+                          qualification_manifest=contract.manifest)
     store = SagaStore(config.state_database)
     service = ControllerService(store, CloudStackCapabilityAuthorizer(), executor, contract.gates)
     authenticator = CloudStackSessionAuthenticator(config.session)

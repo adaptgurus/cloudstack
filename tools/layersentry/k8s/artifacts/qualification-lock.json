@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "b30d73f2-b65c-4c8f-a87c-f4210e4e5c5b",
+  "rke2": "v1.36.4+rke2r1",
+  "cni": "canal",
+  "template": {
+    "id": "fb356dd9-8b2c-499c-86d4-cc1b69234feb",
+    "name": "LS-RKE2-Rocky-9.8-v1",
+    "qcow2Sha256": "b5e690bbcf8b78fb085ab4c9725f3b0a6405dfad17c9a3ffbfe0babc5d5db4c4",
+    "virtualSize": 42949672960
+  },
+  "evidenceSource": "operator-confirmed live-qualified identity; not rebuilt or re-registered in this pass",
+  "observedState": "Download Complete / isready=true"
+}

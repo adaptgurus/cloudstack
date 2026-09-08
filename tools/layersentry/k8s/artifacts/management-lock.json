@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0",
+  "components": [
+    {
+      "name": "capc",
+      "version": "0.6.1",
+      "image": "ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e"
+    },
+    {
+      "name": "capi",
+      "version": "1.13.5",
+      "image": "registry.k8s.io/cluster-api/cluster-api-controller@sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e"
+    },
+    {
+      "name": "caprke2-bootstrap",
+      "version": "0.25.2",
+      "image": "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa"
+    },
+    {
+      "name": "caprke2-control-plane",
+      "version": "0.25.2",
+      "image": "ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5"
+    },
+    {
+      "name": "cert-manager-cainjector",
+      "version": "1.21.1",
+      "image": "quay.io/jetstack/cert-manager-cainjector@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98"
+    },
+    {
+      "name": "cert-manager-controller",
+      "version": "1.21.1",
+      "image": "quay.io/jetstack/cert-manager-controller@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a"
+    },
+    {
+      "name": "cert-manager-webhook",
+      "version": "1.21.1",
+      "image": "quay.io/jetstack/cert-manager-webhook@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42"
+    },
+    {
+      "name": "coredns",
+      "version": "1.14.2",
+      "image": "registry.k8s.io/coredns/coredns@sha256:e7e6440cfd1e919280958f5b5a6ab2b184d385bba774c12ad2a9e1e4183f90d9"
+    },
+    {
+      "name": "management-node",
+      "version": "1.36.4",
+      "image": "docker.io/kindest/node@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
+    }
+  ]
+}

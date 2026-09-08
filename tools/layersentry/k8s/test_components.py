@@ -78,6 +78,7 @@ class ComponentReadinessTest(unittest.TestCase):
         candidate["fluxCatalog"] = {
             "repository": "https://git.example.test/layersentry/catalog.git",
             "commit": "c" * 40,
+            "contentSha256": "d" * 64,
             "contentDigestVerified": True,
         }
         for gate in ("tupleReconciliation", "endpoint6443", "endpoint9345", "fluxRemoteReconcile"):

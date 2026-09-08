@@ -72,11 +72,13 @@ class E1Executor:
     def __init__(
         self, kubernetes: KubernetesClient, resolver: InfrastructureResolver,
         gates: ReleaseGates, flux: FluxBaseline,
+        *, qualification_manifest=None,
     ):
         self.kubernetes = kubernetes
         self.resolver = resolver
         self.gates = gates
         self.flux = flux
+        self.qualification_manifest = qualification_manifest
 
     def _resolved(self, operation: Operation) -> ResolvedInfrastructure:
         value = operation.resources.get("resolvedInfrastructure")
@@ -88,7 +90,8 @@ class E1Executor:
             raise InvalidRequestError("stored infrastructure resolution is invalid") from exc
 
     def _resources(self, operation: Operation):
-        return build_cluster_resources(parse_cluster_request(operation.request), self._resolved(operation))
+        return build_cluster_resources(parse_cluster_request(operation.request), self._resolved(operation),
+                                       qualification_manifest=self.qualification_manifest)
 
     @staticmethod
     def _owned(resource: Mapping[str, Any], actual: Mapping[str, Any], project_id: str) -> bool:

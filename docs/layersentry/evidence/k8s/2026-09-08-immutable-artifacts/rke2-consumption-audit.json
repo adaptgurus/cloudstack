@@ -1,0 +1,26 @@
+{
+  "status": "BLOCKED",
+  "rke2Version": "v1.36.4+rke2r1",
+  "caprke2Version": "v0.25.2",
+  "cni": "canal",
+  "checksumManifestSha256": "8e12805c4bda79bec2fd20c89f705af3cb2ed11ea8854dc4937fca41b124b57a",
+  "officialAssets": {
+    "rke2.linux-amd64.tar.gz": "7bcbd3167d6947e1d79cdf722acdc740b28021fefb50dd5b974a1980776d4079",
+    "rke2-images.linux-amd64.tar.zst": "03b82bfa0eb5df65fdedbac17c4a16a1c436d087d0026f1f172f486c27449cbb",
+    "rke2-images-core.linux-amd64.tar.zst": "8988a2eff587dd88b8eab86fe719703e9541a1f08d22771a94cbec446a13db86",
+    "rke2-images-canal.linux-amd64.tar.zst": "4359b651bfdec8f3bcc01b351b33a55ff21f06b18a767366db6f3800d5750871"
+  },
+  "installerSha256": "42983c86d1da64a92061d83afb57630cedd69241989f1b0673f3db6c3d92ee6b",
+  "sourceFiles": [
+    "CAPRKE2/bootstrap/api/v1beta2/rke2config_types.go",
+    "CAPRKE2/bootstrap/internal/cloudinit/controlplane_init.go",
+    "CAPRKE2/bootstrap/internal/cloudinit/worker_join.go",
+    "RKE2/install.sh",
+    "tools/layersentry/k8s/controller/e1_resources.py"
+  ],
+  "supportedMethod": "Pre-stage exact release binary, full image archive, checksum manifest and pinned install.sh; verify every byte before CAPRKE2 airGapped installation. Set airGappedChecksum to the locked checksum-file SHA256. RKE2 installer verifies full archive and binary and stages images before service startup. Canal is selected by serverConfig.cni. No chart rewrite needed.",
+  "currentGap": "LayerSentry currently emits airGapped only; no pinned install.sh, preRKE2Commands/files staging, or airGappedChecksum is bound. Online path curls mutable get.rke2.io. Bootstrap exception and live air-gap qualification remain unimplemented/false.",
+  "additionalVerification": "Verify archive image manifests match the approved 30-entry lock, and verify local-first image pull policy/no unverified registry fallback before claiming enforced consumption. Additional core/canal archive copy loop itself does not validate those archive checksums; explicitly verify them if using split archives.",
+  "implemented": false,
+  "downloadedLargeArchives": false
+}

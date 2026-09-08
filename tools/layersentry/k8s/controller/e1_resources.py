@@ -26,6 +26,7 @@ from typing import Any, Mapping, Tuple
 from layersentry_k8s_policy import ClusterRequest
 
 from .model import InvalidRequestError
+from .components import validate_qualification_templates
 
 
 CAPC_ENDPOINT_ANNOTATION = "infrastructure.cluster.x-k8s.io/layersentry-rke2-endpoint"
@@ -96,6 +97,7 @@ def _machine_template(
 
 def build_cluster_resources(
     request: ClusterRequest, resolved: ResolvedInfrastructure,
+    *, qualification_manifest=None,
 ) -> Tuple[Mapping[str, Any], ...]:
     """Build the exact pinned provider resources without embedding secrets."""
 
@@ -103,6 +105,11 @@ def build_cluster_resources(
         raise InvalidRequestError("resolved project does not match the authorized request")
     if request.zone_id != resolved.zone_id or request.network_id != resolved.network_id:
         raise InvalidRequestError("resolved CloudStack Site/network does not match the request")
+    validate_qualification_templates(
+        resolved.project_id,
+        [resolved.control_plane_template_id, *resolved.worker_template_ids.values()],
+        manifest=qualification_manifest,
+    )
     for field_name in (
         "namespace", "cloudstack_secret_name", "cloudstack_secret_namespace", "project_id",
         "project_name", "zone_id", "zone_name", "network_id", "network_name",

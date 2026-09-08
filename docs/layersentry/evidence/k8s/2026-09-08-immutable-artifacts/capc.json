@@ -1,0 +1,57 @@
+{
+  "component": "capc",
+  "sourceCommit": "7521b14a31e6c46f81f16aae3738a27c08ad063f",
+  "patches": [
+    {
+      "path": "0001-layersentry-rke2-endpoint-volume-ownership.diff",
+      "sha256": "6d3fc88ccf986bd025fc6d714ec7b4fa19d0c2afe6f10c50ef02a198286cea74",
+      "purpose": "CAPC-owned RKE2 6443/9345 endpoint and ownership-safe Machine data-disk deletion"
+    }
+  ],
+  "builder": "docker.io/library/golang@sha256:ad5c126b5cf501a8caef751a243bb717ec204ab1aa56dc41dc11be089fafcb4f",
+  "runtime": "gcr.io/distroless/static@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7",
+  "recipeSha256": "04dcdb492f6c8545cecd40de5381b60b2233fda391318bc7dad74a4059521c24",
+  "apkLockSha256": null,
+  "cleanBuildRuntimeDigests": [
+    "e6cde56046e7a5156e36b9adbced11fcb623de4af5344be887b637cfc71bcd2c",
+    "e6cde56046e7a5156e36b9adbced11fcb623de4af5344be887b637cfc71bcd2c"
+  ],
+  "tests": "REPO_ROOT=/src go test -p 2 ./pkg/... -ginkgo.label-filter=\"!integ\" passed in both builds",
+  "liveQualified": false,
+  "image": "ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e",
+  "pullByDigestVerified": true,
+  "publicationRun": "https://github.com/adaptgurus/layersentry-flux-catalog/actions/runs/34230376101",
+  "registryVerification": {
+    "image": "ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e",
+    "anonymousPullVerified": true,
+    "platform": "linux/amd64",
+    "platformManifest": "sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e",
+    "configDigest": "sha256:412a4786efc8658427eba173c8225fd528050bc709b8f330c68c5cd30b8571e8"
+  },
+  "comparisonWithPreviouslyImportedImage": {
+    "localImage": "layersentry/capc:0.6.1-6d3fc88ccf98",
+    "oldRuntimeSha256": "17f21ce77ea30a1d9ffb50edccdcea245341809cf2a80f9f20a1b9f7a4337d9f",
+    "newRuntimeSha256": "e6cde56046e7a5156e36b9adbced11fcb623de4af5344be887b637cfc71bcd2c",
+    "identical": false,
+    "differences": [
+      {
+        "path": "manager",
+        "before": [
+          493,
+          0,
+          0,
+          "",
+          "e8a6109ea2217082222fdfcb744d8f4094d6eaac30269ba17f9aed066c83a968"
+        ],
+        "after": [
+          493,
+          0,
+          0,
+          "",
+          "b48e154142c8b0da9233e0062db35ce7d7b26033d5fe80dfbae97b1296d83a75"
+        ]
+      }
+    ]
+  },
+  "anonymousFullPullVerified": true
+}

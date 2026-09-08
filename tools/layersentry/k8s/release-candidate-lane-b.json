@@ -10,7 +10,8 @@
     "manifest": "tools/layersentry/k8s/downstream/capc/manifest.json",
     "patchSha256": "6d3fc88ccf986bd025fc6d714ec7b4fa19d0c2afe6f10c50ef02a198286cea74",
     "clusterEndpointAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-rke2-endpoint=true",
-    "machineVolumeOwnershipAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-volume-ownership=true"
+    "machineVolumeOwnershipAnnotation": "infrastructure.cluster.x-k8s.io/layersentry-volume-ownership=true",
+    "image": "ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e"
   },
   "caprke2": "0.25.2",
   "rke2": "1.36.4+rke2r1",
@@ -45,7 +46,8 @@
   "fluxCatalog": {
     "repository": "https://github.com/adaptgurus/layersentry-flux-catalog.git",
     "commit": "8bc33753011555553736bfb73f281cf917bb5842",
-    "contentDigestVerified": true
+    "contentDigestVerified": true,
+    "contentSha256": "5159e45a47ada5712b313973fda057f8c86f87e18a8ae3093541bb6810efbaa4"
   },
   "architecture": {
     "infrastructureOwner": "CloudStack",
@@ -82,5 +84,13 @@
     "docs/layersentry/LAYERSENTRY_K8S_DBAAS_APAAS_ARCHITECTURE_ADDENDUM.md",
     "docs/layersentry/evidence/k8s/2026-09-06-k8s-master-context-full-validation.md",
     "docs/layersentry/codex/WORKSTREAM_E_K8S_DBAAS_APAAS.md"
-  ]
+  ],
+  "qualificationArtifactLock": {
+    "path": "tools/layersentry/k8s/artifacts/qualification-lock.json",
+    "sha256": "f8cc91b46298e33c0612b99e34f8f716853699ce398a1ecaccc435e5c5a3751b"
+  },
+  "managementArtifactLock": {
+    "path": "tools/layersentry/k8s/artifacts/management-lock.json",
+    "sha256": "8acd5b89f6e581b8b59574bf9f4f6842f2b241908999186c28e960ae7ce7f67b"
+  }
 }

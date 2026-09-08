@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "1.0",
+  "operation": "OFFLINE_JSON_PATCH_PLAN_ONLY",
+  "patches": [
+    {
+      "namespace": "capi-system",
+      "deployment": "capi-controller-manager",
+      "container": "manager",
+      "index": 0,
+      "image": "registry.k8s.io/cluster-api/cluster-api-controller@sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e",
+      "runningImageIDs": [
+        "registry.k8s.io/cluster-api/cluster-api-controller@sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e"
+      ],
+      "anonymousPullVerified": true,
+      "platform": "linux/amd64",
+      "platformManifest": "sha256:0aa40b410d2c05ed40ecf257c73c411a6c0f4d580240ee54d09eec6ad8e98554",
+      "configDigest": "sha256:04b1c1b0c7994b881afc18d7ebbdc2ca721d676120eb01a8e9d825f0665adc02",
+      "currentImage": "registry.k8s.io/cluster-api/cluster-api-controller:v1.13.5",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "registry.k8s.io/cluster-api/cluster-api-controller:v1.13.5"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "registry.k8s.io/cluster-api/cluster-api-controller@sha256:560f4f53e85f3c23e4adf50236efcc7247e2b3aa416f73f5a0c3eb67f5bd1a1e"
+        }
+      ],
+      "applied": false,
+      "identityMatchesRunning": true,
+      "offlineImageOnlyComparisonVerified": true
+    },
+    {
+      "namespace": "cert-manager",
+      "deployment": "cert-manager",
+      "container": "cert-manager-controller",
+      "index": 0,
+      "image": "quay.io/jetstack/cert-manager-controller@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a",
+      "runningImageIDs": [
+        "quay.io/jetstack/cert-manager-controller@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a"
+      ],
+      "anonymousPullVerified": true,
+      "platform": "linux/amd64",
+      "platformManifest": "sha256:4c2b5201fd66085b777dc6b256d96d7d346b6445404cec34db5f8aea86182cc5",
+      "configDigest": "sha256:8359cecc5aa6ffd4940996999c15c543821a9949d2b8a3881295c38ef86e0757",
+      "currentImage": "quay.io/jetstack/cert-manager-controller:v1.21.1",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "quay.io/jetstack/cert-manager-controller:v1.21.1"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "quay.io/jetstack/cert-manager-controller@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a"
+        }
+      ],
+      "applied": false,
+      "identityMatchesRunning": true,
+      "offlineImageOnlyComparisonVerified": true
+    },
+    {
+      "namespace": "cert-manager",
+      "deployment": "cert-manager-cainjector",
+      "container": "cert-manager-cainjector",
+      "index": 0,
+      "image": "quay.io/jetstack/cert-manager-cainjector@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98",
+      "runningImageIDs": [
+        "quay.io/jetstack/cert-manager-cainjector@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98"
+      ],
+      "anonymousPullVerified": true,
+      "platform": "linux/amd64",
+      "platformManifest": "sha256:1910ad7e134880e27d229e07affb43da1b07841a77f70c364f17467cb4e49bd9",
+      "configDigest": "sha256:3133bbd4dd2783fe7197585d9198c738508b9784c8746bf62e9fac6aad41535a",
+      "currentImage": "quay.io/jetstack/cert-manager-cainjector:v1.21.1",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "quay.io/jetstack/cert-manager-cainjector:v1.21.1"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "quay.io/jetstack/cert-manager-cainjector@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98"
+        }
+      ],
+      "applied": false,
+      "identityMatchesRunning": true,
+      "offlineImageOnlyComparisonVerified": true
+    },
+    {
+      "namespace": "cert-manager",
+      "deployment": "cert-manager-webhook",
+      "container": "cert-manager-webhook",
+      "index": 0,
+      "image": "quay.io/jetstack/cert-manager-webhook@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42",
+      "runningImageIDs": [
+        "quay.io/jetstack/cert-manager-webhook@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42"
+      ],
+      "anonymousPullVerified": true,
+      "platform": "linux/amd64",
+      "platformManifest": "sha256:741084291faf115a2909bfe3515458b54926c67f039ac20effd821bac69817a4",
+      "configDigest": "sha256:6f7f1ce59de1febbc7e423da382eedd0350ba6c8600368e6f42d7fdefa1bb6b9",
+      "currentImage": "quay.io/jetstack/cert-manager-webhook:v1.21.1",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "quay.io/jetstack/cert-manager-webhook:v1.21.1"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "quay.io/jetstack/cert-manager-webhook@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42"
+        }
+      ],
+      "applied": false,
+      "identityMatchesRunning": true,
+      "offlineImageOnlyComparisonVerified": true
+    },
+    {
+      "namespace": "rke2-bootstrap-system",
+      "deployment": "rke2-bootstrap-controller-manager",
+      "container": "manager",
+      "index": 0,
+      "image": "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa",
+      "runningImageIDs": [
+        "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa"
+      ],
+      "anonymousPullVerified": true,
+      "platform": "linux/amd64",
+      "platformManifest": "sha256:48d02d3a37c8707acb1347f2a7b8b52efc6f4746692176e84886902e0da26edf",
+      "configDigest": "sha256:5f5eaf285a9129c73c3483fd88dca911409169a52b647102d65ae361cdb0307f",
+      "currentImage": "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap:v0.25.2",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap:v0.25.2"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa"
+        }
+      ],
+      "applied": false,
+      "identityMatchesRunning": true,
+      "offlineImageOnlyComparisonVerified": true
+    },
+    {
+      "namespace": "rke2-control-plane-system",
+      "deployment": "rke2-control-plane-controller-manager",
+      "container": "manager",
+      "index": 0,
+      "image": "ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5",
+      "runningImageIDs": [
+        "ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5"
+      ],
+      "anonymousPullVerified": true,
+      "platform": "linux/amd64",
+      "platformManifest": "sha256:74a3de2b12eef44839a585fd738bb3d674df4e635fc123220d872cb0ca9da8c8",
+      "configDigest": "sha256:212182d19b687855c8fa44391753adb62bdf8b27d8e6049e2d0e92647f351f1e",
+      "currentImage": "ghcr.io/rancher/cluster-api-provider-rke2-controlplane:v0.25.2",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "ghcr.io/rancher/cluster-api-provider-rke2-controlplane:v0.25.2"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:3fc66ad642ab65e0409e86542edbd381a5ce1fff0e3daab5848dc9e8eee942a5"
+        }
+      ],
+      "applied": false,
+      "identityMatchesRunning": true,
+      "offlineImageOnlyComparisonVerified": true
+    },
+    {
+      "namespace": "kube-system",
+      "deployment": "coredns",
+      "container": "coredns",
+      "index": 0,
+      "image": "registry.k8s.io/coredns/coredns@sha256:e7e6440cfd1e919280958f5b5a6ab2b184d385bba774c12ad2a9e1e4183f90d9",
+      "runningImageIDs": [
+        "sha256:38667dd9be96c17227adde456e33ad701bdbdc5c6db0272a1d33a929bd8e62d6"
+      ],
+      "anonymousPullVerified": true,
+      "platform": "linux/amd64",
+      "platformManifest": "sha256:fd5079792b93909db3adefa91e41c3995455013394f0197c7346786ae19079fc",
+      "configDigest": "sha256:38667dd9be96c17227adde456e33ad701bdbdc5c6db0272a1d33a929bd8e62d6",
+      "currentImage": "registry.k8s.io/coredns/coredns:v1.14.2",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "registry.k8s.io/coredns/coredns:v1.14.2"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/template/spec/containers/0/image",
+          "value": "registry.k8s.io/coredns/coredns@sha256:e7e6440cfd1e919280958f5b5a6ab2b184d385bba774c12ad2a9e1e4183f90d9"
+        }
+      ],
+      "applied": false,
+      "identityMatchesRunning": true,
+      "offlineImageOnlyComparisonVerified": true
+    }
+  ],
+  "capcPatch": "WITHHELD: newly built CAPC runtime differs from the locally imported image; not an identity-preserving tag-to-digest change",
+  "capcCandidateImage": "ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e",
+  "managementSubstrate": {
+    "image": "docker.io/kindest/node@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed",
+    "anonymousPullVerified": true,
+    "platform": "linux/amd64",
+    "platformManifest": "sha256:597367624b4748b74b98e4fe2d661cd78063d02ecdaca702fd90572375b83e67",
+    "configDigest": "sha256:0fa975026f71246c4e4744409d43e2e5884bb6e960851b438e50f455808c16f4"
+  },
+  "additionalControllers": "CoreDNS included. Existing kind node digest covers bundled API server, etcd, controller-manager, scheduler and node networking. Local-path provisioner is not required for the first CAPI apply; Flux is not currently deployed."
+}
