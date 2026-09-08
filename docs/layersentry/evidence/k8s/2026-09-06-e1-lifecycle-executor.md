@@ -50,3 +50,70 @@ No actual CloudStack, Kubernetes, CAPI, RKE2, CCM, CSI, Flux, network or VM muta
 For an ambiguous apply/patch/delete, do not replay until exact Kubernetes/CloudStack state has been read. Roll back cluster creation through CAPI deletion only after the volume-safety gate and retention preflight pass. A Flux baseline rollback pins the prior qualified commit and waits for reconciliation; do not use an unpinned branch.
 
 Remaining before E1 can pass: package/service wiring, authenticated CloudStack-backed authorization, real CRD admission/reconciliation, automatic RKE2 join, one CNI, CloudStack CCM, one CSI storage path, central Flux delivery, restart/rollback/failure tests and Rocky Linux evidence. PostgreSQL remains blocked until E0/E1 live gates pass.
+
+## 2026-09-08 live qualification checkpoint
+
+Source/distribution: `5d35ec923c4ce41014984fc6801d5071cb471125`; feature CI
+[34261337474](https://github.com/adaptgurus/cloudstack/actions/runs/34261337474)
+passed (137 K8s tests, five downstream tests, 13 governance tests).
+Production live gates remain false. This is bounded first-cluster qualification,
+not production certification. The co-located Rocky controller host was explicitly
+approved by the operator; its pre-existing SELinux mode is Permissive.
+
+Completed live actions:
+
+- Installed the verified systemd/filesystem controller distribution and pinned
+  Python/Gunicorn RPM dependencies on 10.10.10.14. BFF listens only on its Unix
+  socket; the reconciler timer remains inactive. Steps were executed individually.
+- Rolled CAPC to the approved immutable candidate
+  `ghcr.io/adaptgurus/layersentry-capc@sha256:f955d6a90b9da6e8aa18ab57c0e1ed4b47ae92b3309c64af715460a21a3a462e`;
+  all management provider Deployments became available. Seven other planned
+  identity-preserving image pins were applied. Old CAPC rollback content was
+  retained locally (archive SHA256
+  `1b8272f3a925178f5bbbe2660d35c22eea3aeeb196e03d8b2474daed50acbe75`).
+- Submitted the single approved 3-control-plane/1-worker request through the
+  existing LayerSentry executor, operation `e4df4d27-0b96-4f25-a191-21f45d70892c`,
+  namespace `lsk8s-83b979b50657`, cluster `ls-rke2-poc`.
+- Fixed the live CRD rejection: CAPRKE2 air-gap fields belong under agentConfig.
+  Fixed qualification template CPU details to request host-model through CAPC;
+  the old qemu64 guest did not boot successfully. No host-wide CPU setting,
+  service offering, template image, or provider version was changed.
+- CAPI/CAPC deleted the first uninitialized, root-only Machine and created its
+  replacement. No native CloudStack VM lifecycle API or finalizer removal was
+  used. The replacement is UUID `13656367-58bf-4197-8ab7-9e4c8de8875a`,
+  CloudStack name `ls-rke2-poc-control-plane-cpu-v2-q4nh7`, domain `i-4-9-VM`.
+  Its CPU is Icelake-Server with host features; QEMU agent reports Rocky 9.8
+  and kernel `5.14.0-687.10.1.el9_8.0.1.x86_64`.
+- CAPC owns two Active LB rules on frontend 10.10.11.23: TCP 6443
+  `fff91298-ec7b-42ea-95e1-793b224b581e` and TCP 9345
+  `3436abc0-7496-45a4-88cc-54c082e29aec`. Active rules are not evidence of
+  healthy/reachable RKE2 services.
+
+First unmet live gate: guest DHCP/IPv4 initialization. The replacement has only
+IPv6 link-local on eth0; native CloudStack's assigned address 172.17.30.202 is
+not proof the guest configured it. The VR reservation and lease entry correctly
+map MAC 02:02:00:d1:00:03 to 172.17.30.202. VR dnsmasq is active. Both guest
+vnet16 and VR vnet12 are forwarding on breth1-153.
+
+A 15-second guest-tap capture observed two DHCP requests and no reply. A separate
+20-second VR capture observed no DHCP packets; a subsequent simultaneous
+35-second capture observed no DHCP packets on either tap, so those windows do
+not conclusively identify the dropping rule. Host bridge-nf-call-iptables=1;
+firewalld puts unmatched bridged forwarding into its public chain, which ends
+in reject. Host firewall forwarding is the leading infrastructure hypothesis,
+not yet a packet-trace-proven root cause. No firewall, NAT, bridge, VLAN, or
+Hyper-V changes were made. Guest-exec is disabled by the template's QEMU agent;
+that restriction was preserved.
+
+Current result: one CAPC-created Rocky guest Running; no workload Node registered,
+no initialized control plane, no worker created, and no Cluster Ready, scale,
+workload delete, CCM, CSI, or Flux live certification. Preserve the operation and
+provider objects. Next action is a scoped host/VR packet trace and, if confirmed,
+reviewed host bridge-forwarding remediation by the infrastructure owner; then
+resume this same operation with fresh capacity evidence. Do not repeat cluster
+creation or globally disable filtering to bypass the blocker.
+
+Private diagnostic artifacts remain under
+`/home/opc/.local/share/layersentry/lifecycle-qualification/` (not imported;
+this directory also contains protected runtime material). No credentials,
+kubeconfigs, tokens, or private keys are included in this checkpoint.
