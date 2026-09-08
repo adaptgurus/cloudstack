@@ -1,0 +1,46 @@
+{
+  "architecture": "x86_64",
+  "dependencies": {
+    "dependencyMetadataClosureObserved": false,
+    "inactiveOptionalDependencies": [],
+    "missing": [
+      "gunicorn"
+    ],
+    "packages": []
+  },
+  "gunicorn": {
+    "status": "NOT_INSTALLED"
+  },
+  "gunicornPipShow": {},
+  "host": {
+    "approvedSharedCloudStackHost": true,
+    "dedicatedControllerOperatorAttestation": false,
+    "name": "layersentry.lab.example"
+  },
+  "osRelease": {
+    "ID": "rocky",
+    "NAME": "Rocky Linux",
+    "PRETTY_NAME": "Rocky Linux 9.8 (Blue Onyx)",
+    "VERSION_ID": "9.8"
+  },
+  "osReleaseSha256": "38ce563647e7c0b928489c19a6ad37a11d431d3b1705a67f60a66f5dd1d36256",
+  "packageArchiveIdentityNote": "Installed tree/NEVRA are observations. Missing original wheel/RPM artifact hashes must be supplied before pinning.",
+  "packagesInstalled": false,
+  "python": {
+    "implementation": "cpython",
+    "path": "/usr/bin/python3",
+    "resolvedPath": "/usr/bin/python3.9",
+    "rpmHeaderSha256": "297aaf4d58b45d2be9d12c5f69d286dbfea71af912bec018bf1b85f3f21b22f2",
+    "rpmNevra": "python3-0:3.9.25-7.el9_8.3.x86_64",
+    "sha256": "7a95e551de45a54b3b6819d80e71a7262cd7138c2a4f1ec905b4cc8895a034c2",
+    "stdlibFileCount": 626,
+    "stdlibPath": "/usr/lib64/python3.9",
+    "stdlibTreeSha256": "d4a7338da363f4098ca830f4fbc043efaf3585cfd4a1f0189446b9d3a3a8966d",
+    "unverifiedStdlibSymlinks": 0,
+    "version": "3.9.25",
+    "versionCommand": "Python 3.9.25"
+  },
+  "schemaVersion": "1.0",
+  "status": "OBSERVED_NOT_QUALIFIED",
+  "systemChanges": false
+}

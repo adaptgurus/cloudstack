@@ -121,7 +121,7 @@
   "treeSha256": "b874fd41f4a47e7a8efe7e1c5c04b76018219e387dcd2a56149146ae766f3efd",
   "runtimeDependencyLock": {
     "path": "tools/layersentry/k8s/artifacts/runtime-dependencies.json",
-    "sha256": "9abf753b875501ea4e970d0ccc5fc8b9e6558ad10cc46da48baffa0cab177bf3"
+    "sha256": "78d94752d232820752c492c158c96c9d114ef1a17ac856c8ddd547c01dcc20f0"
   },
   "runtimeIdentity": {},
   "releaseMetadata": "Install the release manifest and referenced artifact locks from the exact release commit separately; never copy runtime credentials from Git."

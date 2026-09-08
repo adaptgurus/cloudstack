@@ -1,10 +1,26 @@
 {
   "schemaVersion": "1.0",
   "status": "BLOCKED",
-  "reason": "Controller acceptance host identity not supplied",
+  "reason": "Selected shared Rocky host has no Gunicorn; package artifact provenance and dependency closure remain unresolved",
   "architecture": "x86_64",
-  "os": null,
-  "python": null,
+  "os": {
+    "id": "rocky",
+    "versionId": "9.8"
+  },
+  "python": {
+    "implementation": "CPython",
+    "path": "/usr/bin/python3",
+    "resolvedPath": "/usr/bin/python3.9",
+    "rpmHeaderSha256": "297aaf4d58b45d2be9d12c5f69d286dbfea71af912bec018bf1b85f3f21b22f2",
+    "rpmNevra": "python3-0:3.9.25-7.el9_8.3.x86_64",
+    "sha256": "7a95e551de45a54b3b6819d80e71a7262cd7138c2a4f1ec905b4cc8895a034c2",
+    "stdlibFileCount": 626,
+    "stdlibPath": "/usr/lib64/python3.9",
+    "stdlibTreeSha256": "d4a7338da363f4098ca830f4fbc043efaf3585cfd4a1f0189446b9d3a3a8966d",
+    "unverifiedStdlibSymlinks": 0,
+    "version": "3.9.25",
+    "versionCommand": "Python 3.9.25"
+  },
   "gunicorn": null,
   "packages": [],
   "dependencyClosureVerified": false,
@@ -40,21 +56,23 @@
     "systemdExternalModule": "gunicorn",
     "gunicornTransitiveDependencies": "UNKNOWN until exact installed package is selected and audited"
   },
-  "acceptanceHostSupplied": false,
+  "acceptanceHostSupplied": true,
   "acceptanceHostContract": {
     "osFamily": "Rocky Linux",
     "osMajor": 9,
     "architecture": "x86_64",
-    "role": "dedicated LayerSentry management/controller host",
+    "role": "User-approved co-located LayerSentry controller and CloudStack/KVM host",
     "prohibitedRoles": [
-      "CloudStack KVM hypervisor",
       "RKE2 workload node",
       "WSL development environment",
       "Docker build runner",
       "kind node"
     ],
-    "prohibitedHostAddresses": [
-      "10.10.10.14"
-    ]
+    "hostAddress": "10.10.10.14",
+    "dedicated": false
+  },
+  "hostObservation": {
+    "path": "docs/layersentry/evidence/k8s/2026-09-08-immutable-artifacts/controller-shared-host-observation.json",
+    "sha256": "fad3834922e7302c592e4d7811843bdbb8f2de114173e03ae17d4a88781b1655"
   }
 }

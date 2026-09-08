@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Observation only. Run on the dedicated Rocky 9 controller acceptance host.
+"""Observation only. Run on the operator-selected Rocky 9 controller acceptance host.
 
 Usage: /usr/bin/python3 -I -B collect-runtime-host.py --dedicated-controller-host
+For the approved DC shared host, use --approved-shared-cloudstack-host instead.
 Writes sanitized JSON to stdout only. Does not install packages or qualify a host.
 """
 import argparse
@@ -163,12 +164,23 @@ def dependency_observations():
             'dependencyMetadataClosureObserved': not missing and all(r['fileCount'] and not r['unverifiedFiles'] for r in result)}
 
 
+def host_role_allowed(addresses, loaded_services, shared):
+    # Shared qualification is an explicit exception for the user-approved DC host.
+    if any(service in loaded_services for service in ('rke2-server', 'rke2-agent')):
+        return False
+    if shared:
+        return '10.10.10.14' in addresses
+    return '10.10.10.14' not in addresses and 'cloudstack-agent' not in loaded_services
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--dedicated-controller-host', action='store_true')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--dedicated-controller-host', action='store_true')
+    group.add_argument('--approved-shared-cloudstack-host', action='store_true')
     args = parser.parse_args()
-    if not args.dedicated_controller_host or not sys.flags.isolated:
-        parser.error('use /usr/bin/python3 -I -B and --dedicated-controller-host on the selected acceptance host')
+    if not sys.flags.isolated:
+        parser.error('use /usr/bin/python3 -I -B with an explicit host-role option')
     os_release = Path('/etc/os-release').read_text()
     fields = {}
     for line in os_release.splitlines():
@@ -178,15 +190,21 @@ def main():
                 fields[key] = value.strip('"')
     code, architecture = query(['uname', '-m'])
     code_ip, addresses = query(['ip', '-j', '-4', 'addr', 'show'])
-    host_refused = '10.10.10.14' in addresses or code_ip != 0
+    host_refused = code_ip != 0
+    addresses = [a['local'] for interface in json.loads(addresses or '[]')
+                 for a in interface.get('addr_info', []) if a.get('family') == 'inet']
+    loaded_services = []
     for service in ('cloudstack-agent', 'rke2-server', 'rke2-agent'):
         code_unit, text = query(['systemctl', 'show', service+'.service', '--property=LoadState', '--value'])
-        host_refused |= code_unit < 0 or text.strip() not in {'not-found', ''}
+        host_refused |= code_unit < 0
+        if text.strip() not in {'not-found', ''}:
+            loaded_services.append(service)
+    host_refused |= not host_role_allowed(addresses, loaded_services, args.approved_shared_cloudstack_host)
     if (fields.get('ID') != 'rocky' or fields.get('VERSION_ID', '').split('.')[0] != '9'
             or code != 0 or architecture.strip() != 'x86_64' or host_refused
             or 'microsoft' in platform.release().lower()
             or Path('/.dockerenv').exists() or Path('/run/.containerenv').exists()):
-        print(json.dumps({'status': 'REFUSED', 'reason': 'Host does not meet dedicated Rocky 9 controller acceptance contract'}))
+        print(json.dumps({'status': 'REFUSED', 'reason': 'Host does not meet the selected Rocky 9 controller acceptance contract'}))
         return 2
     python = Path('/usr/bin/python3')
     if Path(sys.executable).resolve() != python.resolve():
@@ -210,7 +228,8 @@ def main():
             gunicorn = {'version': metadata.version('gunicorn'), 'modulePath': str(module.parent),
                         'moduleTreeSha256': tree, 'moduleFileCount': count, 'unverifiedSymlinks': links, 'rpmNevra': rpm_owner(module), 'rpmHeaderSha256': rpm_header(rpm_owner(module))}
     report = {'schemaVersion': '1.0', 'status': 'OBSERVED_NOT_QUALIFIED',
-        'host': {'name': platform.node(), 'dedicatedControllerOperatorAttestation': True},
+        'host': {'name': platform.node(), 'dedicatedControllerOperatorAttestation': args.dedicated_controller_host,
+                 'approvedSharedCloudStackHost': args.approved_shared_cloudstack_host},
         'osRelease': fields, 'osReleaseSha256': file_hash(Path('/etc/os-release')),
         'architecture': architecture.strip(),
         'python': {'path': str(python), 'resolvedPath': str(python.resolve()), 'sha256': file_hash(python),

@@ -84,13 +84,14 @@ class HostObservationTests(unittest.TestCase):
         self.assertNotIn('synthetic secret',result)
         self.assertTrue(run.call_args.kwargs['timeout']<=20)
 
-    def test_runtime_host_remains_unselected(self):
-        lock=json.loads((ROOT/'artifacts/runtime-dependencies.json').read_text())
-        self.assertEqual(lock['status'],'BLOCKED')
-        self.assertFalse(lock['acceptanceHostSupplied'])
-        self.assertEqual(lock['reason'],'Controller acceptance host identity not supplied')
-        self.assertIn('10.10.10.14',lock['acceptanceHostContract']['prohibitedHostAddresses'])
-        self.assertIsNone(lock['python']);self.assertIsNone(lock['gunicorn'])
+    def test_shared_host_exception_is_explicit_and_bounded(self):
+        self.assertFalse(observer.host_role_allowed(['10.10.10.14'], ['cloudstack-agent'], False))
+        self.assertTrue(observer.host_role_allowed(['10.10.10.14'], ['cloudstack-agent'], True))
+        self.assertFalse(observer.host_role_allowed(['10.10.10.20'], [], True))
+        self.assertFalse(observer.host_role_allowed(['10.10.10.140'], [], True))
+        self.assertFalse(observer.host_role_allowed(['10.10.10.14'], ['rke2-server'], True))
+        self.assertFalse(observer.host_role_allowed(['10.10.10.14'], ['rke2-agent'], True))
+        self.assertTrue(observer.host_role_allowed(['10.10.10.50'], [], False))
 
     def test_hashing_does_not_follow_package_symlinks(self):
         with tempfile.TemporaryDirectory() as directory:
