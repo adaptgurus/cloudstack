@@ -46,6 +46,20 @@ class SagaStore:
         self._initialize()
         os.chmod(self.path, 0o600)
 
+    def bind_qualification(self, identity):
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("CREATE TABLE IF NOT EXISTS qualification_binding (id INTEGER PRIMARY KEY CHECK(id=1), identity TEXT NOT NULL, retired INTEGER NOT NULL DEFAULT 0)")
+            connection.execute("INSERT OR IGNORE INTO qualification_binding (id,identity) VALUES (1,?)", (identity,))
+            row = connection.execute("SELECT identity,retired FROM qualification_binding WHERE id=1").fetchone()
+            if row["identity"] != identity or row["retired"]:
+                raise ConflictError("qualification journal is bound or retired")
+            connection.commit()
+
+    def retire_qualification(self):
+        with self._connect() as connection:
+            connection.execute("UPDATE qualification_binding SET retired=1 WHERE id=1")
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=15, isolation_level=None)
         connection.row_factory = sqlite3.Row

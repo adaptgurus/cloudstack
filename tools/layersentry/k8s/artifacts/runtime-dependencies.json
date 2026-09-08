@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
-  "status": "BLOCKED",
-  "reason": "Selected shared Rocky host has no Gunicorn; package artifact provenance and dependency closure remain unresolved",
+  "status": "PINNED",
+  "reason": "Measured on user-approved shared Rocky host; runtime package identities pinned, no production certification",
   "architecture": "x86_64",
   "os": {
     "id": "rocky",
@@ -21,9 +21,68 @@
     "version": "3.9.25",
     "versionCommand": "Python 3.9.25"
   },
-  "gunicorn": null,
-  "packages": [],
-  "dependencyClosureVerified": false,
+  "gunicorn": {
+    "version": "21.2.0",
+    "contentSha256": "68c4ba048504c5ea86a48463f34cfd0fd3ed9b9f5eecba54885ae099615e9555"
+  },
+  "packages": [
+    {
+      "name": "python",
+      "version": "3.9.25",
+      "sha256": "7a95e551de45a54b3b6819d80e71a7262cd7138c2a4f1ec905b4cc8895a034c2",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://in.mirrors.cicku.me/rocky/9.8/BaseOS/x86_64/os/Packages/p/python3-3.9.25-7.el9_8.3.x86_64.rpm",
+        "nevra": "python3-3.9.25-7.el9_8.3.x86_64",
+        "artifactSha256": "d38577c9d7d92b4cf0dc09ba9c670a6aef78003f627315e3da493919e63a0f23"
+      }
+    },
+    {
+      "name": "python-libs",
+      "version": "3.9.25",
+      "sha256": "d4a7338da363f4098ca830f4fbc043efaf3585cfd4a1f0189446b9d3a3a8966d",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://in.mirrors.cicku.me/rocky/9.8/BaseOS/x86_64/os/Packages/p/python3-libs-3.9.25-7.el9_8.3.x86_64.rpm",
+        "nevra": "python3-libs-3.9.25-7.el9_8.3.x86_64",
+        "artifactSha256": "b802d3a2eb92533949857e081d27b718a2ecb32a83f2c552e6ba6ffbd2c9bf5f"
+      }
+    },
+    {
+      "name": "gunicorn",
+      "version": "21.2.0",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://mirror.krfoss.org/fedora-epel/9/Everything/x86_64/Packages/p/python3-gunicorn-21.2.0-2.el9.noarch.rpm",
+        "nevra": "python3-gunicorn-21.2.0-2.el9.noarch",
+        "artifactSha256": "faf74539a627474e1031f0e7a090c8b1865a3284185b9e28e4bc0d8515160de0"
+      }
+    },
+    {
+      "name": "packaging",
+      "version": "20.9",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://rocky-linux-asia-south1.production.gcp.mirrors.ctrliq.cloud/pub/rocky//9.8/AppStream/x86_64/os/Packages/p/python3-packaging-20.9-5.el9.noarch.rpm",
+        "nevra": "python3-packaging-20.9-5.el9.noarch",
+        "artifactSha256": "b532d7fbe4a6adbd7b1587d12d7b1e986a49bec02211768889f21e83a8e18674"
+      }
+    },
+    {
+      "name": "pyparsing",
+      "version": "2.4.7",
+      "sha256": "a20f5184f709f1ab524a1a5b5f46b303e157dc83f5439f9ad9622caadfabac82",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://in.mirrors.cicku.me/rocky/9.8/BaseOS/x86_64/os/Packages/p/python3-pyparsing-2.4.7-9.el9.0.1.noarch.rpm",
+        "nevra": "python3-pyparsing-2.4.7-9.el9.0.1.noarch",
+        "artifactSha256": "572fd75a74c91b982994f92571b4472b79120fd6f8ac7f1b6be4cc8113e8dc56"
+      }
+    }
+  ],
+  "dependencyClosureVerified": true,
   "sourceImportAudit": {
     "imports": [
       "__future__",
@@ -54,7 +113,10 @@
     ],
     "nonStdlibProductImports": [],
     "systemdExternalModule": "gunicorn",
-    "gunicornTransitiveDependencies": "UNKNOWN until exact installed package is selected and audited"
+    "gunicornTransitiveDependencies": [
+      "packaging==20.9",
+      "pyparsing==2.4.7"
+    ]
   },
   "acceptanceHostSupplied": true,
   "acceptanceHostContract": {
@@ -72,7 +134,17 @@
     "dedicated": false
   },
   "hostObservation": {
-    "path": "docs/layersentry/evidence/k8s/2026-09-08-immutable-artifacts/controller-shared-host-observation.json",
-    "sha256": "fad3834922e7302c592e4d7811843bdbb8f2de114173e03ae17d4a88781b1655"
+    "path": "docs/layersentry/evidence/k8s/2026-09-08-immutable-artifacts/controller-runtime-installed.json",
+    "sha256": "ff5bc2ed77e606b624e52f6e2aac0bb92c01a78b5919dd1f8792e944c4c8d204"
+  },
+  "identity": {
+    "os": {
+      "id": "rocky",
+      "versionId": "9.8"
+    },
+    "pythonVersion": "3.9.25",
+    "pythonSha256": "7a95e551de45a54b3b6819d80e71a7262cd7138c2a4f1ec905b4cc8895a034c2",
+    "gunicornVersion": "21.2.0",
+    "gunicornContentSha256": "68c4ba048504c5ea86a48463f34cfd0fd3ed9b9f5eecba54885ae099615e9555"
   }
 }

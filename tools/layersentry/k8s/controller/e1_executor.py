@@ -72,13 +72,14 @@ class E1Executor:
     def __init__(
         self, kubernetes: KubernetesClient, resolver: InfrastructureResolver,
         gates: ReleaseGates, flux: FluxBaseline,
-        *, qualification_manifest=None,
+        *, qualification_manifest=None, qualification=None,
     ):
         self.kubernetes = kubernetes
         self.resolver = resolver
         self.gates = gates
         self.flux = flux
         self.qualification_manifest = qualification_manifest
+        self.qualification = qualification
 
     def _resolved(self, operation: Operation) -> ResolvedInfrastructure:
         value = operation.resources.get("resolvedInfrastructure")
@@ -130,6 +131,12 @@ class E1Executor:
 
     def reconcile(self, operation: Operation, step: Mapping[str, Any]) -> StepResult:
         action = step.get("action")
+        if self.qualification:
+            if operation.kind != "kubernetes.cluster.create":
+                raise InvalidRequestError("qualification permits only its first-cluster create")
+            self.qualification.validate_request(parse_cluster_request(operation.request))
+            if action in {"resolve-iaas-inputs", "reconcile-infrastructure", "reconcile-control-plane", "reconcile-worker-pools"}:
+                self.qualification.admit_capacity(self.resolver, operation.request)
         if action == "scale-worker-pool":
             request = operation.request
             resource = {
@@ -176,7 +183,7 @@ class E1Executor:
             self.kubernetes.delete(resource)
             return StepResult(StepOutcome.PENDING, detail="CAPI Cluster deletion requested; CAPC remains VM authority")
         if action == "resolve-certified-release":
-            if not self.gates.kubernetes_ready():
+            if not self.gates.kubernetes_ready() and self.qualification is None:
                 return StepResult(StepOutcome.FAILED, detail="release evidence gates are no longer satisfied")
             return StepResult(StepOutcome.CONVERGED, {
                 "release": {

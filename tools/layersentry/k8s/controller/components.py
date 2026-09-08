@@ -250,7 +250,7 @@ def _controller_distribution(manifest, blockers, artifact_root):
                     "systemd/layersentry-k8s-reconciler.timer"}
         required.update("controller/" + name for name in (
             "__init__.py", "bff.py", "runtime.py", "service.py", "components.py", "e1_executor.py",
-            "e1_resources.py", "cloudstack.py", "model.py", "store.py", "kubernetes.py", "auth.py", "capacity.py", "flux_resources.py"))
+            "qualification.py", "e1_resources.py", "cloudstack.py", "model.py", "store.py", "kubernetes.py", "auth.py", "capacity.py", "flux_resources.py"))
         expected = {str(p.relative_to(root)) for p in (root / "controller").glob("*.py")} | required
         if not isinstance(rows, list) or len(rows) != len(expected):
             raise InvalidRequestError("distribution file set invalid")

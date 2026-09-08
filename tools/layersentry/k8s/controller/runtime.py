@@ -85,6 +85,7 @@ class RuntimeConfig:
     profile: ClusterProfile
     flux_path: str
     flux_namespace: str
+    qualification_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -127,6 +128,10 @@ def load_runtime_config(path: Path | str) -> RuntimeConfig:
         root = json.loads(config_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise InvalidRequestError("runtime configuration is unreadable or invalid") from exc
+    qualification_path = None
+    if isinstance(root, Mapping) and "qualificationContext" in root:
+        root = dict(root)
+        qualification_path = _absolute_file(root.pop("qualificationContext"), "qualificationContext")
     root = _object(root, "root", _ROOT_KEYS)
     if root["schemaVersion"] != "1.0":
         raise InvalidRequestError("unsupported runtime configuration schemaVersion")
@@ -176,14 +181,20 @@ def load_runtime_config(path: Path | str) -> RuntimeConfig:
         raise InvalidRequestError("runtime Flux fields must be non-empty strings")
     return RuntimeConfig(
         release_manifest, state_database, cloudstack, session, kubernetes_config,
-        cluster_profile, flux["path"], flux["sourceNamespace"],
+        cluster_profile, flux["path"], flux["sourceNamespace"], qualification_path,
     )
 
 
 def build_runtime(config_path: Path | str) -> ControllerRuntime:
     config = load_runtime_config(config_path)
     contract = load_release_contract(config.release_manifest)
-    contract.readiness.require_deployable()
+    store = SagaStore(config.state_database)
+    qualification = None
+    if config.qualification_path is not None:
+        from .qualification import FirstClusterQualification
+        qualification = FirstClusterQualification(config.qualification_path, config.release_manifest, store)
+    else:
+        contract.readiness.require_deployable()
     kubernetes = KubernetesClient(config.kubernetes)
     resolver = CloudStackResolver(CloudStackClient(config.cloudstack), config.profile)
     flux = FluxBaseline(
@@ -193,9 +204,8 @@ def build_runtime(config_path: Path | str) -> ControllerRuntime:
         source_namespace=config.flux_namespace,
     )
     executor = E1Executor(kubernetes, resolver, contract.gates, flux,
-                          qualification_manifest=contract.manifest)
-    store = SagaStore(config.state_database)
-    service = ControllerService(store, CloudStackCapabilityAuthorizer(), executor, contract.gates)
+                          qualification_manifest=contract.manifest, qualification=qualification)
+    service = ControllerService(store, CloudStackCapabilityAuthorizer(), executor, contract.gates, qualification=qualification)
     authenticator = CloudStackSessionAuthenticator(config.session)
     return ControllerRuntime(config, contract, store, service, BFFApplication(service, authenticator))
 

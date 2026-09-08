@@ -259,6 +259,7 @@ def validate_cluster_request(
     request: ClusterRequest,
     gates: ReleaseGates,
     storage_profiles: Sequence[StorageProfile] = (),
+    *, qualification=None,
 ) -> List[str]:
     """Validate an RKE2/CAPI cluster request and return non-blocking warnings."""
 
@@ -306,6 +307,10 @@ def validate_cluster_request(
                 raise ValidationError(
                     f"StorageProfile {profile.name} is a direct node-disk profile and is not production-enabled"
                 )
+
+    if qualification is not None:
+        qualification.validate_request(request)
+        return ["First-cluster qualification only; no production certification."]
 
     if not gates.tuple_reconciliation:
         raise ValidationError("release tuple has not passed CAPI/CAPC/CAPRKE2 reconciliation")
@@ -418,9 +423,9 @@ def validate_application_request(
     return kind, warnings
 
 
-def plan_cluster_create(request: ClusterRequest, gates: ReleaseGates, storage_profiles: Sequence[StorageProfile]) -> WorkflowPlan:
+def plan_cluster_create(request: ClusterRequest, gates: ReleaseGates, storage_profiles: Sequence[StorageProfile], *, qualification=None) -> WorkflowPlan:
     try:
-        warnings = validate_cluster_request(request, gates, storage_profiles)
+        warnings = validate_cluster_request(request, gates, storage_profiles, qualification=qualification)
     except ValidationError as exc:
         return WorkflowPlan(ServiceKind.KUBERNETES, request.name, (), (str(exc),), ())
 

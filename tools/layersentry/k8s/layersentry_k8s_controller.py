@@ -29,6 +29,7 @@ def main() -> int:
     parser.add_argument("--config", required=True, help="absolute runtime JSON path")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("check-config")
+    subparsers.add_parser("retire-qualification")
     reconcile = subparsers.add_parser("reconcile")
     reconcile.add_argument("--max-operations", type=int, default=20)
     args = parser.parse_args()
@@ -36,11 +37,22 @@ def main() -> int:
         if args.command == "check-config":
             config = load_runtime_config(args.config)
             contract = load_release_contract(config.release_manifest)
+            if config.qualification_path is not None:
+                runtime = build_runtime(args.config)
+                print(json.dumps({"status": "QUALIFICATION_ONLY", "productionDeployable": False,
+                                  "blockers": list(contract.readiness.blockers)}))
+                return 0
             print(json.dumps({
                 "status": "READY" if contract.readiness.deployable else "BLOCKED",
                 "blockers": list(contract.readiness.blockers),
             }, sort_keys=True))
             return 0 if contract.readiness.deployable else 2
+        if args.command == "retire-qualification":
+            from controller.store import SagaStore
+            config = load_runtime_config(args.config)
+            SagaStore(config.state_database).retire_qualification()
+            print(json.dumps({"status": "QUALIFICATION_RETIRED"}))
+            return 0
         runtime = build_runtime(args.config)
         print(json.dumps(runtime.reconcile_batch(args.max_operations), sort_keys=True))
         return 0

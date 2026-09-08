@@ -99,7 +99,7 @@ class ArtifactBindingTest(unittest.TestCase):
             self.assertIs(MANIFEST[section][field], False)
         blockers = evaluate_component_readiness(MANIFEST).blockers
         self.assertEqual(len([b for b in blockers if b.startswith("E1 evidence gate")]), 4)
-        self.assertTrue(any("Controller" in b for b in blockers))
+        self.assertFalse(evaluate_component_readiness(MANIFEST).deployable)
 
     def test_resource_generation_enforces_reserved_project_template(self):
         from test_e1_resources import request, resolved

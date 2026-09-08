@@ -1,0 +1,204 @@
+{
+  "status": "LIVE_VERIFIED",
+  "scope": "Installed runtime package identities only; controller not deployed",
+  "observation": {
+    "architecture": "x86_64",
+    "dependencies": {
+      "dependencyMetadataClosureObserved": false,
+      "inactiveOptionalDependencies": [
+        "eventlet",
+        "gevent",
+        "importlib-metadata",
+        "setproctitle",
+        "tornado"
+      ],
+      "missing": [],
+      "packages": [
+        {
+          "fileCount": 0,
+          "files": [],
+          "installationSource": "pip metadata; archive hash may require owner-supplied wheel",
+          "installedContentSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "installedRecordSha256": null,
+          "installer": "rpm",
+          "name": "gunicorn",
+          "rpmHeaderSha256": {},
+          "rpmNevra": [],
+          "unverifiedFiles": 0,
+          "version": "21.2.0",
+          "wheelOrSourceArchiveSha256": null
+        },
+        {
+          "fileCount": 0,
+          "files": [],
+          "installationSource": "pip metadata; archive hash may require owner-supplied wheel",
+          "installedContentSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "installedRecordSha256": null,
+          "installer": "rpm",
+          "name": "packaging",
+          "rpmHeaderSha256": {},
+          "rpmNevra": [],
+          "unverifiedFiles": 0,
+          "version": "20.9",
+          "wheelOrSourceArchiveSha256": null
+        },
+        {
+          "fileCount": 8,
+          "files": [
+            {
+              "path": "pyparsing-2.4.7.dist-info/INSTALLER",
+              "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508"
+            },
+            {
+              "path": "pyparsing-2.4.7.dist-info/LICENSE",
+              "sha256": "10d5120a16805804ffda8b688c220bfb4e8f39741b57320604d455a309e01972"
+            },
+            {
+              "path": "pyparsing-2.4.7.dist-info/METADATA",
+              "sha256": "38105277dcab9496432631402dd026294753fef33b92ec92432197c190ee780b"
+            },
+            {
+              "path": "pyparsing-2.4.7.dist-info/RECORD",
+              "sha256": "2bd526b7e6505e1194a22af219253496b6bcf429ba14fe336b8c39b88803016a"
+            },
+            {
+              "path": "pyparsing-2.4.7.dist-info/REQUESTED",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "path": "pyparsing-2.4.7.dist-info/WHEEL",
+              "sha256": "67e9f2629c2b712ab17ddbb1e4c6e7fc3439db988fec9d831b72601af398c934"
+            },
+            {
+              "path": "pyparsing-2.4.7.dist-info/top_level.txt",
+              "sha256": "7943a31b3255865437592dab140cb698ddcb5ffec5293339192274e237e72e65"
+            },
+            {
+              "path": "pyparsing.py",
+              "sha256": "a315ff64ecfcb7e7aba2cf94598ee726071d5200fead0e770a4d2aa7bfefdc88"
+            }
+          ],
+          "installationSource": "RPM ownership",
+          "installedContentSha256": "a20f5184f709f1ab524a1a5b5f46b303e157dc83f5439f9ad9622caadfabac82",
+          "installedRecordSha256": "efa2a3721b31ce7f64a47b3c4416e839c5322bbfa2130f6583f917ddafba01f7",
+          "installer": "pip",
+          "name": "pyparsing",
+          "rpmHeaderSha256": {
+            "python3-pyparsing-0:2.4.7-9.el9.0.1.noarch": "4c796713f4115a4a3d6f46ea5d082bab275823263f222898f534183dd1926817"
+          },
+          "rpmNevra": [
+            "python3-pyparsing-0:2.4.7-9.el9.0.1.noarch"
+          ],
+          "unverifiedFiles": 0,
+          "version": "2.4.7",
+          "wheelOrSourceArchiveSha256": null
+        }
+      ]
+    },
+    "gunicorn": {
+      "moduleFileCount": 34,
+      "modulePath": "/usr/lib/python3.9/site-packages/gunicorn",
+      "moduleTreeSha256": "68c4ba048504c5ea86a48463f34cfd0fd3ed9b9f5eecba54885ae099615e9555",
+      "rpmHeaderSha256": "e6ff779a01df01845168a4b7fbe30f23c4b3a89fe5bce925ca034cb797e50af9",
+      "rpmNevra": "python3-gunicorn-0:21.2.0-2.el9.noarch",
+      "unverifiedSymlinks": 0,
+      "version": "21.2.0"
+    },
+    "gunicornPipShow": {
+      "Location": "/usr/lib/python3.9/site-packages",
+      "Name": "gunicorn",
+      "Requires": "packaging",
+      "Version": "21.2.0"
+    },
+    "host": {
+      "approvedSharedCloudStackHost": true,
+      "dedicatedControllerOperatorAttestation": false,
+      "name": "layersentry.lab.example"
+    },
+    "osRelease": {
+      "ID": "rocky",
+      "NAME": "Rocky Linux",
+      "PRETTY_NAME": "Rocky Linux 9.8 (Blue Onyx)",
+      "VERSION_ID": "9.8"
+    },
+    "osReleaseSha256": "38ce563647e7c0b928489c19a6ad37a11d431d3b1705a67f60a66f5dd1d36256",
+    "packageArchiveIdentityNote": "Installed tree/NEVRA are observations. Missing original wheel/RPM artifact hashes must be supplied before pinning.",
+    "packagesInstalled": false,
+    "python": {
+      "implementation": "cpython",
+      "path": "/usr/bin/python3",
+      "resolvedPath": "/usr/bin/python3.9",
+      "rpmHeaderSha256": "297aaf4d58b45d2be9d12c5f69d286dbfea71af912bec018bf1b85f3f21b22f2",
+      "rpmNevra": "python3-0:3.9.25-7.el9_8.3.x86_64",
+      "sha256": "7a95e551de45a54b3b6819d80e71a7262cd7138c2a4f1ec905b4cc8895a034c2",
+      "stdlibFileCount": 626,
+      "stdlibPath": "/usr/lib64/python3.9",
+      "stdlibTreeSha256": "d4a7338da363f4098ca830f4fbc043efaf3585cfd4a1f0189446b9d3a3a8966d",
+      "unverifiedStdlibSymlinks": 0,
+      "version": "3.9.25",
+      "versionCommand": "Python 3.9.25"
+    },
+    "schemaVersion": "1.0",
+    "status": "OBSERVED_NOT_QUALIFIED",
+    "systemChanges": false
+  },
+  "rpmSignatures": "5/5 digests signatures OK",
+  "rpmInstalledVerification": "rpm -V python3 python3-libs python3-gunicorn python3-packaging python3-pyparsing: exit 0, no discrepancies",
+  "packages": [
+    {
+      "name": "python",
+      "version": "3.9.25",
+      "sha256": "7a95e551de45a54b3b6819d80e71a7262cd7138c2a4f1ec905b4cc8895a034c2",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://in.mirrors.cicku.me/rocky/9.8/BaseOS/x86_64/os/Packages/p/python3-3.9.25-7.el9_8.3.x86_64.rpm",
+        "nevra": "python3-3.9.25-7.el9_8.3.x86_64",
+        "artifactSha256": "d38577c9d7d92b4cf0dc09ba9c670a6aef78003f627315e3da493919e63a0f23"
+      }
+    },
+    {
+      "name": "python-libs",
+      "version": "3.9.25",
+      "sha256": "d4a7338da363f4098ca830f4fbc043efaf3585cfd4a1f0189446b9d3a3a8966d",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://in.mirrors.cicku.me/rocky/9.8/BaseOS/x86_64/os/Packages/p/python3-libs-3.9.25-7.el9_8.3.x86_64.rpm",
+        "nevra": "python3-libs-3.9.25-7.el9_8.3.x86_64",
+        "artifactSha256": "b802d3a2eb92533949857e081d27b718a2ecb32a83f2c552e6ba6ffbd2c9bf5f"
+      }
+    },
+    {
+      "name": "gunicorn",
+      "version": "21.2.0",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://mirror.krfoss.org/fedora-epel/9/Everything/x86_64/Packages/p/python3-gunicorn-21.2.0-2.el9.noarch.rpm",
+        "nevra": "python3-gunicorn-21.2.0-2.el9.noarch",
+        "artifactSha256": "faf74539a627474e1031f0e7a090c8b1865a3284185b9e28e4bc0d8515160de0"
+      }
+    },
+    {
+      "name": "packaging",
+      "version": "20.9",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://rocky-linux-asia-south1.production.gcp.mirrors.ctrliq.cloud/pub/rocky//9.8/AppStream/x86_64/os/Packages/p/python3-packaging-20.9-5.el9.noarch.rpm",
+        "nevra": "python3-packaging-20.9-5.el9.noarch",
+        "artifactSha256": "b532d7fbe4a6adbd7b1587d12d7b1e986a49bec02211768889f21e83a8e18674"
+      }
+    },
+    {
+      "name": "pyparsing",
+      "version": "2.4.7",
+      "sha256": "a20f5184f709f1ab524a1a5b5f46b303e157dc83f5439f9ad9622caadfabac82",
+      "installationSource": {
+        "kind": "rpm",
+        "url": "https://in.mirrors.cicku.me/rocky/9.8/BaseOS/x86_64/os/Packages/p/python3-pyparsing-2.4.7-9.el9.0.1.noarch.rpm",
+        "nevra": "python3-pyparsing-2.4.7-9.el9.0.1.noarch",
+        "artifactSha256": "572fd75a74c91b982994f92571b4472b79120fd6f8ac7f1b6be4cc8113e8dc56"
+      }
+    }
+  ]
+}

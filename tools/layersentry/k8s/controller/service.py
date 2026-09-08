@@ -166,13 +166,14 @@ def parse_cluster_request(payload: Mapping[str, Any]) -> ClusterRequest:
 class ControllerService:
     def __init__(
         self, store: SagaStore, authorizer: Authorizer, executor: StepExecutor,
-        gates: ReleaseGates, storage_profiles: Sequence[StorageProfile] = (),
+        gates: ReleaseGates, storage_profiles: Sequence[StorageProfile] = (), *, qualification=None,
     ):
         self.store = store
         self.authorizer = authorizer
         self.executor = executor
         self.gates = gates
         self.storage_profiles = tuple(storage_profiles)
+        self.qualification = qualification
 
     def readiness(self, actor: Actor) -> Mapping[str, Any]:
         self.authorizer.require(actor, "kubernetes.readiness.read", "*")
@@ -186,7 +187,9 @@ class ControllerService:
         request = parse_cluster_request(payload)
         project_id = request.project_id or actor.account_id
         self.authorizer.require(actor, "kubernetes.cluster.create", project_id)
-        plan = plan_cluster_create(request, self.gates, self.storage_profiles)
+        if self.qualification and idempotency_key != self.qualification.context["idempotencyKey"]:
+            raise InvalidRequestError("qualification requires its single durable idempotency key")
+        plan = plan_cluster_create(request, self.gates, self.storage_profiles, qualification=self.qualification)
         if not plan.executable:
             raise InvalidRequestError("; ".join(plan.blockers))
         normalized = asdict(request)
@@ -213,6 +216,8 @@ class ControllerService:
     def submit_cluster_scale(
         self, actor: Actor, payload: Mapping[str, Any], idempotency_key: str,
     ) -> tuple[Operation, bool]:
+        if self.qualification:
+            raise InvalidRequestError("first-cluster qualification does not authorize scale/delete before lifecycle evidence")
         allowed = {"cluster_name", "namespace", "node_pool", "replicas", "project_id"}
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("request body must be a JSON object")
@@ -244,6 +249,8 @@ class ControllerService:
     def submit_cluster_delete(
         self, actor: Actor, payload: Mapping[str, Any], idempotency_key: str,
     ) -> tuple[Operation, bool]:
+        if self.qualification:
+            raise InvalidRequestError("first-cluster qualification does not authorize scale/delete before lifecycle evidence")
         allowed = {"cluster_name", "namespace", "project_id", "confirm_cluster_name", "retain_workload_volumes"}
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("request body must be a JSON object")

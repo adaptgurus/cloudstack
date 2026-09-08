@@ -83,6 +83,7 @@ class ComponentReadinessTest(unittest.TestCase):
         }
         for gate in ("tupleReconciliation", "endpoint6443", "endpoint9345", "fluxRemoteReconcile"):
             candidate["hardGates"][gate] = True
+        candidate.pop("controllerDistribution")
         result = evaluate_component_readiness(candidate)
         self.assertFalse(result.deployable)
         self.assertTrue(any("Controller" in b for b in result.blockers))
