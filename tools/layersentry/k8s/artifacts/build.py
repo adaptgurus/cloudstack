@@ -27,7 +27,8 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parent
 K8S = ROOT.parent
-COMPONENTS = {'ccm': ('cloudstack-ccm', './cmd/cloudstack-ccm', 'cloudstack-ccm'),
+COMPONENTS = {'capc': ('capc', '.', 'manager'),
+              'ccm': ('cloudstack-ccm', './cmd/cloudstack-ccm', 'cloudstack-ccm'),
               'csi': ('cloudstack-csi', './cmd/cloudstack-csi-driver', 'cloudstack-csi-driver')}
 
 
@@ -98,14 +99,16 @@ def build(component, output):
             package_layer = ('COPY locked-apks /locked-apks\n'
                              'RUN --network=none apk add --no-network /locked-apks/*.apk '
                              '&& rm -rf /locked-apks /var/cache/apk/* /var/log/apk.log\n')
+        tests = "go test -p 2 ./pkg/... -ginkgo.label-filter=\"!integ\"" if component == 'capc' else 'go test -p 2 ./...'
         dockerfile = (f'FROM {images["builder"]} AS build\n'
                       'WORKDIR /src\nENV GOTOOLCHAIN=local CGO_ENABLED=0 GOFLAGS=-mod=readonly\n'
                       'COPY go.mod go.sum ./\nRUN go mod download && go mod verify\n'
-                      'COPY . .\nRUN go test -p 2 ./...\n'
+                      f'COPY . .\nRUN {tests}\n'
                       f'RUN go build -p 2 -trimpath -buildvcs=false -o /artifact {target}\n'
                       f'FROM {runtime}\n' + package_layer +
                       f'COPY --from=build /artifact /{binary}\n'
-                      'LABEL org.opencontainers.image.source="https://github.com/adaptgurus/layersentry-flux-catalog"\n'
+                      'LABEL org.opencontainers.image.source="https://github.com/adaptgurus/layersentry-flux-catalog"\n' +
+                      ('USER 65532:65532\n' if component == 'capc' else '') +
                       f'ENTRYPOINT ["/{binary}"]\n')
         (source / 'Dockerfile.qualification').write_text(dockerfile)
         (source / '.dockerignore').write_text('.git\n')
@@ -126,7 +129,7 @@ def build(component, output):
         report = {'component': component, 'sourceCommit': spec['upstreamCommit'],
                   'patches': spec['patches'], 'builder': images['builder'], 'runtime': runtime,
                   'recipeSha256': sha(dockerfile.encode()), 'apkLockSha256': package_lock,
-                  'cleanBuildRuntimeDigests': digests, 'tests': 'go test -p 2 ./... passed in both builds',
+                  'cleanBuildRuntimeDigests': digests, 'tests': tests + ' passed in both builds',
                   'liveQualified': False}
         output.mkdir(parents=True, exist_ok=True)
         (output / f'{component}.json').write_text(json.dumps(report, indent=2) + '\n')
