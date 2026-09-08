@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "sourceCommit": "1bea2299ca9851d0f071b0657f57b8ab048fafbb",
+  "sourceCommit": "6f36134574fabdb24ba00ab0c3604d217af6409b",
   "distribution": "systemd-filesystem",
   "files": [
     {
@@ -37,7 +37,7 @@
       "path": "controller/components.py",
       "installedPath": "/usr/lib/layersentry/k8s/controller/components.py",
       "mode": "0644",
-      "sha256": "cb9e62a6d693eb1f71483c091f8ffac237956e9784444916635f2b6216959f34"
+      "sha256": "6f1781f53573e3276982c8d2a0c3acb990c848864bbef3e6dc4ba624eaaba5ac"
     },
     {
       "path": "controller/e1_executor.py",
@@ -49,7 +49,7 @@
       "path": "controller/e1_resources.py",
       "installedPath": "/usr/lib/layersentry/k8s/controller/e1_resources.py",
       "mode": "0644",
-      "sha256": "8feb3d869b444cff4371bfca1cc71671e89329decd325d64ff81c69844f8eae8"
+      "sha256": "852db7a743e14ea9eb7fd20e5908027fe096a0b29d8466e471a26072022f04ea"
     },
     {
       "path": "controller/flux_resources.py",
@@ -118,7 +118,11 @@
       "sha256": "040aaf2d3450c03d88d942e338d8bdfd837a4f077bb73bcb4126c618b70eea4a"
     }
   ],
-  "treeSha256": "ea38097a993aacb2528ba9182d6d98d6ba42aa02e0090c0da1d5de3325627c03",
-  "hostDependencies": "BLOCKED: Python/Gunicorn OS package identities not yet qualified",
+  "treeSha256": "cd0af9a690220025b1e4e198793270738776e4e6a07850f238038391d0afe25c",
+  "runtimeDependencyLock": {
+    "path": "tools/layersentry/k8s/artifacts/runtime-dependencies.json",
+    "sha256": "85419098568f1bceeb3f7ef2d02388840fceda55b2a3f9ef72ede6526d9198e3"
+  },
+  "runtimeIdentity": {},
   "releaseMetadata": "Install the release manifest and referenced artifact locks from the exact release commit separately; never copy runtime credentials from Git."
 }

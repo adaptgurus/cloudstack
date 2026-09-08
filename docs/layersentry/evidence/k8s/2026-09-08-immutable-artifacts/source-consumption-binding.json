@@ -75,5 +75,26 @@
     "registrySemantics": "DisableDefaultEndpoint clears default endpoint for configured mirrors. Wildcard plus explicit docker.io mirrors select loopback port 1; no public fallback. A verified archive supplies local images before startup. Runtime archive mismatch keeps release readiness blocked.",
     "upstreamDocumentation": "https://docs.rke2.io/install/private_registry"
   },
-  "deploymentHostEvidence": "docs/layersentry/evidence/k8s/2026-09-06-e1-controller-runtime-wiring.md:84 states development host is not Rocky acceptance target and Gunicorn is not packaged."
+  "deploymentHostEvidence": "docs/layersentry/evidence/k8s/2026-09-06-e1-controller-runtime-wiring.md:84 states development host is not Rocky acceptance target and Gunicorn is not packaged.",
+  "controllerDistribution": {
+    "path": "tools/layersentry/k8s/artifacts/controller-distribution.json",
+    "sha256": "0ab5140e373bf0c495423d769dc6ac13ff73afa00653d712a1a15a65961ceccc",
+    "sourceCommit": "6f36134574fabdb24ba00ab0c3604d217af6409b",
+    "treeSha256": "cd0af9a690220025b1e4e198793270738776e4e6a07850f238038391d0afe25c"
+  },
+  "runtimeDependencyLock": {
+    "path": "tools/layersentry/k8s/artifacts/runtime-dependencies.json",
+    "sha256": "85419098568f1bceeb3f7ef2d02388840fceda55b2a3f9ef72ede6526d9198e3"
+  },
+  "readinessBlockers": [
+    "Controller runtime dependency identity is unresolved",
+    "RKE2 archive consumption identity is unresolved or mismatched",
+    "CloudStack CCM v1.2.0 is not qualified with Kubernetes 1.36",
+    "CloudStack CSI project lifecycle is not qualified",
+    "CloudStack CSI resize idempotency is not live-qualified",
+    "E1 evidence gate tupleReconciliation is false",
+    "E1 evidence gate endpoint6443 is false",
+    "E1 evidence gate endpoint9345 is false",
+    "E1 evidence gate fluxRemoteReconcile is false"
+  ]
 }
