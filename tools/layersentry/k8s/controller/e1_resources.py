@@ -79,7 +79,7 @@ def _metadata(name: str, resolved: ResolvedInfrastructure, *, annotations=None) 
 
 
 def _machine_template(
-    name: str, resolved: ResolvedInfrastructure, offering_id: str, template_id: str,
+    name: str, resolved: ResolvedInfrastructure, offering_id: str, template_id: str, *, cpu_mode=None,
 ) -> dict[str, Any]:
     return {
         "apiVersion": "infrastructure.cluster.x-k8s.io/v1beta3",
@@ -91,6 +91,7 @@ def _machine_template(
                 "offering": {"id": offering_id},
                 "template": {"id": template_id},
                 "failureDomainName": "primary",
+                **({"details": {"guest.cpu.mode": cpu_mode}} if cpu_mode else {}),
             },
         }},
     }
@@ -163,6 +164,8 @@ def build_cluster_resources(
     endpoint = _endpoint_host(resolved.endpoint_host)
     cluster_name = request.name
     control_plane_name = f"{cluster_name}-control-plane"
+    cpu_mode = "host-model" if resolved.project_id == qualification["projectId"] else None
+    cp_template_name = control_plane_name + ("-cpu-v2" if cpu_mode else "")
     resources: list[Mapping[str, Any]] = [
         {
             "apiVersion": "v1",
@@ -195,8 +198,8 @@ def build_cluster_resources(
             },
         },
         _machine_template(
-            control_plane_name, resolved,
-            resolved.control_plane_offering_id, resolved.control_plane_template_id,
+            cp_template_name, resolved,
+            resolved.control_plane_offering_id, resolved.control_plane_template_id, cpu_mode=cpu_mode,
         ),
         {
             "apiVersion": "controlplane.cluster.x-k8s.io/v1beta2",
@@ -224,7 +227,7 @@ def build_cluster_resources(
                     "infrastructureRef": {
                         "apiGroup": "infrastructure.cluster.x-k8s.io",
                         "kind": "CloudStackMachineTemplate",
-                        "name": control_plane_name,
+                        "name": cp_template_name,
                     },
                     "deletion": {
                         "nodeDrainTimeoutSeconds": 600,
@@ -262,8 +265,9 @@ def build_cluster_resources(
             raise InvalidRequestError(f"worker pool {pool.name} has unresolved CloudStack IDs")
         machine_template_name = f"{cluster_name}-{pool.name}"
         bootstrap_name = f"{machine_template_name}-rke2"
+        worker_template_name = machine_template_name + ("-cpu-v2" if cpu_mode else "")
         resources.extend((
-            _machine_template(machine_template_name, resolved, offering_id, template_id),
+            _machine_template(worker_template_name, resolved, offering_id, template_id, cpu_mode=cpu_mode),
             {
                 "apiVersion": "bootstrap.cluster.x-k8s.io/v1beta2",
                 "kind": "RKE2ConfigTemplate",
@@ -297,7 +301,7 @@ def build_cluster_resources(
                         }},
                         "infrastructureRef": {
                             "apiGroup": "infrastructure.cluster.x-k8s.io",
-                            "kind": "CloudStackMachineTemplate", "name": machine_template_name,
+                            "kind": "CloudStackMachineTemplate", "name": worker_template_name,
                         },
                     }},
                 },

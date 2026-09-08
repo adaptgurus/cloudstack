@@ -44,7 +44,7 @@ _READ_COMMANDS = {
     "listApis", "listProjects", "listZones", "listNetworks", "listServiceOfferings",
     "listTemplates", "listPublicIpAddresses", "listLoadBalancerRules",
     "listCapacity", "listClusters", "listHosts", "listStoragePools",
-    "listSystemVms", "listVirtualMachines", "listDiskOfferings",
+    "listSystemVms", "listVirtualMachines", "listDiskOfferings", "listVolumes",
 }
 
 

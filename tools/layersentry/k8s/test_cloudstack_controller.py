@@ -217,7 +217,7 @@ class CloudStackControllerTest(unittest.TestCase):
             "listApis", "listProjects", "listZones", "listNetworks", "listServiceOfferings",
             "listTemplates", "listPublicIpAddresses", "listLoadBalancerRules",
             "listCapacity", "listClusters", "listHosts", "listStoragePools",
-            "listSystemVms", "listVirtualMachines", "listDiskOfferings",
+            "listSystemVms", "listVirtualMachines", "listDiskOfferings", "listVolumes",
         })
         client = CloudStackClient(self.credential_config())
         query = urllib.parse.parse_qs(client._signed_query(

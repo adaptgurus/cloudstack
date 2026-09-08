@@ -116,12 +116,18 @@ class ConsumptionTests(unittest.TestCase):
             self.assertTrue(command.endswith(' || exit 1'))
             self.assertNotIn('systemctl start',script)
         self.assertEqual(cp['serverConfig']['cni'],'canal')
+        templates=[x for x in docs if x['kind']=='CloudStackMachineTemplate']
+        for t in templates:
+            self.assertTrue(t['metadata']['name'].endswith('-cpu-v2'))
+            self.assertEqual(t['spec']['template']['spec']['details'],{'guest.cpu.mode':'host-model'})
 
     def test_ordinary_project_unchanged_and_wrong_cni_rejected(self):
         docs=build_cluster_resources(request(),resolved())
         cp=next(x['spec'] for x in docs if x['kind']=='RKE2ControlPlane')
         self.assertFalse(cp['agentConfig']['airGapped']);self.assertNotIn('preRKE2Commands',cp)
         self.assertEqual(cp['serverConfig']['cni'],'cilium')
+        for t in docs:
+            if t['kind']=='CloudStackMachineTemplate':self.assertNotIn('details',t['spec']['template']['spec'])
         with self.assertRaisesRegex(InvalidRequestError,'CNI'):
             build_cluster_resources(request(project_id=LOCK['projectId']),resolved(project_id=LOCK['projectId'],control_plane_template_id=LOCK['template']['id'],worker_template_ids={'workers':LOCK['template']['id']}))
 
