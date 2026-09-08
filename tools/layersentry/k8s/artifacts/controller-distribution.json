@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "sourceCommit": "765f29fdc030a33ed4e647b7589c3f04d9969374",
+  "sourceCommit": "719bb91699a50019372a811aa55e57d4626fb681",
   "distribution": "systemd-filesystem",
   "files": [
     {
@@ -37,13 +37,13 @@
       "path": "controller/components.py",
       "installedPath": "/usr/lib/layersentry/k8s/controller/components.py",
       "mode": "0644",
-      "sha256": "e49002ccd26fee821cc04391aae46ea00d4906540acdd28e5a640351e1346c68"
+      "sha256": "19fca35b992e6822b6c8b41082b48ee341162b24ba664fe5ff0e98aa106bf4c4"
     },
     {
       "path": "controller/e1_executor.py",
       "installedPath": "/usr/lib/layersentry/k8s/controller/e1_executor.py",
       "mode": "0644",
-      "sha256": "515acafa5b5afefd0dadcde7b8992ed6d83ada9e2d55f47d1a704a86b7274ee4"
+      "sha256": "2d6c53d4bf88d7422275eaa099a39a7030e2e574250303481086fb757a93cafd"
     },
     {
       "path": "controller/e1_resources.py",
@@ -70,34 +70,40 @@
       "sha256": "9142724716a925ebc5dcb37cea048bb3fe6374fe534f4f146c85f83f71ad9632"
     },
     {
+      "path": "controller/qualification.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/qualification.py",
+      "mode": "0644",
+      "sha256": "1b74a17943a908d7e92f602760a9ba98d07532d959651a0229644656a1b85e51"
+    },
+    {
       "path": "controller/runtime.py",
       "installedPath": "/usr/lib/layersentry/k8s/controller/runtime.py",
       "mode": "0644",
-      "sha256": "710333f81a454beb1330fda888fb652d82c9625986367e1bef0fa405f7c5d19a"
+      "sha256": "295937aec111472564b375623b6cdb7a1618e1d358b6becbd7a6f01224f67865"
     },
     {
       "path": "controller/service.py",
       "installedPath": "/usr/lib/layersentry/k8s/controller/service.py",
       "mode": "0644",
-      "sha256": "0dcc8476da9db92bc8b1323c0aff3f965c01a7b3e89daa82907bbdc2022fca18"
+      "sha256": "cc906bdff3072fbbb8e9e9b95ef4dde117ff3404fe18b5f58df4e0f888ede89b"
     },
     {
       "path": "controller/store.py",
       "installedPath": "/usr/lib/layersentry/k8s/controller/store.py",
       "mode": "0644",
-      "sha256": "99082150d8d8bec85f7c7c2ea0560a438fe97d834fb4a1b636ff2f711e8c2e5e"
+      "sha256": "27173c16dce77a96d00c84ee27e9e47569971e6bc8272e3d4ec3aca2f5dd740c"
     },
     {
       "path": "layersentry_k8s_controller.py",
       "installedPath": "/usr/lib/layersentry/k8s/layersentry_k8s_controller.py",
       "mode": "0644",
-      "sha256": "cc59df85783b8563b92a87f9c52eaa8c913406a8e9421227983c4579ef20fb0d"
+      "sha256": "740a3bd00e2a951da859fce6c86d13ac36b989439da6fbeb88a89d8b6f63fff1"
     },
     {
       "path": "layersentry_k8s_policy.py",
       "installedPath": "/usr/lib/layersentry/k8s/layersentry_k8s_policy.py",
       "mode": "0644",
-      "sha256": "4774941a0ab1973d03e2f88b60dc3263d319c4729ed571a95ed2fb7491c8666a"
+      "sha256": "f51316ab728f6e8c0d3c30c779ce57437534a0bb56eeb7aa3ab183bd52bdd7b6"
     },
     {
       "path": "systemd/layersentry-k8s-bff.service",
@@ -118,11 +124,20 @@
       "sha256": "040aaf2d3450c03d88d942e338d8bdfd837a4f077bb73bcb4126c618b70eea4a"
     }
   ],
-  "treeSha256": "b874fd41f4a47e7a8efe7e1c5c04b76018219e387dcd2a56149146ae766f3efd",
+  "treeSha256": "f015e9310583d32b8f4e48257e3cbff903c10426ff54f90baf3a37f6f06cde49",
   "runtimeDependencyLock": {
     "path": "tools/layersentry/k8s/artifacts/runtime-dependencies.json",
-    "sha256": "78d94752d232820752c492c158c96c9d114ef1a17ac856c8ddd547c01dcc20f0"
+    "sha256": "60c678e9925ace965973ff18dcd630fd881c4032048d51fe05ff239e5af21e21"
   },
-  "runtimeIdentity": {},
+  "runtimeIdentity": {
+    "os": {
+      "id": "rocky",
+      "versionId": "9.8"
+    },
+    "pythonVersion": "3.9.25",
+    "pythonSha256": "7a95e551de45a54b3b6819d80e71a7262cd7138c2a4f1ec905b4cc8895a034c2",
+    "gunicornVersion": "21.2.0",
+    "gunicornContentSha256": "68c4ba048504c5ea86a48463f34cfd0fd3ed9b9f5eecba54885ae099615e9555"
+  },
   "releaseMetadata": "Install the release manifest and referenced artifact locks from the exact release commit separately; never copy runtime credentials from Git."
 }
