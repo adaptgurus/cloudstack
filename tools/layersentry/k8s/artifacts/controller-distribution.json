@@ -1,0 +1,124 @@
+{
+  "schemaVersion": "1.0",
+  "sourceCommit": "1bea2299ca9851d0f071b0657f57b8ab048fafbb",
+  "distribution": "systemd-filesystem",
+  "files": [
+    {
+      "path": "controller/__init__.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/__init__.py",
+      "mode": "0644",
+      "sha256": "c62dbca374f454247be6a4ad7d5af95220518f0884cfc93573e3edd3961ec827"
+    },
+    {
+      "path": "controller/auth.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/auth.py",
+      "mode": "0644",
+      "sha256": "f2896069d63b6df19ba4bf358967c0f01305a65a08b2d6b358a74cc952ed4bac"
+    },
+    {
+      "path": "controller/bff.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/bff.py",
+      "mode": "0644",
+      "sha256": "b7428ae59bfc4060b66d6aecb499ec1ff08286cca8b4450f9480aa9f5df357ab"
+    },
+    {
+      "path": "controller/capacity.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/capacity.py",
+      "mode": "0644",
+      "sha256": "f38ba1091dd1307899c1c34bef000aefc73f80ed5ae98eed910a755fba91939d"
+    },
+    {
+      "path": "controller/cloudstack.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/cloudstack.py",
+      "mode": "0644",
+      "sha256": "5412116e96d437e160e5292e8bf3c8937e81075adefebeac723ea71026c893f0"
+    },
+    {
+      "path": "controller/components.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/components.py",
+      "mode": "0644",
+      "sha256": "cb9e62a6d693eb1f71483c091f8ffac237956e9784444916635f2b6216959f34"
+    },
+    {
+      "path": "controller/e1_executor.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/e1_executor.py",
+      "mode": "0644",
+      "sha256": "515acafa5b5afefd0dadcde7b8992ed6d83ada9e2d55f47d1a704a86b7274ee4"
+    },
+    {
+      "path": "controller/e1_resources.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/e1_resources.py",
+      "mode": "0644",
+      "sha256": "8feb3d869b444cff4371bfca1cc71671e89329decd325d64ff81c69844f8eae8"
+    },
+    {
+      "path": "controller/flux_resources.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/flux_resources.py",
+      "mode": "0644",
+      "sha256": "1637e5ab50670aabc43b4f01793bf3093edc8b07944263e25ed1018515275c8b"
+    },
+    {
+      "path": "controller/kubernetes.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/kubernetes.py",
+      "mode": "0644",
+      "sha256": "95feb65e7fdddf09f63a843a51a1c4b4c39fbe1a4a6c879550e6ea0f980f4769"
+    },
+    {
+      "path": "controller/model.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/model.py",
+      "mode": "0644",
+      "sha256": "9142724716a925ebc5dcb37cea048bb3fe6374fe534f4f146c85f83f71ad9632"
+    },
+    {
+      "path": "controller/runtime.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/runtime.py",
+      "mode": "0644",
+      "sha256": "710333f81a454beb1330fda888fb652d82c9625986367e1bef0fa405f7c5d19a"
+    },
+    {
+      "path": "controller/service.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/service.py",
+      "mode": "0644",
+      "sha256": "0dcc8476da9db92bc8b1323c0aff3f965c01a7b3e89daa82907bbdc2022fca18"
+    },
+    {
+      "path": "controller/store.py",
+      "installedPath": "/usr/lib/layersentry/k8s/controller/store.py",
+      "mode": "0644",
+      "sha256": "99082150d8d8bec85f7c7c2ea0560a438fe97d834fb4a1b636ff2f711e8c2e5e"
+    },
+    {
+      "path": "layersentry_k8s_controller.py",
+      "installedPath": "/usr/lib/layersentry/k8s/layersentry_k8s_controller.py",
+      "mode": "0644",
+      "sha256": "cc59df85783b8563b92a87f9c52eaa8c913406a8e9421227983c4579ef20fb0d"
+    },
+    {
+      "path": "layersentry_k8s_policy.py",
+      "installedPath": "/usr/lib/layersentry/k8s/layersentry_k8s_policy.py",
+      "mode": "0644",
+      "sha256": "4774941a0ab1973d03e2f88b60dc3263d319c4729ed571a95ed2fb7491c8666a"
+    },
+    {
+      "path": "systemd/layersentry-k8s-bff.service",
+      "installedPath": "/etc/systemd/system/layersentry-k8s-bff.service",
+      "mode": "0644",
+      "sha256": "14849e8784da2ecae6e253064ae63f44e0f6c33c01ae78f9e4607496921b8aa3"
+    },
+    {
+      "path": "systemd/layersentry-k8s-reconciler.service",
+      "installedPath": "/etc/systemd/system/layersentry-k8s-reconciler.service",
+      "mode": "0644",
+      "sha256": "c3921e7916d4a5208e2e890eaab629807d1dd3ccb5f9438f3c346b58bc57550b"
+    },
+    {
+      "path": "systemd/layersentry-k8s-reconciler.timer",
+      "installedPath": "/etc/systemd/system/layersentry-k8s-reconciler.timer",
+      "mode": "0644",
+      "sha256": "040aaf2d3450c03d88d942e338d8bdfd837a4f077bb73bcb4126c618b70eea4a"
+    }
+  ],
+  "treeSha256": "ea38097a993aacb2528ba9182d6d98d6ba42aa02e0090c0da1d5de3325627c03",
+  "hostDependencies": "BLOCKED: Python/Gunicorn OS package identities not yet qualified",
+  "releaseMetadata": "Install the release manifest and referenced artifact locks from the exact release commit separately; never copy runtime credentials from Git."
+}

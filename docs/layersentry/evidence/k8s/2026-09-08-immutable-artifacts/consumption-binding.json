@@ -1,0 +1,49 @@
+{
+  "status": "PARTIAL",
+  "featureBase": "ae76c1249545a80d34e65866d5fe55059b7d3f39",
+  "capacityFixPreserved": true,
+  "managementArtifactLock": {
+    "path": "tools/layersentry/k8s/artifacts/management-lock.json",
+    "sha256": "8acd5b89f6e581b8b59574bf9f4f6842f2b241908999186c28e960ae7ce7f67b"
+  },
+  "controllerDistribution": {
+    "path": "tools/layersentry/k8s/artifacts/controller-distribution.json",
+    "sha256": "971ee752f4cd655a247381a6214134707294a9f64ab953120eab28100f237e99",
+    "sourceCommit": "1bea2299ca9851d0f071b0657f57b8ab048fafbb",
+    "treeSha256": "ea38097a993aacb2528ba9182d6d98d6ba42aa02e0090c0da1d5de3325627c03"
+  },
+  "readinessBlockers": [
+    "CloudStack CCM v1.2.0 is not qualified with Kubernetes 1.36",
+    "CloudStack CSI project lifecycle is not qualified",
+    "CloudStack CSI resize idempotency is not live-qualified",
+    "E1 evidence gate tupleReconciliation is false",
+    "E1 evidence gate endpoint6443 is false",
+    "E1 evidence gate endpoint9345 is false",
+    "E1 evidence gate fluxRemoteReconcile is false"
+  ],
+  "remainingConsumptionBlockers": [
+    "New reproducible CAPC manager binary differs from currently running local image. Identity-preserving pinning patch withheld; candidate needs separately approved deployment/qualification.",
+    "RKE2/CAPRKE2 verified asset pre-staging/checksum and offline/local image consumption are not wired by LayerSentry. No bootstrap exception implemented.",
+    "Systemd runtime source payload is immutable, but Python/Gunicorn OS dependency identities and installation assembly are still unqualified."
+  ],
+  "validation": {
+    "command": "python3 tools/layersentry/k8s/validate-source.py",
+    "k8sTestsPassed": 110,
+    "downstreamTestsPassed": 5,
+    "capcOfflineTests": "pkg/cloud passed in both clean builds; integration cases excluded with !integ; envtest/controller integration not run",
+    "artifactBuilderTests": "included in K8s suite",
+    "downstreamPatchHashes": "all three unchanged and verified",
+    "gitDiffCheck": "PASS",
+    "moduleWriterPrecommit": "PASS"
+  },
+  "liveActions": {
+    "deploymentPatchesApplied": false,
+    "controllerDeployed": false,
+    "capiObjectsCreated": false,
+    "capcObjectsCreated": false,
+    "workloadVMsCreated": false,
+    "capacityPreflightRerun": false,
+    "bootstrapExceptionImplemented": false
+  },
+  "nextGate": "Resolve CAPC image equivalence/qualification and RKE2 verified archive consumption before any first-cluster bootstrap exception."
+}
