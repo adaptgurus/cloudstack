@@ -41,7 +41,7 @@ from .model import InvalidRequestError, NotFoundError
 
 
 _READ_COMMANDS = {
-    "listProjects", "listZones", "listNetworks", "listServiceOfferings",
+    "listApis", "listProjects", "listZones", "listNetworks", "listServiceOfferings",
     "listTemplates", "listPublicIpAddresses", "listLoadBalancerRules",
     "listCapacity", "listClusters", "listHosts", "listStoragePools",
     "listSystemVms", "listVirtualMachines", "listDiskOfferings",

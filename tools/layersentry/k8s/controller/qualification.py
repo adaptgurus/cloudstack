@@ -90,6 +90,19 @@ class FirstClusterQualification:
                 or any(p.direct_node_disks or p.node_disk_set_id or p.storage_profile_ids or p.gpu for p in request.node_pools)):
             raise ValidationError("request is outside the exact first-cluster qualification")
 
+    def operator_actor(self, client):
+        from .auth import CloudStackSessionAuthenticator
+        from .model import Actor, AuthenticationError
+        self.check()
+        capabilities = CloudStackSessionAuthenticator._capabilities(client.call("listApis", {}))
+        project = qualification_template(self.manifest)["projectId"]
+        rows = client.call("listProjects", {"id": project}).get("project", [])
+        if len(rows) != 1 or rows[0].get("id") != project or rows[0].get("state") != "Active":
+            raise AuthenticationError("qualification API credential lacks active project access")
+        identity = hashlib.sha256(client.config.api_key_file.read_bytes()).hexdigest()
+        return Actor(subject="cloudstack-api-qualification:"+identity, account_id="", domain_id="",
+                     project_ids=(project,), capabilities=capabilities)
+
     def admit_capacity(self, resolver, request):
         from .capacity import plan_cluster, discover_capacity, assess_capacity
         resolved, plan = plan_cluster(resolver, request)

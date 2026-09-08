@@ -116,3 +116,17 @@ class QualificationTest(unittest.TestCase):
 
     def test_no_live_gate_in_checked_in_release_is_promoted(self):
         self.assertFalse(any(MANIFEST['hardGates'].values()))
+
+    def test_operator_uses_native_capabilities_and_active_project(self):
+        from controller.model import AuthenticationError
+        q=self.build();key=self.root/'key';key.write_text('synthetic-key')
+        class Client:
+            config=SimpleNamespace(api_key_file=key)
+            def call(inner, command, params):
+                if command=='listApis':return {'api':[{'name':'listProjects'}]}
+                return {'project':[{'id':LOCK['projectId'],'state':'Active'}]}
+        actor=q.operator_actor(Client())
+        self.assertEqual(actor.capabilities,('listProjects',))
+        self.assertNotIn('deployVirtualMachine',actor.capabilities)
+        with patch.object(Client,'call',return_value={'project':[]}):
+            with self.assertRaises(AuthenticationError):q.operator_actor(Client())

@@ -30,6 +30,8 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("check-config")
     subparsers.add_parser("retire-qualification")
+    create = subparsers.add_parser("qualify-create")
+    create.add_argument("--request", required=True)
     reconcile = subparsers.add_parser("reconcile")
     reconcile.add_argument("--max-operations", type=int, default=20)
     args = parser.parse_args()
@@ -54,6 +56,16 @@ def main() -> int:
             print(json.dumps({"status": "QUALIFICATION_RETIRED"}))
             return 0
         runtime = build_runtime(args.config)
+        if args.command == "qualify-create":
+            from pathlib import Path
+            q = runtime.service.qualification
+            if q is None:
+                raise InvalidRequestError("operator create is only available in bounded qualification")
+            actor = q.operator_actor(runtime.service.executor.resolver.client)
+            operation, created = runtime.service.submit_cluster_create(actor,
+                json.loads(Path(args.request).read_text()), q.context["idempotencyKey"])
+            print(json.dumps({"operationId": operation.id, "created": created, "status": operation.status.value}))
+            return 0
         print(json.dumps(runtime.reconcile_batch(args.max_operations), sort_keys=True))
         return 0
     except (InvalidRequestError, ValueError) as exc:

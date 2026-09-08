@@ -214,7 +214,7 @@ class CloudStackControllerTest(unittest.TestCase):
     def test_disk_offering_discovery_is_read_only(self):
         from controller.cloudstack import _READ_COMMANDS
         self.assertEqual(_READ_COMMANDS, {
-            "listProjects", "listZones", "listNetworks", "listServiceOfferings",
+            "listApis", "listProjects", "listZones", "listNetworks", "listServiceOfferings",
             "listTemplates", "listPublicIpAddresses", "listLoadBalancerRules",
             "listCapacity", "listClusters", "listHosts", "listStoragePools",
             "listSystemVms", "listVirtualMachines", "listDiskOfferings",
