@@ -435,3 +435,17 @@ and treeSha256 fields were still old. Corrected these two release metadata field
 to the exact existing source/receipt identities; no controller source change or
 gate bypass. Direct evaluate_component_readiness then returned exactly the seven
 pending live blockers. The failed context revision did not alter journal binding.
+
+Final corrected source CI 34321140776 passed at
+`c4bfaf5dba998d62e29b34f2f74ca9c29355f415`. Exact release installed with BFF
+stopped; explicit qualification-release revision succeeded without changing the
+locked request or operation. Runtime then exposed missing Machine-list permission
+for the new ownership observation. Added only namespaced Machine list and
+CloudStackMachine get permissions for the existing qualifier ServiceAccount via
+`tools/layersentry/k8s/qualification-capacity-read.yaml` (server dry-run PASS).
+No Secret access, mutation verbs, ClusterRole broadening or foreign namespace.
+
+Live corrected admission PASS: exact existing CP credit 8 CPU/16000 MHz;
+remaining headroom 7 CPU, 42.160240173339844 GiB RAM, 549.6988518685102 GiB primary.
+The same operation/journal resumed; no replayed Cluster create or VM duplication.
+CAPI Cluster unpaused and BFF restarted; reconciler timer remains inactive.
