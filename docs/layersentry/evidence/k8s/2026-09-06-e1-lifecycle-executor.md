@@ -220,3 +220,61 @@ and worker before the RKE2 installer. Ordinary projects are unchanged. Source
 validation passed 138 K8s and five downstream tests; checksum/URL/package/key
 substitution fails closed. Controller distribution regenerated from exact source
 commit bytes. All production live flags remain false.
+
+The immutable bootstrap distribution is now `370e19082c2a961fc456122e9fb15e002084902d`
+(source `cfd7816d50`, tree
+`efc52d69ab7f42d18a4da324fcc3be3ce7a3c65dd808239c44b893d14a017ed9`).
+Source CI `34313543946` passed. Installed the exact five changed payload/metadata
+files on the authorized co-located controller host and explicitly revised the
+same qualification journal/context; production deployability remains false.
+
+Reboot confirmed the remaining pause-container AVC was an old unpacked image
+file labeled `var_lib_t`, not a policy-package defect. Corrected only stale
+`var_lib_t` objects beneath containerd overlay snapshots to `container_file_t`.
+The initial label command followed image symlinks; immediately restored the two
+existing host symlink targets with restorecon, then repeated using chcon -h.
+No custom allow policy, SELinux disable, or registry fallback was introduced.
+After correction, etcd and API pods run, local `/readyz` returns `ok`, RKE2 is
+active, and SELinux remains Enforcing. Future nodes install policy before unpack.
+
+The next observed infrastructure blocker was stale host BF-cloudbr0 filtering:
+new public ingress fell through empty BF-cloudbr0-IN/OUT chains to FORWARD DROP.
+The Virtual Router already had correct HAProxy backends and native 6443/9345
+firewall rules. Windows/WSL probes failed before reaching VR eth2. Added only
+bridged cloudbr0 -> cloudbr0 TCP 6443/9345 to 10.10.11.23/32 via firewalld direct.
+The first runtime direct-rule activation reset legacy iptables state; immediately
+restored the saved complete table set with the scoped rule prepended, and verified
+zero missing original rules/chains. Persisted only the new direct rule in
+`/etc/firewalld/direct.xml`. No Windows/Hyper-V/NAT/default-route or native LB
+change. Verified MAC spoofing On for both sen adapters using enum string values.
+
+Afterward Windows and management-client TCP probes succeed for both ports.
+CAPRKE2 and CAPI recognize the first registered Node as Machine Ready/Available.
+Updated only generated preRKE2Commands on the CP/worker bootstrap resources,
+removed the temporary public-key Files entry from future CP templates, refreshed
+native/host capacity (PROVISION_ALLOWED, 11 CPU and 41.19 GiB RAM headroom after
+planned allocation), and resumed CAPI. CAPC created next CP VM
+`5596283c-2989-47b5-a98e-4994fbb5515a` and worker VM
+`a4270271-21da-4f7e-ae2d-1f5ebdce652d`. The old CP has diagnostic SSH access until
+its provider-owned rolling replacement completes. Flux source is exact-commit
+Ready; baseline/remote reconciliation and full 3+1 readiness are still pending.
+
+### Current stop gate — measured control-plane CPU pressure
+
+At 05:21–05:24 UTC the 2-vCPU first CP remained CPU-saturated: vmstat reported
+27–37 runnable tasks, 0% idle, ~49% user/~50% system, negligible I/O wait, and load
+average rising to 24.20. RAM was not exhausted (about 4.2 GiB available; no swap).
+Local API readiness again timed out after 15 seconds and the external authenticated
+API client timed out. Earlier Machine Ready/Available is historical/transient, not
+proof of a stable Cluster. The host itself retains spare CPU/RAM; the constrained
+per-VM offering is the immediate sizing gate. Four vCPU per CP is a proposed next
+qualification measurement, not a proven sufficient production size.
+
+Paused the CAPI Cluster and suspended both baseline and remote Flux Kustomizations
+before further retries/provisioning. The controller reconciler timer remains
+inactive. Three provider-created VMs remain preserved: first CP, next CP, worker;
+no completed 3+1 Cluster or lifecycle/production certification is claimed. Next
+operator decision: authorize a revised fixed CP offering/request (suggested 4
+vCPU, retain measured-safe memory) and a fresh capacity check. Do not mutate the
+existing locked request or use native VM resizing as a CAPC bypass. Preserve the
+current protected journal, credentials and diagnostic evidence for continuation.
