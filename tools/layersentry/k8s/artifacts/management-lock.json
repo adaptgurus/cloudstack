@@ -14,7 +14,7 @@
     {
       "name": "caprke2-bootstrap",
       "version": "0.25.2",
-      "image": "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa"
+      "image": "ghcr.io/adaptgurus/layersentry-caprke2-bootstrap@sha256:aa4f547351a2e0b374e7c4ab23cefec5c3820690195aae6a8ecbbc1c4de26217"
     },
     {
       "name": "caprke2-control-plane",

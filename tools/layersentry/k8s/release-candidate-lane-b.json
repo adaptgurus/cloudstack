@@ -91,7 +91,7 @@
   },
   "managementArtifactLock": {
     "path": "tools/layersentry/k8s/artifacts/management-lock.json",
-    "sha256": "8acd5b89f6e581b8b59574bf9f4f6842f2b241908999186c28e960ae7ce7f67b"
+    "sha256": "92f82fee9a3519caac36197d61c32c85b53ba652ea3e38b7db948128e55c536f"
   },
   "controllerDistribution": {
     "path": "tools/layersentry/k8s/artifacts/controller-distribution.json",

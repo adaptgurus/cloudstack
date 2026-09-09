@@ -1,0 +1,2 @@
+# Patch context preserves exact upstream trailing whitespace.
+caprke2/*.diff whitespace=-blank-at-eol
