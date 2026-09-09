@@ -674,3 +674,56 @@ CP1 subsequently completed its logging-config static-pod replacement. Its RKE2
 service is active, protected file sink exists, local etcd linearizable health
 passed (sample latency 1.124793941s), and workload API responds again. This remains
 high-latency recovery evidence, not sustained performance or all-node readiness.
+
+### Current recovery checkpoint — 2026-09-09
+
+Feature `c5ef109dfb2ccad6df1b11352a0e2cc74726963b`, source CI `34340655080`
+SUCCESS (152 K8s + 5 downstream tests). Installed the exact three-file controller/
+release/distribution archive, SHA
+`348e903099034ad7e3bd06b5c818cc4f790a392c0f56410ec889c60eabe0492a`.
+Backups are protected under `pre-etcd-cold-unpack-release` on the controller host.
+Used the existing revise-qualification-release command to change only the release
+identity; request, idempotency key, expiry and existing operation journal are
+preserved. BFF restarted and check-config passes QUALIFICATION_ONLY with all
+seven production evidence blockers retained. Reconciler timer is still inactive.
+
+The second Node registered, but reported NetworkPluginNotReady / cni plugin not
+initialized. Fresh observations must replace the stale 10:30:43/10:30:46 UTC Node
+heartbeats; neither earlier Ready nor a running API process establishes sustained
+health. CP2 later exhausted RKE2's API-readiness deadline and restarted. It
+successfully reconciled its local datastore with file logging (no pipe_write
+threads), but certificate/bootstrap requests time out under load. Worker joins
+continue waiting for a healthy supervisor. Third CP has not been created.
+
+Paused only Cluster ls-rke2-cp8-net-poc via spec.paused=true to prevent creation
+with the old bootstrap during repair; existing guest services continue. A repaired
+RCP manifest is prepared at `/var/lib/layersentry/k8s/cp8-net-repaired-control-plane.json`
+but NOT applied. It retains three replicas and uses the provider-supported
+maxSurge=0 for this operator repair, avoiding a fourth eight-CPU CP beyond the
+lab reserve. Do not apply/unpause without fresh capacity and health assessment.
+
+Fresh native/host capacity admission passed for the existing eight-CPU profile:
+15 available cores, 16 already allocated CP cores verified through exact CAPI ->
+CAPC -> native VM ownership, conservative post-plan headroom 5 cores,
+31.031341552734375 GiB RAM and 469.69885186851025 GiB primary storage.
+Receipt: `/var/lib/layersentry/k8s/cp8-net-pre-rollout-admission.json`; this is
+not durable authorization or a performance pass.
+
+Correlated vmstat samples show both eight-vCPU CPs at 99-100% busy, runnable
+queues approximately 17-58, while the 36-vCPU KVM host has 43-45% idle CPU.
+CP2 has ~4.4 GiB available memory, no swap or OOM events and no cgroup CPU
+throttling. These observations do not support requesting more RAM. CP1's
+background dnf-makecache job was stopped once; its timer remains enabled/active,
+and no package update/security configuration was disabled. Guest clocksource is
+kvm-clock; the kernel rejected unstable raw TSC. No clocksource/timer/Hyper-V
+change was made or proposed as a shortcut.
+
+Next proposed bounded diagnostic is twelve vCPUs per CP. That topology needs
+36 CP + 2 worker + 3 observed System-VM cores + minimum 2 reserve = at least 43
+usable cores; requested availability of 44, with RAM unchanged. This is a test
+hypothesis for measured CPU saturation, not a guarantee or production sizing.
+No new offering, changed qualification request, VM creation, rollout or host
+restart has been dispatched for that hypothesis. Operator was asked not to
+restart sen yet. Current first unmet gate remains sustained healthy control
+planes/CNI and completion of the 3+1 join; lifecycle/live qualification is NOT
+complete.
