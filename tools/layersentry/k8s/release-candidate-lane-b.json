@@ -55,7 +55,10 @@
     "rke2Owner": "CAPRKE2",
     "packageOwner": "Flux",
     "databaseOwner": "database-operator",
-    "requiredControlPlanePorts": [6443, 9345]
+    "requiredControlPlanePorts": [
+      6443,
+      9345
+    ]
   },
   "hardGates": {
     "tupleReconciliation": false,
@@ -87,7 +90,7 @@
   ],
   "qualificationArtifactLock": {
     "path": "tools/layersentry/k8s/artifacts/qualification-lock.json",
-    "sha256": "d687dc7990e6cc1c73b827d006591f75de7435eac9961ae2afa41a91e637a07f"
+    "sha256": "88c474272482e6e1a2ef3ca46e97328a5a433bf15465fbf90b5f61a0143633c4"
   },
   "managementArtifactLock": {
     "path": "tools/layersentry/k8s/artifacts/management-lock.json",

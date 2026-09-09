@@ -110,7 +110,18 @@ class ConsumptionTests(unittest.TestCase):
             self.assertNotIn('get.rke2.io',command);self.assertNotIn('latest',command)
             for item in LOCK['rke2Artifacts']['assets']:
                 self.assertIn(item['sha256'],command);self.assertIn(item['url'],command)
+            policy=LOCK['rke2Artifacts']['selinuxPrerequisites']
+            for item in policy['assets']:
+                self.assertIn(item['sha256'],command);self.assertIn(item['url'],command)
             script=shlex.split(command)[3];subprocess.run(['sh','-n'],input=script,text=True,check=True)
+            self.assertLess(script.index('dnf -y'),script.index(LOCK['rke2Artifacts']['assets'][0]['url']))
+            self.assertIn('--disablerepo="*"',script)
+            self.assertIn('--setopt=localpkg_gpgcheck=1',script)
+            self.assertIn('rpm --checksig',script)
+            self.assertIn('test "$(getenforce)" = Enforcing',script)
+            self.assertNotIn('setenforce',script)
+            self.assertNotIn('--nogpgcheck',script)
+            for package in policy['packages']:self.assertIn(package,script)
             self.assertIn('disable-default-registry-endpoint: true',script)
             self.assertEqual(spec['privateRegistriesConfig']['mirrors']['*']['endpoint'],['https://127.0.0.1:1'])
             self.assertTrue(command.endswith(' || exit 1'))
@@ -134,6 +145,17 @@ class ConsumptionTests(unittest.TestCase):
     def test_asset_checksum_tampering_rejected(self):
         lock=deepcopy(LOCK);lock['rke2Artifacts']['assets'][1]['sha256']='0'*64
         with self.assertRaises(InvalidRequestError):rke2_artifacts(lock)
+
+    def test_selinux_policy_identity_is_required_and_exact(self):
+        for change in ('missing','checksum','url','package','rocky-key'):
+            with self.subTest(change=change):
+                lock=deepcopy(LOCK);policy=lock['rke2Artifacts']['selinuxPrerequisites']
+                if change=='missing':del lock['rke2Artifacts']['selinuxPrerequisites']
+                elif change=='checksum':policy['assets'][1]['sha256']='0'*64
+                elif change=='url':policy['assets'][1]['url']='https://example.invalid/policy.rpm'
+                elif change=='package':policy['packages'][0]='container-selinux-4:9-1.el9.noarch'
+                else:policy['rockyKeySha256']='0'*64
+                with self.assertRaises(InvalidRequestError):qualification_bootstrap(lock)
 
     def test_checksum_failure_exits_without_following_bootstrap(self):
         script=shlex.split(qualification_bootstrap(LOCK)['preRKE2Commands'][0])[3]

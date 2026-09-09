@@ -105,6 +105,31 @@ def qualification_bootstrap(lock):
         "install -d -o root -g root -m 0700 /opt/rke2-artifacts /etc/rancher/rke2/config.yaml.d",
         "tmp=$(mktemp -d /opt/rke2-artifacts/.qualification.XXXXXX)",
         "trap 'rm -rf \"$tmp\"' EXIT"]
+    policy = assets["selinuxPrerequisites"]
+    for item in policy["assets"]:
+        name = item["filename"]
+        commands += [
+            "curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' "
+            "--connect-timeout 15 --max-time 300 --retry 2 --output \"$tmp/" + name + "\" " + shlex.quote(item["url"]),
+            "printf '%s  %s\\n' " + item["sha256"] + " \"$tmp/" + name + "\" | sha256sum --check --status",
+            "chown root:root \"$tmp/" + name + "\"",
+            "chmod 0600 \"$tmp/" + name + "\"",
+        ]
+    commands += [
+        '. /etc/os-release; test "$ID" = rocky; test "${VERSION_ID%%.*}" = 9',
+        'test "$(uname -m)" = x86_64',
+        'test "$(getenforce)" = Enforcing',
+        "printf '%s  %s\\n' " + policy["rockyKeySha256"] + " /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9 | sha256sum --check --status",
+        'rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9 "$tmp/rancher-public.key"',
+        'rpm --checksig "$tmp/container-selinux-2.245.0-1.el9.noarch.rpm" "$tmp/rke2-selinux-0.23-1.el9.noarch.rpm"',
+        'dnf -y --disablerepo="*" --setopt=localpkg_gpgcheck=1 --setopt=install_weak_deps=False install '
+        '"$tmp/container-selinux-2.245.0-1.el9.noarch.rpm" "$tmp/rke2-selinux-0.23-1.el9.noarch.rpm"',
+    ]
+    for package in policy["packages"]:
+        name = package.rsplit("-", 2)[0]
+        commands.append('test "$(rpm -q --qf \'%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\\n\' '
+                        + name + ')" = ' + shlex.quote(package))
+    commands += ['test "$(getenforce)" = Enforcing']
     for item in assets["assets"]:
         name = item["filename"]
         target = "/opt/install.sh" if name == "install.sh" else "/opt/rke2-artifacts/" + name

@@ -181,6 +181,22 @@ _RKE2_HASHES = {
 }
 
 
+_SELINUX_PREREQUISITES = {'osId': 'rocky',
+ 'osMajor': '9',
+ 'architecture': 'x86_64',
+ 'rockyKeySha256': '3a66e521e7a4abac9768d889c7cd60a8250f59512b275cf576c8a10ff34624c1',
+ 'assets': [{'filename': 'rancher-public.key',
+             'url': 'https://rpm.rancher.io/public.key',
+             'sha256': '7d2415f7fc532c365c8874bfad966566daaa0d04a9a5ba14d1db6080a9c12629'},
+            {'filename': 'container-selinux-2.245.0-1.el9.noarch.rpm',
+             'url': 'https://dl.rockylinux.org/pub/rocky/9.8/AppStream/x86_64/os/Packages/c/container-selinux-2.245.0-1.el9.noarch.rpm',
+             'sha256': '59a415e878fbd61b317a6cda5ec7aac07fa215cd1b11356b974ac28e6dc27dc7'},
+            {'filename': 'rke2-selinux-0.23-1.el9.noarch.rpm',
+             'url': 'https://github.com/rancher/rke2-selinux/releases/download/v0.23.stable.1/rke2-selinux-0.23-1.el9.noarch.rpm',
+             'sha256': '95fd066cab84868cbb7f245b1884734bb90f28717f45ccb85a55e5a403d3a454'}],
+ 'packages': ['container-selinux-4:2.245.0-1.el9.noarch', 'rke2-selinux-0:0.23-1.el9.noarch']}
+
+
 def rke2_artifacts(lock):
     value = lock.get("rke2Artifacts", {})
     base = "https://github.com/rancher/rke2/releases/download/v1.36.4%2Brke2r1/"
@@ -189,7 +205,8 @@ def rke2_artifacts(lock):
         "https://raw.githubusercontent.com/rancher/rke2/v1.36.4%2Brke2r1/install.sh"}
         for name, digest in _RKE2_HASHES.items()]
     if (value.get("version") != "v1.36.4+rke2r1" or value.get("architecture") != "amd64"
-            or value.get("assets") != expected):
+            or value.get("assets") != expected
+            or value.get("selinuxPrerequisites") != _SELINUX_PREREQUISITES):
         raise InvalidRequestError("qualification RKE2 assets differ from approved release")
     return value
 
