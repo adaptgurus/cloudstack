@@ -236,6 +236,30 @@ Do not build automatic test-VM reimage/snapshot rollback solely for lab cleanup.
 
 ## 6. Evidence/security/continuity
 
+### Configuration must survive restart and reboot
+
+For every operational fix, identify the authoritative owner and save the intended
+configuration in its persistent, versioned source before calling the fix complete.
+Apply through that owner's supported configuration/API path. Runtime-only shell
+changes, detached processes, `/run` or `/tmp` files, and an unrecorded manual node
+patch are not durable configuration. Keep credentials in the existing protected
+secret store; commit only references and non-secret templates.
+
+Verify both saved and effective state: service enablement and startup order,
+network/storage prerequisites, configuration permissions, and the exact deployed
+artifact. Dependencies such as tunnels need bounded automatic reconnection and
+duplicate-process protection. Preserve CloudStack/CAPI/Flux ownership rather than
+introducing competing VM, network or workload controllers.
+
+After VM save/restore or suspend/resume, verify host and guest time synchronization
+before accepting API/TLS/quorum health. A saved-memory image is a one-use recovery
+checkpoint, not configuration or an image to replay on subsequent reboots.
+
+Test service restart/reconnection and an authorized controlled reboot with before/
+after configuration hashes and functional checks. Preserve the rollback record
+outside temporary directories. If reboot validation has not run, explicitly mark
+it `NOT_TESTED`; never infer reboot survival from a running process or HTTP 200.
+
 Use only governed statuses: `DESIGN_DEFINED`, `SOURCE_COMPLETE`, `CI_VERIFIED`, `LIVE_VERIFIED`, `PRODUCTION_CERTIFIED`, `PARTIAL`, `PENDING`, `BLOCKED`, `UNKNOWN`, `NOT_TESTED`.
 
 Source is not runtime proof. Build success is not deployment proof. Documentation support is not exact-combination proof.
