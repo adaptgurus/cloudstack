@@ -17,9 +17,9 @@ Endpoint observation rechecks project, Site, network, public IP, both Active TCP
 
 ```bash
 python3 tools/layersentry/k8s/lab-capacity-preflight.py \
-  --runtime-config /run/layersentry/k8s/runtime-config.json \
-  --request /run/layersentry/k8s/poc-request.json \
-  --host-evidence /run/layersentry/k8s/poc-host-evidence.json \
+  --runtime-config /etc/layersentry/k8s/runtime.json \
+  --request /etc/layersentry/k8s/poc-request.json \
+  --host-evidence /var/lib/layersentry/k8s/poc-host-evidence.json \
   --cluster-id VERIFIED_CLUSTER_UUID \
   --host-id VERIFIED_HOST_UUID \
   --pool-id VERIFIED_PRIMARY_POOL_UUID
@@ -88,3 +88,52 @@ This command never creates a cluster and is not a durable admission token. Re-ru
 it immediately before any separately gated CAPI request. Release/source gates,
 valid management-cluster providers, endpoint reachability and eventual Cluster
 Ready are separate proof requirements. An API metadata check cannot certify them.
+
+## Persistent configuration and reboot acceptance
+
+Follow the configuration-persistence rule in `AGENTS.md`. Runtime configuration,
+request/qualification identity and CA references belong in protected `/etc` files;
+the operation database and recovery receipts belong in `/var/lib`. `/run` contains
+recreated sockets and optional systemd credentials, never the only configuration
+copy. The browser API's systemd unit creates its runtime directory, tolerates an
+absent optional credential mount, and restarts after failure. Enable that service
+once the exact distribution and qualification configuration pass `check-config`.
+Preserve an intentionally disabled reconciler and paused CAPI Cluster until its
+current capacity and health gates pass; a reboot must not silently resume a
+blocked provisioning operation.
+
+For the nested qualification nodes, CAPRKE2 writes the bounded cold-container
+deadline and the chrony service dependency to persistent files. Both RKE2 service
+roles wait at most about one minute for NTP synchronization before starting.
+Read back effective `ExecStartPre` and file hashes on existing repaired nodes;
+deploying a controller artifact alone does not update already-created guests.
+Future nodes consume the same files through the versioned bootstrap template.
+
+Before a host maintenance reboot, record the exact native VM identities, CAPI
+pause/journal state, service enablement, configuration hashes, mount sources,
+network bridges and rollback path. Use CloudStack's maintenance and VM lifecycle
+owner. Do not enable a second libvirt autostart/HA controller. A lab-only saved
+memory checkpoint must be consumed once, with a durable marker for an incomplete
+restore/time-sync step. Never replay an old `.restored` memory image at boot.
+
+After save/restore or suspend/resume, compare guest time with the NTP-synchronized
+host. When the authorized recovery uses `virsh domtime --now`, require host NTP
+health, supported guest-agent time commands, bounded calls and read-back evidence.
+Reestablish NTP selection with the existing chrony service; do not disable TLS or
+change certificate validity to accommodate a bad clock. libvirt documents the
+[guest-time operation](https://www.libvirt.org/manpages/virsh.html#domtime), and
+chrony documents [bounded synchronization checks](https://chrony-project.org/doc/4.6/chronyc.html).
+
+If this development profile uses a workstation-to-server SSH management tunnel,
+keep its configuration, trust and supervisor in durable paths. Bind only to
+loopback, verify host keys, discover the local API port from the existing
+kubeconfig, and use a singleton lock plus automatic reconnect/startup. Preserve
+the prior startup configuration in a protected persistent backup directory.
+This profile still depends on that workstation being online; a tunnel is not a
+production management-cluster availability design.
+
+Acceptance requires pre/post-reboot configuration hashes, enabled/active service
+checks, authenticated management API reads, current VM/system-agent/storage state,
+guest NTP synchronization, sustained workload `/readyz`, fresh Node heartbeats and
+the intended topology. Test reconnect failure separately. Mark a full reboot
+`NOT_TESTED` until an authorized controlled reboot actually passes these checks.
