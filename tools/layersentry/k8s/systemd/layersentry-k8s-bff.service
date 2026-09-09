@@ -2,6 +2,7 @@
 Description=LayerSentry Kubernetes browser API
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=0
 ConditionPathExists=/etc/layersentry/k8s/runtime.json
 
 [Service]
@@ -18,6 +19,8 @@ ExecStart=/usr/bin/python3 -m gunicorn --workers 2 --threads 4 --timeout 60 --gr
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGTERM
 TimeoutStopSec=45
+Restart=on-failure
+RestartSec=10s
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true
@@ -32,7 +35,7 @@ RestrictRealtime=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
 ReadWritePaths=/var/lib/layersentry/k8s /run/layersentry-k8s
-ReadOnlyPaths=/etc/layersentry/k8s /run/credentials/layersentry-k8s
+ReadOnlyPaths=/etc/layersentry/k8s -/run/credentials/layersentry-k8s
 
 [Install]
 WantedBy=multi-user.target
