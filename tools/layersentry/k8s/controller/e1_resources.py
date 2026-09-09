@@ -35,6 +35,15 @@ CAPC_VOLUME_ANNOTATION = "infrastructure.cluster.x-k8s.io/layersentry-volume-own
 MANAGED_LABEL = "layersentry.io/managed"
 PROJECT_LABEL = "layersentry.io/project"
 RKE2_VERSION = "v1.36.4+rke2r1"
+# A stopped containerd can leave etcd blocked on its stdout/stderr pipes,
+# preventing RKE2's local-datastore-first restart. Use etcd's bounded file sink
+# inside the existing, protected data-directory mount (no extra host mounts).
+# RKE2 converts log-outputs to a YAML string array, so preserve JSON brackets.
+ETCD_LOG_ARGS = (
+    'log-outputs=["/var/lib/rancher/rke2/server/db/etcd/etcd.log"]',
+    'enable-log-rotation=true',
+    'log-rotation-config-json={"maxsize":20,"maxage":7,"maxbackups":3,"localtime":false,"compress":true}',
+)
 _DNS_NAME = re.compile(r"^(?=.{1,253}\.?$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.?$")
 
 
@@ -253,6 +262,7 @@ def build_cluster_resources(
                 "serverConfig": {
                     "cni": request.cni,
                     "disableComponents": {"kubernetesComponents": ["cloudController"]},
+                    "etcd": {"customConfig": {"extraArgs": list(ETCD_LOG_ARGS)}},
                 },
                 "machineTemplate": {"spec": {
                     "infrastructureRef": {

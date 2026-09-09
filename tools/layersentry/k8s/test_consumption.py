@@ -101,6 +101,9 @@ class ConsumptionTests(unittest.TestCase):
             resolved(project_id=pid,control_plane_template_id=tid,worker_template_ids={'workers':tid}))
         cp=next(x['spec'] for x in docs if x['kind']=='RKE2ControlPlane')
         worker=next(x['spec']['template']['spec'] for x in docs if x['kind']=='RKE2ConfigTemplate')
+        ordinary_cp=next(x['spec'] for x in build_cluster_resources(request(),resolved()) if x['kind']=='RKE2ControlPlane')
+        self.assertEqual(cp['serverConfig']['etcd'], ordinary_cp['serverConfig']['etcd'])
+        self.assertNotIn('etcd', json.dumps(worker))
         for spec in (cp,worker):
             self.assertIs(spec['agentConfig']['airGapped'],True)
             self.assertEqual(spec['agentConfig']['airGappedChecksum'],LOCK['rke2Artifacts']['assets'][0]['sha256'])

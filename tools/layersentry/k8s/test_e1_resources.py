@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import unittest
 
 from controller.e1_resources import (
@@ -59,6 +60,22 @@ def resolved(**overrides):
 
 
 class E1ResourceTest(unittest.TestCase):
+    def test_etcd_logging_survives_containerd_pipe_loss_with_bounded_files(self):
+        resources = build_cluster_resources(request(), resolved())
+        cp = next(item for item in resources if item["kind"] == "RKE2ControlPlane")
+        args = cp["spec"]["serverConfig"]["etcd"]["customConfig"]["extraArgs"]
+        options = dict(arg.split("=", 1) for arg in args)
+        self.assertEqual(set(options), {"log-outputs", "enable-log-rotation", "log-rotation-config-json"})
+        self.assertEqual(json.loads(options["log-outputs"]),
+                         ["/var/lib/rancher/rke2/server/db/etcd/etcd.log"])
+        self.assertEqual(options["enable-log-rotation"], "true")
+        self.assertEqual(json.loads(options["log-rotation-config-json"]),
+                         {"maxsize": 20, "maxage": 7, "maxbackups": 3, "localtime": False, "compress": True})
+        # No durability, peer/TLS or election setting is changed; workers do not run etcd.
+        worker = next(item for item in resources if item["kind"] == "RKE2ConfigTemplate")
+        self.assertNotIn("etcd", json.dumps(worker))
+        self.assertEqual(cp["spec"]["replicas"], 3)
+
     def test_exact_mixed_provider_contract_and_automatic_join(self):
         resources = build_cluster_resources(request(), resolved())
         by_kind = {item["kind"]: item for item in resources if item["kind"] != "CloudStackMachineTemplate"}

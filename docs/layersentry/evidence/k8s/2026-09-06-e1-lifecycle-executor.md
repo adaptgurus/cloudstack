@@ -538,3 +538,85 @@ verification and diff checks passed. Readiness still reports the same seven
 pending live evidence gates. Existing live controller/request artifacts have not
 yet been replaced by this correction; source CI and a fresh CAPI bootstrap are
 the next gates.
+
+Feature CI `34328507813` SUCCESS at
+`16ef35980c672d1f3b928a7f6ecc3b7c7603d2b1`. Installed the exact five-file runtime/
+artifact update, archive SHA
+`3207ab06fe84348c74330f492d28451efd3785512b2390dd31bf723bd232a5e1`.
+Runtime validates with the seven production blockers retained. Captured failure
+logs and exact root-only volume proof before retiring CP8 through CAPI/CAPC.
+Used the existing disposable root-only drain/volume-wait exclusions; no forced
+finalizer removal or native/manual VM destruction. All three VMs and old Cluster
+resources are deleted. Pre-existing project network/frontend were preserved.
+Old CP8 journal was explicitly retired and retained.
+
+Fresh admission for the corrected attempt: PROVISION_ALLOWED, nested KVM PASS,
+36 CPU total, 3 allocated, 33 available; plan remains 3x8-CPU/6-GiB CP plus
+1x2-CPU/8-GiB worker, 160 GiB roots. Post-plan headroom: 7 CPU,
+37.34791564941406 GiB RAM, 509.69885186851025 GiB primary. Both storage reserves
+and host freshness checks passed. Private `preflight-cp8-net-admission.json`
+records cluster_create_executed=false at the preflight itself.
+
+New Cluster `ls-rke2-cp8-net-poc`, operation
+`c7329569-93f6-4e46-bebe-2c957d7ec600`, idempotency
+`layersentry-cp8-net-qualification-20260909`. Protected journal/context are
+`controller-cp8-net.sqlite` and `qualification-cp8-net.json`; prior contexts and
+journals remain retired. CAPC created VM
+`18ea4910-af62-4fd7-aff5-c68e7e1e3013` (`i-4-21-VM`, 172.17.30.104), 8 CPU/6 GiB,
+approved offering/template. First Machine is
+`ls-rke2-cp8-net-poc-control-plane-q47g4`. The saga reached step 7, before baseline
+packages. BFF is active; reconciler timer remains inactive. First-node bootstrap
+and stable Cluster Ready are still PENDING, not live success of the correction.
+
+
+### CP8-NET join diagnosis — 2026-09-09T09:22:23.080829+00:00
+
+First control-plane Machine q47g4 is Running/Ready with Node ls-rke2-cp8-net-poc-control-plane-cpu-v2-t7859. CAPC also created second control-plane VM ad617bcb-f1c4-45cd-b3ee-8530e6180020 (i-4-22-VM, 172.17.30.142) and worker aa754be3-452f-4c14-aa3a-89883c823375 (i-4-23-VM, 172.17.30.154); neither has a registered Node yet. Third CP creation remains pending provider sequencing. This is not Cluster Ready.
+
+Compared the actual decoded bootstrap configurations without exposing tokens: the CP configuration differs only in server, with the second using https://10.10.11.23:9345 and the same nonempty registration token. CAPRKE2 registrationMethod is control-plane-endpoint; availableServerIPs contains 10.10.11.23. Both native 6443/9345 LB rules are Active and TCP reachable from the management host. No join-configuration source defect has been established by these checks.
+
+Second CP console proves verified airgap installation reached systemctl start rke2-server, then reported startup failure and automatic retries. Its kubelet 10250 subsequently became reachable, but authenticated pods/log reads returned HTTP 500 Authorization error. The first API readyz passed including etcd at the sampled time, while recent events show intermittent component probe timeouts. These are not stable multi-node readiness proof. Host sample: approximately 41% idle CPU, no swap use; no evidence-based request for further compute is established.
+
+Private console and diagnostic evidence is under lifecycle-qualification/ (cp8-net-cp2-console.log, cp8-net-cp2-kubelet-*.raw, cp8-net-cp2-filesystem-logs.*). Live read-only XFS inspection rejected a mount with Structure needs cleaning; this inconsistent live disk view does not prove guest filesystem corruption. No filesystem repair, native VM lifecycle action, networking change, source change, or readiness-gate relaxation was performed. Temporary diagnostic forward 16448 and console reader were closed; final root-only ro,norecovery inspection is pending. First unmet gate remains joining-node startup/registration and stable 3+1.
+
+Root-only read-only XFS inspection with ro,norecovery succeeded (cp8-net-cp2-root-logs.json, private); no log replay or guest-disk mutation. Captured second-node messages at 09:20 UTC show Starting etcd for existing cluster member, Connection to etcd is ready, and ETCD server is now running. Earlier startup exited because the local API server never became ready (127.0.0.1:6443 connection refused, context deadline exceeded, systemd result protocol). Kubelet likewise cannot register against that local API. This establishes progress past registration-token discovery into etcd membership, not Kubernetes Node Ready. A focused API-server/containerd log read is the next diagnostic. Both CPs expose TCP 2379/2380 from the router, and router rules allow frontend TCP 6443/9345. First Node Ready heartbeat sampled at 09:26:23 UTC was 09:24:55 UTC. No live success or production qualification flag changed.
+
+Focused API-server container-log inspection could not complete: read-only diagnostic appliance launch reached its 600-second bound. The stalled appliance and all temporary console/16448 diagnostic readers were terminated; management tunnel 16443 was preserved. No repeated provisioning or filesystem repair was attempted. First CP kubelet/supervisor ports were subsequently not listening while 6443 remained reachable; previous Ready status is not a claim of sustained health.
+
+Verified the second CP SSH host key from its trusted libvirt console output and attempted the existing qualification diagnostic key through the trusted host/router path. SSH rejected it with publickey/gssapi methods only (password authentication is not offered). Management-host root access does not provide guest shell access. Current diagnostic blocker: a working SSH key or authenticated console on second CP 172.17.30.142 is needed to read its API-server/containerd/etcd logs and prove the cause before a permanent fix. Existing public key is cp4-diagnostic-key.pub in the protected local lifecycle-qualification directory; no private key or credential was copied into repository evidence. Product source and live readiness flags remain unchanged. Cluster/all-node readiness remains BLOCKED.
+
+### CP8-NET authenticated diagnosis and etcd restart recovery — 2026-09-09
+
+The guest-access blocker above is resolved under renewed operator authorization.
+Trusted libvirt consoles installed the existing restricted diagnostic public key
+on the two exact CP guests. Temporary console passwords were locked again and
+removed from local storage; password SSH stays disabled and SELinux Enforcing.
+Guest known_hosts keys were verified through the trusted consoles.
+
+Authenticated evidence establishes an etcd logging restart deadlock: CP1 lost
+its rke2-etcd leader lease at 09:07:27 UTC; RKE2/containerd exited while static etcd
+continued with stdout/stderr pipes that were no longer drained. Both etcd
+processes had threads blocked in pipe_write. RKE2's local-datastore-first startup
+then failed with failed to reconcile with local datastore / context deadline
+exceeded. The actual CP join configurations differ only in server and have the
+same nonempty registration token; no join-token/address defect is established.
+This matches upstream RKE2 issue 11056 and etcd issue 22326.
+
+A bounded read-only drain of existing process log pipes (no datastore/member/VM
+mutation) drained 895108 bytes from CP1 and 170278 from CP2. CP1 service became
+active after 116.7 seconds; CP2 passed local etcd bootstrap and started containerd
+but had not become active at the 150-second bound. Subsequent etcd member list
+contained both exact CP members and a local linearizable health check passed.
+CP2 has a separate proven unpack failure: kube-apiserver and kube-proxy container
+creation cancels overlayfs layer extraction after about 120 seconds, leaving its
+API unstarted. This is not yet stable 3+1 readiness.
+
+The narrow source correction uses CAPRKE2 serverConfig.etcd.customConfig.extraArgs
+to select a file-only log sink inside RKE2's existing protected etcd data mount,
+with built-in rotation (20 MiB, three backups, seven days, compression). It does
+not change peer/TLS, elections, fsync, membership or volume ownership. Verified
+against the pinned RKE2 executor/k3s ToConfigFile path, CAPRKE2 config mapping and
+live etcd 3.6.14 help. JSON-array log-outputs is required by that conversion path.
+A protected CP2 RKE2 config drop-in is under live validation; no CAPI template
+rollout or VM creation has been dispatched for this change. Existing latency
+measurements remain a separate concern, not resolved by file logging.
