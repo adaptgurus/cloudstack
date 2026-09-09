@@ -455,3 +455,86 @@ YAML. Converted identical Role/RoleBinding objects to
 `tools/layersentry/k8s/qualification-capacity-read.json` (Kubernetes List).
 Normalized objects compare equal; no extra dependency or permission change.
 Installed controller source/release bytes remain those already CI-verified.
+
+Final JSON RBAC validation passed 147 K8s + 5 downstream tests; server dry-run
+reported identical existing permissions. Feature CI 34322029159 SUCCESS for
+`ca56dade530b86b013d41b35f859e7e0016b74a1`. Shared branch remains unchanged.
+First CP8 public 6443 and 9345 both passed TLS certificate verification against
+the cluster CA (TLSv1.3), and authenticated public readyz returned ok.
+
+CAPC next created CP2 `6324e025-aa22-4392-8003-eabc4ee8f24a` (`i-4-19-VM`, 8 CPU,
+6 GiB, guest 172.17.30.124) and worker `50f07200-4589-47e6-bb6c-21ee11b57792`
+(`i-4-20-VM`, 2 CPU, 8 GiB, guest 172.17.30.67). Both use the exact qualified
+Rocky template. Same journal reached step 7 (before baseline packages). No Flux
+baseline Kustomization applied yet; CP2/worker joining and final CP3 remain pending.
+
+### 2026-09-09 — CP8 joined, then control-plane health failed
+
+Both CP Machines acquired NodeRefs; CP2 reported EtcdMemberHealthy at 07:37:44
+UTC. Last successful CAPI workload probe was 07:38:37 UTC. Subsequent public and
+direct CP2 API reads timed out; both Machines became Ready UNKNOWN. CP3 has not
+been created and the worker has no NodeRef. This is not stable Cluster Ready.
+
+Authenticated, CA-verified kubelet observation recovered CP2 cloud-init and
+service/container logs without installing guest keys. Cloud-init completed at
+07:37:17 UTC after verified pinned SELinux RPM and RKE2 archive installation.
+Etcd established peer streams to CP1, then logged loss of leader at 07:42:56 UTC
+and repeated read/raft agreement timeouts. Read-only libguestfs inspection of
+CP1 recovered its messages: RKE2 failed lease renewals, exited at 07:40:30 UTC,
+and its automatic restart stopped progressing after opening the local etcd
+connection at 07:40:53 UTC. No guest reboot, filesystem write, security-policy
+relaxation or manual VM creation was used for these observations.
+
+Host/guest clocks agree. A bounded guest CPU sample observed CP1 12.55% idle,
+CP2 0.39% idle, and worker 74.56% idle; CP2 load1 was 38.27 on 8 vCPU. Earlier
+fresh balloon measurements showed usable RAM on both CPs; sampled primary I/O
+averages were approximately 3.5–3.7 ms/write and 1.3 ms/flush. These measurements
+do not prove the root cause or exclude storage latency outliers. No additional
+CPU/RAM/storage sizing is claimed sufficient from these observations alone.
+
+Paused `ls-rke2-cp8-poc` via the CAPI pause annotation during forensics. The
+reconciler timer remains inactive and the same operation remains at step 7,
+before baseline packages. Private raw evidence is under the existing protected
+`lifecycle-qualification` directory: `cp8-cp2-kubelet-messages.log`,
+`cp8-cp2-etcd-file.log`, `cp8-cp2-kubelet.pprof`, and
+`cp8-cp1-disk-messages.log`. Logs are not copied into Git. The next diagnostic is
+CP1's etcd/container log; do not retry cluster creation or change offerings to
+hide this failure. All production/live qualification flags remain false.
+
+The next read-only disk inspection recovered CP1 etcd, API, kubelet and containerd
+logs (`cp8-cp1-disk-detail.json`, private). Etcd logged slow apply/read operations;
+kubelet housekeeping took 40–50 seconds. A concrete independent bootstrap defect
+was also exposed: CNI portmap repeatedly failed pod sandbox creation because
+`iptables` was absent from its PATH. This is a proven missing Rocky/RKE2
+prerequisite, not proof that it alone caused every etcd timeout.
+
+Extended the existing pinned air-gap prerequisite transaction with Rocky 9.8
+BaseOS `iptables-nft`, `iptables-libs`, `libmnl`, `libnftnl`, `libnfnetlink`, and
+`libnetfilter_conntrack`. Exact URLs, byte SHA256 and RPM NEVRA are in the existing
+qualification lock. All six downloaded RPMs passed signature and checksum
+verification; no host package was installed for this verification. This follows
+the upstream [RKE2 air-gap prerequisites](https://docs.rke2.io/install/airgap),
+which include iptables-nft/libnftnl. The same bootstrap transaction keeps all
+repositories disabled, verifies every RPM signature, checks exact installed
+versions, and now rejects missing/non-nft iptables and ip6tables before staging
+RKE2. SELinux Enforcing, immutable RKE2 images, registry-fallback prohibition,
+capacity reserves and ordinary-project behavior are preserved.
+
+Seven focused consumption tests passed, including CP/worker staging, ordinary
+project behavior, immutable prerequisite tampering, package closure inclusion,
+missing/broken/legacy iptables rejection, and checksum failure stopping startup.
+The failed CP8 cluster is still paused and preserved; this source correction is
+not yet live-verified. All temporary diagnostic SSH forwards and read-only
+inspection appliances were closed. The management tunnel is retained.
+
+Source correction committed as `c8e7ab0cf8d369b5fbf10ca621bff32c10de9e82`.
+Regenerated distribution from those exact committed bytes: tree
+`2fda63c62246f87c4baf7bc8ed0da263a792d370b32a3c483a697973ca56aa17`, receipt SHA
+`a92114ec2964b0f637b1368d209e13ba251ac6812aa53410d3dacbbeac500407`.
+Qualification lock SHA is
+`1f54c32e0f0e43fe1877322f9671ef42cc29ba5ef330ca97239f30db4d2b2212`.
+Full source validation passed 150 K8s tests plus 5 downstream tests; distribution
+verification and diff checks passed. Readiness still reports the same seven
+pending live evidence gates. Existing live controller/request artifacts have not
+yet been replaced by this correction; source CI and a fresh CAPI bootstrap are
+the next gates.
