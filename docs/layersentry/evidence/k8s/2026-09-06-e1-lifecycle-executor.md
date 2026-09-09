@@ -360,3 +360,70 @@ validation (138 K8s tests plus 5 downstream tests; CI 34313543946 SUCCESS) remai
 applicable to unchanged source. Only this scoped evidence file changed in Git;
 no credentials or runtime kubeconfigs were copied. Live provisioning remains
 BLOCKED at stable control-plane readiness, not LIVE_VERIFIED/PRODUCTION_CERTIFIED.
+
+### 2026-09-09 — resized host and eight-vCPU qualification
+
+Operator increased `sen` to 36 vCPU and the requested 84-GB RAM allocation,
+then restarted it without a storage change. Hyper-V reported 36 processors and
+88080384000 assigned memory bytes; Rocky `free -m` reported 81952 MiB total.
+CloudStack reports 36 CPUs, 84859256832 memory bytes, host Up/Enabled. Restored
+only the existing loopback SSH management tunnel after reboot. System VMs/router
+restarted automatically; SSVM and Console Proxy both returned Running/Agent Up,
+and router HAProxy is active. Router link-local IP changed to 169.254.208.179;
+SSH validated against the same previously trusted VM host key using HostKeyAlias.
+No Windows/Hyper-V networking, NAT, routes, NFS, template or firewall changes.
+
+Created/read-back verified fixed `LS-RKE2-CP-8CPU-V5`, UUID
+`4b1e8045-54cb-4ada-babb-ebfc730da62c`: 8 vCPU, 2000 MHz, 6144 MiB, shared/thin,
+rootdisksize=0, offerha=false, limitcpuuse=false. Internal disk linkage
+`3b82e86f-c907-42fe-864d-c3cd6323ab07`. Existing offerings retained unchanged.
+Worker remains `a530859d-06fd-4bb6-8223-838afa0ee9b6` (2 vCPU/8 GiB).
+
+Proved exactly one ROOT disk per each of the three stopped CP4 project VMs,
+no additional project VMs, no Flux Kustomizations, and no CAPC ownership tags on
+pre-existing network/frontend. CAPI/CAPC deleted the CP4 cluster and all three
+VMs. Cleanup initially failed while the rebooting router was unavailable;
+paused retries, verified router recovery, then resumed the same finalizers to
+successful deletion. No forced finalizer removal or manual VM API deletion.
+CP4 journal is retired and retained; source and all prior evidence preserved.
+
+Fresh CP8 admission at 06:33 UTC: PROVISION_ALLOWED, nested KVM PASS, host Up,
+36 total/3 allocated/33 available CPU before guests. New plan 3 CP + 1 worker:
+26 vCPU, 52000 MHz, 26 GiB RAM, 160 GiB roots. Post-plan headroom: 7 CPU,
+48.42567825317383 GiB RAM, 586.16796875 GiB primary storage. CPU/RAM safety floors,
+20% primary/secondary reserves and healthy System VM requirements all retained.
+Private sanitized result: lifecycle-qualification/preflight-cp8-admission.json.
+
+New bounded context `/etc/layersentry/k8s/qualification-cp8.json`, protected
+journal `/var/lib/layersentry/k8s/controller-cp8.sqlite`, request `ls-rke2-cp8-poc`,
+operation `2443f8e6-65a7-4ea2-acfb-d55fd7025cd6`, idempotency
+`layersentry-cp8-qualification-20260909`. Config check passed QUALIFICATION_ONLY,
+productionDeployable=false with all seven live blockers unchanged. Started the
+existing BFF; timer remains inactive and each lifecycle step is advanced manually.
+Same provider/image/template/Canal artifacts. Cluster sizing remains under live
+qualification; no production-readiness claim or additional tenant cluster.
+
+CAPC created first CP8 VM `3af28c10-aceb-4095-9429-9ba39379ebc8`, `i-4-18-VM`,
+with 8 vCPU/6 GiB and no CPU quota cap. Both native 6443 and 9345 rules are Active
+on 10.10.11.23. First Node registered Ready, while bootstrap/system load still
+needs stability measurement. Worker admission then exposed a new source defect:
+native CPU already included the first 8-vCPU CP (11 allocated, 25 available), but
+qualification subtracted the full 26-vCPU request again. Fresh host evidence
+reproduced `Insufficient CPU after management/system reserve`. Paused the Cluster
+before further provider creation; no extra compute requested to hide this defect.
+
+Targeted correction in source commit `6bd61dcad45dfa74c816bdd9ab50b1fcf5510e7d`:
+observe exact Cluster/RKE2ControlPlane/Machine/CloudStackMachine owner UIDs and
+native project/zone/host/network/offering/template/CPU identity. Credit only
+already Running CP CPU/MHz included in the native allocation, with stable reads
+before/after capacity discovery. Workers, RAM and root storage remain reserved
+in full; this is intentionally conservative. Missing/foreign/ambiguous/changing
+ownership or allocation fails closed. No CloudStack mutation API was added.
+Freshness, nested KVM, host/pool, CPU/RAM floors and 20% storage checks remain.
+
+Focused capacity/qualification/executor tests: 44 PASS. Full source validation:
+147 K8s tests + 5 downstream tests PASS; distribution verification and diff checks
+PASS. Regenerated distribution from exact source commit above, tree
+`b2756d8231c360df48680984f8c7b679b4902b574896c1667e9b0acd26f71e53`, receipt SHA
+`942da569cdb93a777d0a8c7d9f2ccbb34cdd3f8bf77ea3ac539705b697f33e59`.
+All production/live qualification booleans remain false.

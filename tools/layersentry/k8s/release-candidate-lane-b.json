@@ -98,7 +98,7 @@
   },
   "controllerDistribution": {
     "path": "tools/layersentry/k8s/artifacts/controller-distribution.json",
-    "sha256": "f49bb107911dee104dc0a08e924c9d3f51b3c2d354d6c822e736915e8ff4d6f8",
+    "sha256": "942da569cdb93a777d0a8c7d9f2ccbb34cdd3f8bf77ea3ac539705b697f33e59",
     "sourceCommit": "cfd7816d50ca7d2a8278219d3a16df0699f6d341",
     "treeSha256": "efc52d69ab7f42d18a4da324fcc3be3ce7a3c65dd808239c44b893d14a017ed9"
   }
