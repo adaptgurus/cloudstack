@@ -117,3 +117,27 @@ Private diagnostic artifacts remain under
 `/home/opc/.local/share/layersentry/lifecycle-qualification/` (not imported;
 this directory also contains protected runtime material). No credentials,
 kubeconfigs, tokens, or private keys are included in this checkpoint.
+
+### 2026-09-09 DHCP remediation (operator approved)
+
+The operator explicitly authorized resolving the host-network blocker. Runtime
+firewalld inspection showed `breth1-153` absent from public-zone interfaces and
+its forwarding allow chain; bridged IPv4 filtering was enabled. Added only this
+project VLAN bridge to the existing public zone, first at runtime. Cycled only
+the uninitialized guest's NIC link down/up to renew DHCP. VR eth0 capture then
+proved two DHCP requests and two replies; QEMU agent confirmed 172.17.30.202/24
+and guest SSH became reachable. Persisted the same interface membership using
+`firewall-cmd --permanent --zone=public --add-interface=breth1-153`.
+Host file affected: `/etc/firewalld/zones/public.xml`. No global forwarding
+sysctl, NAT, route, VLAN, Hyper-V, or CloudStack network changes. Temporary nft
+trace table was removed; its window produced no IP trace and is not claimed as
+packet-level drop proof. The successful DHCP exchange after the scoped change
+provides the live remediation evidence.
+
+Read-only guest log inspection showed cloud-init previously completed with
+`DataSourceNone` after the failed first-boot network attempt. Before replacing
+that disposable Machine, native inventory proved exactly one 40-GiB ROOT volume,
+no data volume, and CAPI no NodeRef. Requested deletion only of CAPI Machine
+`ls-rke2-poc-control-plane-vsrmj`; provider finalizers own cleanup/recreation.
+Retry guard allowed the materially changed firewall environment. No manual
+RKE2 installation, cloud-init replay, native VM deletion, or finalizer removal.
