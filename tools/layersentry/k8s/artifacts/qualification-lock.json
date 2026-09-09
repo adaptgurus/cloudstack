@@ -78,11 +78,47 @@
           "filename": "rke2-selinux-0.23-1.el9.noarch.rpm",
           "url": "https://github.com/rancher/rke2-selinux/releases/download/v0.23.stable.1/rke2-selinux-0.23-1.el9.noarch.rpm",
           "sha256": "95fd066cab84868cbb7f245b1884734bb90f28717f45ccb85a55e5a403d3a454"
+        },
+        {
+          "filename": "iptables-libs-1.8.10-11.el9_5.x86_64.rpm",
+          "url": "https://dl.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/i/iptables-libs-1.8.10-11.el9_5.x86_64.rpm",
+          "sha256": "3d9571eeda3a537660d7955bec839c59ec48a59423f49b23e52972a859fceda3"
+        },
+        {
+          "filename": "iptables-nft-1.8.10-11.el9_5.x86_64.rpm",
+          "url": "https://dl.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/i/iptables-nft-1.8.10-11.el9_5.x86_64.rpm",
+          "sha256": "6934590699b76caf0403253766510d397d2314cdec13e10c54b38f7d3d79e112"
+        },
+        {
+          "filename": "libmnl-1.0.4-16.el9_4.x86_64.rpm",
+          "url": "https://dl.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libmnl-1.0.4-16.el9_4.x86_64.rpm",
+          "sha256": "de67327a302fe3ec5a33d26f600e6450c9b4de408013fe5ca7747cade407131f"
+        },
+        {
+          "filename": "libnftnl-1.2.6-4.el9_4.x86_64.rpm",
+          "url": "https://dl.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libnftnl-1.2.6-4.el9_4.x86_64.rpm",
+          "sha256": "53eb14c0ee34f68341db9a096520b4f86b554a109a28f1c9154b07331d8ce3c0"
+        },
+        {
+          "filename": "libnfnetlink-1.0.1-23.el9_5.x86_64.rpm",
+          "url": "https://dl.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.x86_64.rpm",
+          "sha256": "1ed133b3c950dc1827b7b6139dbe29a59c351679a9a40dcb2c4114e76b810d34"
+        },
+        {
+          "filename": "libnetfilter_conntrack-1.0.9-1.el9.x86_64.rpm",
+          "url": "https://dl.rockylinux.org/pub/rocky/9.8/BaseOS/x86_64/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.x86_64.rpm",
+          "sha256": "162fdb1bfe7217bd77f06c19ccf45b274136b434101838ddcafff638fd83cf62"
         }
       ],
       "packages": [
         "container-selinux-4:2.245.0-1.el9.noarch",
-        "rke2-selinux-0:0.23-1.el9.noarch"
+        "rke2-selinux-0:0.23-1.el9.noarch",
+        "iptables-libs-0:1.8.10-11.el9_5.x86_64",
+        "iptables-nft-0:1.8.10-11.el9_5.x86_64",
+        "libmnl-0:1.0.4-16.el9_4.x86_64",
+        "libnftnl-0:1.2.6-4.el9_4.x86_64",
+        "libnfnetlink-0:1.0.1-23.el9_5.x86_64",
+        "libnetfilter_conntrack-0:1.0.9-1.el9.x86_64"
       ]
     }
   }

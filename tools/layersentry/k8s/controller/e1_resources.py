@@ -106,6 +106,9 @@ def qualification_bootstrap(lock):
         "tmp=$(mktemp -d /opt/rke2-artifacts/.qualification.XXXXXX)",
         "trap 'rm -rf \"$tmp\"' EXIT"]
     policy = assets["selinuxPrerequisites"]
+    # Include the pinned Rocky networking dependencies required by CNI portmap.
+    rpm_paths = " ".join('"$tmp/' + item["filename"] + '"'
+                         for item in policy["assets"] if item["filename"].endswith(".rpm"))
     for item in policy["assets"]:
         name = item["filename"]
         commands += [
@@ -121,15 +124,18 @@ def qualification_bootstrap(lock):
         'test "$(getenforce)" = Enforcing',
         "printf '%s  %s\\n' " + policy["rockyKeySha256"] + " /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9 | sha256sum --check --status",
         'rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9 "$tmp/rancher-public.key"',
-        'rpm --checksig "$tmp/container-selinux-2.245.0-1.el9.noarch.rpm" "$tmp/rke2-selinux-0.23-1.el9.noarch.rpm"',
+        'rpm --checksig ' + rpm_paths,
         'dnf -y --disablerepo="*" --setopt=localpkg_gpgcheck=1 --setopt=install_weak_deps=False install '
-        '"$tmp/container-selinux-2.245.0-1.el9.noarch.rpm" "$tmp/rke2-selinux-0.23-1.el9.noarch.rpm"',
+        + rpm_paths,
     ]
     for package in policy["packages"]:
         name = package.rsplit("-", 2)[0]
         commands.append('test "$(rpm -q --qf \'%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\\n\' '
                         + name + ')" = ' + shlex.quote(package))
-    commands += ['test "$(getenforce)" = Enforcing']
+    commands += ['test "$(getenforce)" = Enforcing',
+        'command -v iptables; command -v ip6tables',
+        'version=$(iptables --version); case "$version" in *"(nf_tables)"*) ;; *) exit 1 ;; esac',
+        'version=$(ip6tables --version); case "$version" in *"(nf_tables)"*) ;; *) exit 1 ;; esac']
     for item in assets["assets"]:
         name = item["filename"]
         target = "/opt/install.sh" if name == "install.sh" else "/opt/rke2-artifacts/" + name

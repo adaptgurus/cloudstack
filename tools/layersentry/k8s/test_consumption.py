@@ -157,6 +157,55 @@ class ConsumptionTests(unittest.TestCase):
                 else:policy['rockyKeySha256']='0'*64
                 with self.assertRaises(InvalidRequestError):qualification_bootstrap(lock)
 
+    def test_cni_iptables_dependency_closure_is_pinned_and_installed(self):
+        required = {'iptables-nft', 'iptables-libs', 'libmnl', 'libnftnl',
+                    'libnfnetlink', 'libnetfilter_conntrack'}
+        policy = LOCK['rke2Artifacts']['selinuxPrerequisites']
+        packages = {p.rsplit('-', 2)[0] for p in policy['packages']}
+        self.assertTrue(required <= packages)
+        script = shlex.split(qualification_bootstrap(LOCK)['preRKE2Commands'][0])[3]
+        install = next(line for line in script.splitlines() if line.startswith('dnf -y'))
+        signatures = next(line for line in script.splitlines() if line.startswith('rpm --checksig'))
+        for item in policy['assets']:
+            if item['filename'].endswith('.rpm'):
+                self.assertIn(item['filename'], install)
+                self.assertIn(item['filename'], signatures)
+                self.assertLess(script.index(item['sha256']), script.index('dnf -y'))
+        self.assertLess(script.index('command -v iptables'),
+                        script.index(LOCK['rke2Artifacts']['assets'][0]['url']))
+
+    def test_cni_package_lock_changes_fail_closed(self):
+        for change in ('omit', 'checksum', 'url', 'version'):
+            with self.subTest(change=change):
+                lock = deepcopy(LOCK)
+                policy = lock['rke2Artifacts']['selinuxPrerequisites']
+                item = next(x for x in policy['assets'] if x['filename'].startswith('iptables-nft-'))
+                if change == 'omit': policy['assets'].remove(item)
+                elif change == 'checksum': item['sha256'] = '0' * 64
+                elif change == 'url': item['url'] = 'https://example.invalid/iptables.rpm'
+                else: policy['packages'] = [p.replace('1.8.10', '1.8.99') for p in policy['packages']]
+                with self.assertRaises(InvalidRequestError): qualification_bootstrap(lock)
+
+    def test_missing_or_wrong_iptables_backend_stops_bootstrap(self):
+        import os
+        script = shlex.split(qualification_bootstrap(LOCK)['preRKE2Commands'][0])[3]
+        # Execute the actual generated post-install checks, without modifying a host firewall.
+        checks = script[script.index('command -v iptables;'):]
+        checks = checks[:checks.index('\ncurl ')]
+        for case in ('valid', 'missing', 'legacy-v4', 'legacy-v6', 'broken-v4', 'error-with-version'):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for name in ('iptables', 'ip6tables'):
+                    if case == 'missing' and name == 'iptables': continue
+                    legacy = (case == 'legacy-v4' and name == 'iptables') or (case == 'legacy-v6' and name == 'ip6tables')
+                    body = 'exit 1' if case == 'broken-v4' and name == 'iptables' else 'echo "iptables v1.8.10 (' + ('legacy' if legacy else 'nf_tables') + ')"'
+                    if case == 'error-with-version' and name == 'iptables': body += '\nexit 1'
+                    p = root/name; p.write_text('#!/bin/sh\n' + body + '\n'); p.chmod(0o700)
+                result = subprocess.run(['/bin/sh', '-eu', '-c', checks + '\nprintf reached > "' + str(root/'continued') + '"'],
+                                        env={**os.environ, 'PATH': str(root)}, capture_output=True)
+                self.assertEqual(result.returncode == 0, case == 'valid')
+                self.assertEqual((root/'continued').exists(), case == 'valid')
+
     def test_checksum_failure_exits_without_following_bootstrap(self):
         script=shlex.split(qualification_bootstrap(LOCK)['preRKE2Commands'][0])[3]
         with tempfile.TemporaryDirectory() as directory:
