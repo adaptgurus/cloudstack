@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "sourceCommit": "5f6b6b930da3819797f9bef0a9f65017fa20b29e",
+  "sourceCommit": "d6dcaef221b1104e573723034a51755e2d68bb8e",
   "distribution": "systemd-filesystem",
   "files": [
     {
@@ -109,13 +109,13 @@
       "path": "systemd/layersentry-k8s-bff.service",
       "installedPath": "/etc/systemd/system/layersentry-k8s-bff.service",
       "mode": "0644",
-      "sha256": "14849e8784da2ecae6e253064ae63f44e0f6c33c01ae78f9e4607496921b8aa3"
+      "sha256": "7c9ac3050f6b14f214b0d7bca9f4980aeb86a340709f5fe5672e5c061fe76430"
     },
     {
       "path": "systemd/layersentry-k8s-reconciler.service",
       "installedPath": "/etc/systemd/system/layersentry-k8s-reconciler.service",
       "mode": "0644",
-      "sha256": "c3921e7916d4a5208e2e890eaab629807d1dd3ccb5f9438f3c346b58bc57550b"
+      "sha256": "ec269a4322bde1f5cbd35f0aa121be004840f49d6d6879f062f53c835484db7d"
     },
     {
       "path": "systemd/layersentry-k8s-reconciler.timer",
@@ -124,7 +124,7 @@
       "sha256": "040aaf2d3450c03d88d942e338d8bdfd837a4f077bb73bcb4126c618b70eea4a"
     }
   ],
-  "treeSha256": "c791d6e512f8b7d68aa05ac4015ae010fbded401cf635bdfdd36eb534e644aa4",
+  "treeSha256": "09d52d8ef37650e0e05b935366587a08f6bc4b7f9904f3f84ffc73d026a048aa",
   "runtimeDependencyLock": {
     "path": "tools/layersentry/k8s/artifacts/runtime-dependencies.json",
     "sha256": "60c678e9925ace965973ff18dcd630fd881c4032048d51fe05ff239e5af21e21"
