@@ -427,3 +427,11 @@ PASS. Regenerated distribution from exact source commit above, tree
 `b2756d8231c360df48680984f8c7b679b4902b574896c1667e9b0acd26f71e53`, receipt SHA
 `942da569cdb93a777d0a8c7d9f2ccbb34cdd3f8bf77ea3ac539705b697f33e59`.
 All production/live qualification booleans remain false.
+
+Source CI 34320850503 passed at `a9cb7acb9c54fbdbc55980ebb772843112d24055`.
+During stopped-BFF installation, the runtime correctly rejected the release:
+the receipt SHA was updated, but duplicate controllerDistribution.sourceCommit
+and treeSha256 fields were still old. Corrected these two release metadata fields
+to the exact existing source/receipt identities; no controller source change or
+gate bypass. Direct evaluate_component_readiness then returned exactly the seven
+pending live blockers. The failed context revision did not alter journal binding.
