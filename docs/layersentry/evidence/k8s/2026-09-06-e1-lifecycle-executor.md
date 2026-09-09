@@ -278,3 +278,85 @@ operator decision: authorize a revised fixed CP offering/request (suggested 4
 vCPU, retain measured-safe memory) and a fresh capacity check. Do not mutate the
 existing locked request or use native VM resizing as a CAPC bypass. Preserve the
 current protected journal, credentials and diagnostic evidence for continuation.
+
+### 2026-09-09 — approved four-vCPU control-plane qualification
+
+Operator approved a new 4-vCPU CP offering/request; worker stays 2 vCPU/8 GiB.
+Created and read-back verified `LS-RKE2-CP-4CPU-V4`, UUID
+`0ec438b2-642a-45fe-82cd-ff379c1c7d96`: 4 vCPU, 2000 MHz, 6144 MiB, fixed,
+shared/thin, offerha=false, limitcpuuse=false, rootdisksize=0. Internal linked disk
+offering `1ae1aac5-58d1-4ad1-a9ed-3aaf3b5a4112`. No existing offering was changed.
+The private operator helper reused secure signed transport; the product preflight
+client remains read-only and source was not modified.
+
+Authoritative cleanup proof found exactly one ROOT volume per each of the three
+old project VMs and no CAPC ownership tag on the pre-existing network/public IP.
+Retired the old qualification journal. CAPI deleted the disposable Cluster and
+CAPC removed all three VMs; no native VM resize/destroy API was issued manually.
+Used documented CAPI drain/volume-wait exclusions only after this root-only proof.
+Old suspended Flux Kustomizations were removed using supported Orphan deletion
+policy because their disposable workload cluster was being deleted. Shared Flux
+source and pre-existing CloudStack network/public IP remain.
+
+Fresh preflight: PROVISION_ALLOWED; new plan 14 vCPU/28000 MHz, 26 GiB RAM,
+160 GiB root storage. Remaining headroom: 7 CPU cores, 44.373844146728516 GiB RAM,
+469.69885186851025 GiB primary storage. Safety reserves retained. Old journal
+`controller.sqlite` remains retired; new protected journal is
+`/var/lib/layersentry/k8s/controller-cp4.sqlite`, context
+`/etc/layersentry/k8s/qualification-cp4.json`. No credentials copied to Git.
+
+New request `ls-rke2-cp4-poc`, operation
+`a9294dda-dbeb-46de-9a9c-b99a6a705c41`, idempotency
+`layersentry-cp4-qualification-20260909`. Same project/template/Canal/provider
+artifacts, topology 3+1. First CAPC VM `66004a18-35ff-4eef-bce0-52b204e2fbe7`,
+`i-4-15-VM`, has 4 vCPU and 6 GiB in live libvirt XML. Fresh cloud-init verified
+both pinned SELinux RPM signatures, installed them successfully, staged RKE2
+assets and began container startup. No guest-specific repair/reboot was used.
+Endpoint rules and worker desired state converged; operation waits before Flux
+baseline while the first CP stabilizes. Full Cluster Ready is not yet claimed.
+
+At 06:04–06:07 UTC the first CP and second CP had registered; etcd/API containers
+were Running with zero restarts, but first CP controller-manager/scheduler had
+restarted after API lease-renewal timeouts. First authenticated public readyz
+passed all checks; later bounded queries were intermittently slow. Guest-agent
+CPU deltas showed nearly zero idle on CP1 and about 2% idle on CP2, while the
+worker was mostly idle. First kubelet statistics reported about 3.46 CPU cores
+used: kubelet 0.93, API server 0.86, etcd 0.59, Canal 0.43. Available guest RAM
+was about 3.45 GiB. This is not yet stable Cluster Ready or proof that 4 vCPU is
+sufficient. Full 3+1 and Flux baseline remain pending. No manual node repair.
+
+Diagnostic limits: guest-exec and guest-file operations are disabled by the
+existing QEMU agent. Attempted temporary diagnostic public-key addition was
+rejected with permission denied; no guest key was installed and no policy was
+relaxed. Read-only virt-cat inspection failed on the live disk lock; no disk
+write, forced unlock, filesystem edit or guest reboot was attempted.
+
+### Current stop gate — four-vCPU CP pressure persists
+
+At 06:06 UTC a second guest-agent measurement confirmed 0.00% CPU idle on both
+CPs, negligible steal (0.23%/0.28%) and zero I/O wait. CP1 load1/load5 was
+33.75/35.75; CP2 was 25.94/17.92. Worker CPU was 92.06% idle, load1 0.19, and
+had not registered. The second CP Machine remained Not Ready after a bounded
+wait. No additional addon baseline was applied. Paused `ls-rke2-cp4-poc` through
+CAPI; reconciler timer remains inactive. Three provider-created VMs are preserved.
+Do not interpret the first Node Ready or readyz pass as stable full-cluster proof.
+
+Requested next operator sizing decision: increase outer `sen` from 24 to 32 vCPU
+and qualify a new fixed 8-vCPU CP offering/request, retaining CP 6 GiB and worker
+2 vCPU/8 GiB. This is a proposed measurement, not proven sufficient sizing.
+Planned RKE2 CPU would be 3*8+2=26 vCPU. The earlier fresh admission showed
+21 CPU available before RKE2 guest allocation; with 8 additional host CPU,
+29-26=3 CPU remain, exceeding the 2-CPU floor if system usage is unchanged.
+Arithmetic minimum increase for this proposed plan is 7 CPU; 32 total gives one
+additional CPU beyond that floor. RAM/root storage plan remains 26 GiB/160 GiB;
+no RAM or storage increase is requested on current evidence. Capacity must be
+freshly remeasured after any host change. Do not resize individual VMs manually,
+reuse a stale capacity approval, restart the old journal, or silently alter the
+locked current request. No separate tenant cluster is admitted yet. Coordinate
+host maintenance before any shutdown; do not power off `sen` unexpectedly.
+
+No LayerSentry source defect was proven during this sizing pass. Existing source
+validation (138 K8s tests plus 5 downstream tests; CI 34313543946 SUCCESS) remains
+applicable to unchanged source. Only this scoped evidence file changed in Git;
+no credentials or runtime kubeconfigs were copied. Live provisioning remains
+BLOCKED at stable control-plane readiness, not LIVE_VERIFIED/PRODUCTION_CERTIFIED.
