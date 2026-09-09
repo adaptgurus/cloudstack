@@ -629,3 +629,36 @@ Validation: 18 focused tests PASS; complete validate-source.py PASS with 151 K8s
 and 5 downstream tests. Distribution verification and diff checks PASS. The same
 seven live-readiness blockers remain false; this source evidence is not cluster
 or lifecycle qualification.
+
+Logging feature CI `34339700527` SUCCESS at
+`cf8873253bdced51a0101f52b6ea7628dd4a6610`. CP2 now runs etcd PID 20434 with
+its protected 0600 file sink and a successful local linearizable health check;
+no pipe_write block was present. CP1 requires completion of its static-pod
+replacement before restart recovery can be called verified on both nodes.
+
+### CP8-NET cold image extraction deadline — 2026-09-09
+
+The pinned kubelet confirms runtimeRequestTimeout defaults to 2m. CP2 repeatedly
+cancelled cold overlayfs extraction while CreateContainer was still working.
+A qualification-only 0600 KubeletConfiguration drop-in sets a finite 10m deadline;
+restarted only the kubelet child through RKE2's existing retry supervisor. No
+etcd/containerd/service restart or image replacement was needed for this test.
+After that change kube-proxy CreateContainer completed at 10:24:22 UTC and
+kube-apiserver at 10:24:47 (started successfully at 10:24:51). Both previously
+failed repeatedly at approximately 120 seconds. Their successful extraction
+exceeded that default but stayed within the new bound. This proves the narrow
+cold-image timeout hypothesis, not stable API/Node/Cluster readiness.
+
+The source correction emits the same standard CAPRKE2 files entry for both
+qualification CPs and workers. Pinned RKE2 writes its own 00-rke2-defaults.conf
+without removing this supported later kubelet drop-in. Ordinary projects retain
+their defaults. The only kubelet setting changed is runtimeRequestTimeout;
+registry fallback, image identity, TLS, reservations and all live gates remain
+unchanged. Nineteen focused tests PASS, including qualification/ordinary-path
+separation and exact bounded configuration for CP and worker.
+
+Worker diagnostic access was established through its exact trusted libvirt
+console using the existing restricted public key; the temporary console password
+was relocked and deleted locally. Its observed join requests reach the supervisor
+and receive runtime-core-not-ready/503 while control planes recover. No worker
+VM replacement or bootstrap-token change was performed.

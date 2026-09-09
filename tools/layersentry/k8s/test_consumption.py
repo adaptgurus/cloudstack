@@ -139,11 +139,31 @@ class ConsumptionTests(unittest.TestCase):
         docs=build_cluster_resources(request(),resolved())
         cp=next(x['spec'] for x in docs if x['kind']=='RKE2ControlPlane')
         self.assertFalse(cp['agentConfig']['airGapped']);self.assertNotIn('preRKE2Commands',cp)
+        self.assertNotIn('files',cp)
         self.assertEqual(cp['serverConfig']['cni'],'cilium')
         for t in docs:
             if t['kind']=='CloudStackMachineTemplate':self.assertNotIn('details',t['spec']['template']['spec'])
         with self.assertRaisesRegex(InvalidRequestError,'CNI'):
             build_cluster_resources(request(project_id=LOCK['projectId']),resolved(project_id=LOCK['projectId'],control_plane_template_id=LOCK['template']['id'],worker_template_ids={'workers':LOCK['template']['id']}))
+
+    def test_qualification_cri_unpack_deadline_is_bounded_for_cp_and_workers(self):
+        pid=LOCK['projectId'];tid=LOCK['template']['id']
+        docs=build_cluster_resources(request(project_id=pid,cni='canal',control_plane_image_id=tid),
+            resolved(project_id=pid,control_plane_template_id=tid,worker_template_ids={'workers':tid}))
+        cp=next(x['spec'] for x in docs if x['kind']=='RKE2ControlPlane')
+        worker=next(x['spec']['template']['spec'] for x in docs if x['kind']=='RKE2ConfigTemplate')
+        for spec in (cp,worker):
+            self.assertEqual(len(spec['files']),1)
+            f=spec['files'][0]
+            self.assertEqual(f['path'],'/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/90-layersentry-qualification.conf')
+            self.assertEqual((f['owner'],f['permissions']),('root:root','0600'))
+            self.assertEqual(json.loads(f['content']),{'apiVersion':'kubelet.config.k8s.io/v1beta1',
+                'kind':'KubeletConfiguration','runtimeRequestTimeout':'10m'})
+            self.assertTrue(spec['agentConfig']['airGapped'])
+            self.assertNotIn('get.rke2.io',json.dumps(spec))
+        ordinary=build_cluster_resources(request(),resolved())
+        for obj in ordinary:
+            self.assertNotIn('runtimeRequestTimeout',json.dumps(obj))
 
     def test_asset_checksum_tampering_rejected(self):
         lock=deepcopy(LOCK);lock['rke2Artifacts']['assets'][1]['sha256']='0'*64

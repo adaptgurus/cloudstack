@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import re
 import shlex
 from dataclasses import dataclass
@@ -166,6 +167,15 @@ def qualification_bootstrap(lock):
     script = "\n".join(commands)
     return {"agentConfig": {"airGapped": True,
             "airGappedChecksum": assets["assets"][0]["sha256"]},
+            # The nested qualification host needs >2m to unpack cold local
+            # images during CreateContainer. Keep a finite CRI deadline and
+            # leave ordinary production projects' kubelet defaults unchanged.
+            "files": [{
+                "path": "/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/90-layersentry-qualification.conf",
+                "owner": "root:root", "permissions": "0600",
+                "content": json.dumps({"apiVersion": "kubelet.config.k8s.io/v1beta1",
+                                       "kind": "KubeletConfiguration", "runtimeRequestTimeout": "10m"}) + "\n",
+            }],
             # Exit the surrounding cloud-init runcmd script too, not merely a child.
             "preRKE2Commands": ["sh -eu -c " + shlex.quote(script) + " || exit 1"],
             "privateRegistriesConfig": {"mirrors": {
