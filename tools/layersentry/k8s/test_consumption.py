@@ -153,8 +153,7 @@ class ConsumptionTests(unittest.TestCase):
         cp=next(x['spec'] for x in docs if x['kind']=='RKE2ControlPlane')
         worker=next(x['spec']['template']['spec'] for x in docs if x['kind']=='RKE2ConfigTemplate')
         for spec in (cp,worker):
-            self.assertEqual(len(spec['files']),1)
-            f=spec['files'][0]
+            f=next(item for item in spec['files'] if item['path'].endswith('/90-layersentry-qualification.conf'))
             self.assertEqual(f['path'],'/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/90-layersentry-qualification.conf')
             self.assertEqual((f['owner'],f['permissions']),('root:root','0600'))
             self.assertEqual(json.loads(f['content']),{'apiVersion':'kubelet.config.k8s.io/v1beta1',
@@ -164,6 +163,28 @@ class ConsumptionTests(unittest.TestCase):
         ordinary=build_cluster_resources(request(),resolved())
         for obj in ordinary:
             self.assertNotIn('runtimeRequestTimeout',json.dumps(obj))
+
+    def test_qualification_time_dependency_persists_for_both_service_roles(self):
+        spec=qualification_bootstrap(LOCK)
+        units={item['path']:item for item in spec['files'] if item['path'].endswith('.conf')
+               and item['path'].startswith('/etc/systemd/system/')}
+        self.assertEqual(set(units), {
+            '/etc/systemd/system/'+role+'.service.d/20-layersentry-time-sync.conf'
+            for role in ('rke2-server','rke2-agent')})
+        for unit in units.values():
+            self.assertEqual(unit['permissions'],'0644')
+            self.assertIn('After=chronyd.service network-online.target\n',unit['content'])
+            self.assertIn('ExecStartPre=/usr/bin/chronyc waitsync 30 0.5 0 2\n',unit['content'])
+            self.assertNotIn('ExecStartPre=-',unit['content'])
+        script=shlex.split(spec['preRKE2Commands'][0])[3]
+        self.assertIn('systemctl enable --now chronyd.service',script)
+        self.assertTrue(script.endswith('chronyc waitsync 30 0.5 0 2'))
+        # Simulate an unsynchronized source: cloud-init must stop, including
+        # its outer wrapper, rather than continuing into RKE2 installation.
+        guarded='sh -eu -c '+shlex.quote('false')+' || exit 1\nprintf unsafe'
+        result=subprocess.run(['sh','-c',guarded],capture_output=True,text=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertNotIn('unsafe',result.stdout)
 
     def test_asset_checksum_tampering_rejected(self):
         lock=deepcopy(LOCK);lock['rke2Artifacts']['assets'][1]['sha256']='0'*64

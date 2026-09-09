@@ -164,6 +164,14 @@ def qualification_bootstrap(lock):
         "test ! -L /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml",
         "mv -T \"$tmp/99-layersentry-qualification.yaml\" /etc/rancher/rke2/config.yaml.d/99-layersentry-qualification.yaml",
     ]
+    # Persist the dependency for every service start, including guest reboot.
+    # The base Rocky qualification image already includes chrony; missing time
+    # support must fail provisioning instead of booting a clock-invalid node.
+    commands += ["command -v chronyc", "systemctl enable --now chronyd.service",
+                 "systemctl daemon-reload", "chronyc burst 4/4",
+                 "chronyc waitsync 30 0.5 0 2"]
+    time_sync_unit = ("[Unit]\nWants=chronyd.service\nAfter=chronyd.service network-online.target\n"
+                      "[Service]\nExecStartPre=/usr/bin/chronyc waitsync 30 0.5 0 2\n")
     script = "\n".join(commands)
     return {"agentConfig": {"airGapped": True,
             "airGappedChecksum": assets["assets"][0]["sha256"]},
@@ -175,7 +183,10 @@ def qualification_bootstrap(lock):
                 "owner": "root:root", "permissions": "0600",
                 "content": json.dumps({"apiVersion": "kubelet.config.k8s.io/v1beta1",
                                        "kind": "KubeletConfiguration", "runtimeRequestTimeout": "10m"}) + "\n",
-            }],
+            }] + [{
+                "path": "/etc/systemd/system/" + service + ".service.d/20-layersentry-time-sync.conf",
+                "owner": "root:root", "permissions": "0644", "content": time_sync_unit,
+            } for service in ("rke2-server", "rke2-agent")],
             # Exit the surrounding cloud-init runcmd script too, not merely a child.
             "preRKE2Commands": ["sh -eu -c " + shlex.quote(script) + " || exit 1"],
             "privateRegistriesConfig": {"mirrors": {
