@@ -166,3 +166,57 @@ K8s publishing workflow can perform the two authoritative clean builds and
 publish with Actions package permission. The local GitHub credential lacks
 package scope. No patched provider rollout or immutable-readiness assertion is
 made before successful publication, digest retrieval and consumption binding.
+
+Patched bootstrap image publication and pull-by-digest succeeded in artifact run
+34309295922. Both clean runtime-content hashes are
+`f1a4d901ef932ea3f2f5abeda51cbdf0bfaad05efb558ecf39d2f0b94814661a`.
+Anonymous linux/amd64 pull succeeded for
+`ghcr.io/adaptgurus/layersentry-caprke2-bootstrap@sha256:aa4f547351a2e0b374e7c4ab23cefec5c3820690195aae6a8ecbbc1c4de26217`.
+The management lock binds that image; feature source CI 34309877516 passed for
+`f3c3511967a0c76cad38211097863b40f5887159`. Controller distribution source bytes
+were unchanged, so its existing source/tree binding remains valid. Only release
+metadata was reinstalled, followed by the explicit audited qualification-release
+revision (same request and idempotency key).
+
+An image-only server dry run and Deployment backup preceded the bootstrap
+controller rollout. The Deployment became available; the old upstream digest
+remains the rollback image. Fresh native/host capacity again returned
+PROVISION_ALLOWED. CAPI/CAPC replaced the root-only, uninitialized Machine;
+current Machine `ls-rke2-poc-control-plane-v99w6`, VM UUID
+`039e67f0-2738-4cf9-8893-78e61dff6e8b`, domain `i-4-11-VM`. Its newly generated
+live bootstrap Secret decodes/parses correctly with eight commands including
+checksum verification. Secret contents were not logged or committed. RKE2
+service/Node/Cluster readiness is still a separate pending live gate.
+
+### 2026-09-09 — SELinux air-gap prerequisite correction
+
+The diagnostic replacement is Machine `ls-rke2-poc-control-plane-6bb2x`,
+CloudStack VM `5b061506-22e1-4f1f-aeab-471c028dac1f`, `i-4-12-VM`,
+172.17.30.83. Its SSH host key was verified against trusted libvirt console output;
+an operator public key was temporarily delivered through CAPRKE2 Files. No
+private key/password was embedded. This diagnostic access must be removed after
+qualification. The Cluster is paused while bootstrap prerequisites are corrected.
+
+The node verified/staged official RKE2 assets and imported all 16 release archive
+images. Supervisor 9345 listens; API 6443 remains pending. The live container
+runtime initially failed with `write fsmount:fscontext:proc/self/attr/keycreate:
+invalid argument`. SELinux was Enforcing but both container-selinux and
+rke2-selinux were absent. This is the documented air-gap prerequisite, not a
+reason to disable SELinux or registry restrictions.
+
+Installed exactly two checksum-pinned, signature-verified local RPMs with all
+repositories disabled and local package GPG checking enabled:
+`container-selinux-4:2.245.0-1.el9.noarch` and
+`rke2-selinux-0:0.23-1.el9.noarch`. No package upgrades or additional dependencies.
+The Rancher key fingerprint is
+`C8CFF216455126E9B9C918BE925EA29AE257814A`; the Rocky key was supplied by the
+unmodified rocky-gpg-keys RPM. Exact asset/key hashes are bound in the qualification
+lock. SELinux remained Enforcing. Restored RKE2 file contexts and restarted the
+service; stale failed sandboxes remained, so rebooted only this disposable guest.
+API recovery is not yet claimed.
+
+Source commit `cfd7816d50` now stages/verifies these exact prerequisites for CP
+and worker before the RKE2 installer. Ordinary projects are unchanged. Source
+validation passed 138 K8s and five downstream tests; checksum/URL/package/key
+substitution fails closed. Controller distribution regenerated from exact source
+commit bytes. All production live flags remain false.

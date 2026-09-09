@@ -24,5 +24,8 @@
   "platform": "linux/amd64",
   "artifactWorkflowRun": 34309295922,
   "sourceValidationRun": 34309541494,
-  "rollout": "NOT_EXECUTED"
+  "rollout": "CONTROLLER_AVAILABLE",
+  "bindingSourceValidationRun": 34309877516,
+  "liveGeneratedCloudConfigValid": true,
+  "rollbackImage": "ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:c4db572fa8d229cbc0363b816c71aea0aacb132a1dc772c5b63bf9a364297baa"
 }
