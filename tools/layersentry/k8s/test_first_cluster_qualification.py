@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
-from controller.qualification import FirstClusterQualification, fingerprint, DEFERRED
+from controller.qualification import FirstClusterQualification, fingerprint, DEFERRED, allocated_control_plane_compute
 from controller.store import SagaStore
 from controller.model import InvalidRequestError, ConflictError
 from controller.components import load_release_contract
@@ -114,6 +114,15 @@ class QualificationTest(unittest.TestCase):
              patch('controller.capacity.assess_capacity',return_value={'decision':'PROVISION_BLOCKED_CAPACITY'}):
             with self.assertRaises(InvalidRequestError):q.admit_capacity(None,{})
 
+    def test_changing_allocation_cannot_authorize_capacity(self):
+        q=self.build();(self.root/'host.json').write_text('{}')
+        with patch('controller.capacity.plan_cluster',return_value=(None,None)), \
+             patch('controller.capacity.discover_capacity',return_value={}), \
+             patch('controller.qualification.allocated_control_plane_compute',side_effect=[{}, {'vm':{'cpu':8,'cpu_mhz':16000}}]), \
+             patch('controller.capacity.assess_capacity') as assess:
+            with self.assertRaises(InvalidRequestError):q.admit_capacity(None,{},kubernetes=object())
+            assess.assert_not_called()
+
     def test_no_live_gate_in_checked_in_release_is_promoted(self):
         self.assertFalse(any(MANIFEST['hardGates'].values()))
 
@@ -144,3 +153,77 @@ class QualificationTest(unittest.TestCase):
         self.path.write_text(json.dumps(self.context))
         with self.assertRaises(InvalidRequestError):
             FirstClusterQualification(self.path,self.release,self.store,previous_context=old)
+
+
+class AllocatedControlPlaneComputeTest(unittest.TestCase):
+    def setUp(self):
+        self.calls=[]
+        self.vm_id='11111111-1111-1111-1111-111111111111'
+        self.resolved=SimpleNamespace(namespace='test',project_id='project',zone_id='zone',network_id='network')
+        self.request={'name':'poc','control_plane_replicas':3,'control_plane_service_offering_id':'offering','control_plane_image_id':'template'}
+        def metadata(name,uid,owner=None):
+            return {'name':name,'uid':uid,'namespace':'test','labels':{'layersentry.io/managed':'true','layersentry.io/project':'project'},
+                    'ownerReferences':[] if owner is None else [{'kind':owner[0],'name':owner[1],'uid':owner[2]}]}
+        self.cluster={'metadata':metadata('poc','cluster-uid')}
+        self.cp={'metadata':metadata('poc-control-plane','cp-uid',('Cluster','poc','cluster-uid')),'spec':{'replicas':3}}
+        self.machine={'metadata':metadata('machine','machine-uid',('RKE2ControlPlane','poc-control-plane','cp-uid')),
+                      'spec':{'clusterName':'poc','infrastructureRef':{'apiGroup':'infrastructure.cluster.x-k8s.io','kind':'CloudStackMachine','name':'capc'}}}
+        self.capc={'metadata':metadata('capc','capc-uid',('Machine','machine','machine-uid')),
+                   'spec':{'offering':{'id':'offering'},'template':{'id':'template'},'instanceID':self.vm_id,'providerID':'cloudstack:///'+self.vm_id}}
+        self.listing={'items':[self.machine]}
+        self.offering={'cpunumber':8,'cpuspeed':2000,'memory':6144}
+        self.vm={'id':self.vm_id,'projectid':'project','zoneid':'zone','hostid':'host','serviceofferingid':'offering',
+                 'templateid':'template','cpunumber':8,'cpuspeed':2000,'memory':6144,'state':'Running','nic':[{'networkid':'network','isdefault':True}]}
+        def get(method,path):
+            self.calls.append((method,path));self.assertEqual(method,'GET')
+            if '/machines?' in path:return self.listing
+            return {'clusters':self.cluster,'rke2controlplanes':self.cp,'cloudstackmachines':self.capc}[path.split('/')[-2]]
+        def exact(command,collection,id,**kwargs):
+            self.calls.append((command,id));self.assertIn(command,('listServiceOfferings','listVirtualMachines'))
+            if command=='listVirtualMachines':
+                self.assertEqual(kwargs,{'projectid':'project'});self.assertEqual(id,self.vm_id)
+                return self.vm
+            return self.offering
+        self.kubernetes=SimpleNamespace(request=get)
+        self.resolver=SimpleNamespace(_exact=exact)
+
+    def observe(self):
+        return allocated_control_plane_compute(self.kubernetes,self.resolver,self.resolved,self.request,'host')
+
+    def test_exact_running_capc_identity_is_read_only_and_counted_once(self):
+        self.assertEqual(self.observe(),{self.vm_id:{'cpu':8,'cpu_mhz':16000}})
+        self.assertEqual(self.observe(),self.observe())  # Restart is fresh observation, not durable credit.
+        self.assertTrue(all(c[0] in ('GET','listServiceOfferings','listVirtualMachines') for c in self.calls))
+
+    def test_absent_capc_allocation_and_nonrunning_vm_get_no_credit(self):
+        self.capc['spec'].pop('instanceID');self.assertEqual(self.observe(),{})
+        self.capc['spec']['instanceID']=self.vm_id
+        for state in ('Starting','Stopped','Error','Destroyed'):
+            self.vm['state']=state;self.assertEqual(self.observe(),{})
+
+    def test_foreign_native_scope_and_changed_profile_are_rejected(self):
+        original=deepcopy(self.vm)
+        for field in ('projectid','zoneid','hostid','serviceofferingid','templateid','cpunumber','cpuspeed','memory','nic'):
+            with self.subTest(field=field):
+                self.vm=deepcopy(original);self.vm[field]=[] if field=='nic' else 'foreign'
+                with self.assertRaises(InvalidRequestError):self.observe()
+
+    def test_owner_uid_tampering_and_deleting_objects_are_rejected(self):
+        for resource in (self.cp,self.machine,self.capc):
+            with self.subTest(resource=resource['metadata']['name']):
+                ref=resource['metadata']['ownerReferences'][0];old=ref['uid'];ref['uid']='foreign'
+                with self.assertRaises(InvalidRequestError):self.observe()
+                ref['uid']=old;resource['metadata']['deletionTimestamp']='2026-09-09T00:00:00Z'
+                with self.assertRaises(InvalidRequestError):self.observe()
+                resource['metadata'].pop('deletionTimestamp')
+
+    def test_duplicate_truncated_and_oversized_inventory_rejected(self):
+        for listing in ({'items':[self.machine,self.machine]}, {'items':[],'metadata':{'continue':'next'}}, {'items':[self.machine]*4}):
+            self.listing=listing
+            with self.assertRaises(InvalidRequestError):self.observe()
+
+    def test_wrong_provider_id_or_capc_profile_rejected(self):
+        original=deepcopy(self.capc)
+        for field,value in [('providerID','cloudstack:///foreign'),('offering',{'id':'foreign'}),('template',{'id':'foreign'})]:
+            self.capc=deepcopy(original);self.capc['spec'][field]=value
+            with self.assertRaises(InvalidRequestError):self.observe()

@@ -24,7 +24,90 @@ from datetime import datetime, timezone
 from pathlib import Path
 from layersentry_k8s_policy import ValidationError
 from .components import load_release_contract, qualification_template
-from .model import InvalidRequestError
+from .model import InvalidRequestError, NotFoundError
+
+
+def allocated_control_plane_compute(kubernetes, resolver, resolved, request, host_id):
+    """Read exact CAPI -> CAPC -> native VM identities, never infer by VM name.
+
+    Only existing Running control planes count. Workers, RAM and storage remain
+    fully reserved, making interrupted/restarted admission conservative.
+    """
+    from urllib.parse import urlencode
+    from .capacity import integer
+    if kubernetes is None:
+        return {}
+    namespace, name = resolved.namespace, request["name"]
+    def get(group, version, plural, object_name):
+        if any(not isinstance(v, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", v)
+               for v in (namespace, object_name)):
+            raise InvalidRequestError("Invalid qualification object identity")
+        return kubernetes.request("GET", f"/apis/{group}/{version}/namespaces/{namespace}/{plural}/{object_name}")
+    def owned(child, kind, parent):
+        refs = [r for r in child.get("metadata", {}).get("ownerReferences", []) if r.get("kind") == kind]
+        meta = parent.get("metadata", {})
+        return (bool(meta.get("uid")) and len(refs) == 1 and refs[0].get("uid") == meta["uid"]
+                and refs[0].get("name") == meta.get("name"))
+    def managed(resource):
+        meta = resource.get("metadata", {})
+        return (meta.get("namespace") == namespace and not meta.get("deletionTimestamp")
+                and meta.get("labels", {}).get("layersentry.io/managed") == "true"
+                and meta.get("labels", {}).get("layersentry.io/project") == resolved.project_id)
+    try:
+        cluster = get("cluster.x-k8s.io", "v1beta2", "clusters", name)
+    except NotFoundError:
+        return {}
+    if not managed(cluster):
+        raise InvalidRequestError("Qualification Cluster ownership mismatch")
+    try:
+        cp = get("controlplane.cluster.x-k8s.io", "v1beta2", "rke2controlplanes", name+"-control-plane")
+    except NotFoundError:
+        return {}
+    if (not managed(cp) or not owned(cp, "Cluster", cluster)
+            or cp.get("spec", {}).get("replicas") != request["control_plane_replicas"]):
+        raise InvalidRequestError("Qualification control-plane ownership mismatch")
+    query = urlencode({"labelSelector": f"cluster.x-k8s.io/cluster-name={name},cluster.x-k8s.io/control-plane", "limit": 4})
+    rows = kubernetes.request("GET", f"/apis/cluster.x-k8s.io/v1beta2/namespaces/{namespace}/machines?{query}")
+    if (not isinstance(rows.get("items"), list) or rows.get("metadata", {}).get("continue")
+            or len(rows["items"]) > request["control_plane_replicas"]):
+        raise InvalidRequestError("Qualification control-plane inventory is ambiguous")
+    offering = resolver._exact("listServiceOfferings", "serviceoffering", request["control_plane_service_offering_id"])
+    cores = integer(offering.get("cpunumber"), "control-plane CPU", 2)
+    speed = integer(offering.get("cpuspeed"), "control-plane MHz", 1)
+    observed, seen = {}, set()
+    for machine in rows["items"]:
+        meta, spec = machine.get("metadata", {}), machine.get("spec", {})
+        ref = spec.get("infrastructureRef", {})
+        if (meta.get("namespace") != namespace or meta.get("deletionTimestamp")
+                or not meta.get("uid") or meta["uid"] in seen or not owned(machine, "RKE2ControlPlane", cp)
+                or spec.get("clusterName") != name or ref.get("kind") != "CloudStackMachine"
+                or ref.get("apiGroup") != "infrastructure.cluster.x-k8s.io"):
+            raise InvalidRequestError("Qualification Machine ownership mismatch")
+        seen.add(meta["uid"])
+        capc = get("infrastructure.cluster.x-k8s.io", "v1beta3", "cloudstackmachines", ref.get("name", ""))
+        cs = capc.get("spec", {})
+        if (capc.get("metadata", {}).get("namespace") != namespace
+                or capc.get("metadata", {}).get("deletionTimestamp") or not owned(capc, "Machine", machine)
+                or cs.get("offering", {}).get("id") != request["control_plane_service_offering_id"]
+                or cs.get("template", {}).get("id") != request["control_plane_image_id"]):
+            raise InvalidRequestError("Qualification CAPC ownership/profile mismatch")
+        vm_id = cs.get("instanceID")
+        if not vm_id:
+            continue  # CAPC has not yet established any authoritative allocation.
+        if (not isinstance(vm_id, str) or not re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", vm_id)
+                or vm_id in observed or cs.get("providerID") != "cloudstack:///"+vm_id):
+            raise InvalidRequestError("Qualification CAPC instance identity mismatch")
+        vm = resolver._exact("listVirtualMachines", "virtualmachine", vm_id, projectid=resolved.project_id)
+        if (vm.get("projectid") != resolved.project_id or vm.get("zoneid") != resolved.zone_id
+                or vm.get("hostid") != host_id or vm.get("serviceofferingid") != request["control_plane_service_offering_id"]
+                or vm.get("templateid") != request["control_plane_image_id"]
+                or vm.get("cpunumber") != cores or vm.get("cpuspeed") != speed
+                or vm.get("memory") != offering.get("memory")
+                or not any(n.get("networkid") == resolved.network_id and n.get("isdefault") is True for n in vm.get("nic", []))):
+            raise InvalidRequestError("Qualification native VM scope/profile mismatch")
+        if vm.get("state") == "Running":
+            observed[vm_id] = {"cpu": cores, "cpu_mhz": cores * speed}
+    return observed
 
 DEFERRED = frozenset({
     "CloudStack CCM v1.2.0 is not qualified with Kubernetes 1.36",
@@ -109,16 +192,21 @@ class FirstClusterQualification:
         return Actor(subject="cloudstack-api-qualification:"+identity, account_id="", domain_id="",
                      project_ids=(project,), capabilities=capabilities)
 
-    def admit_capacity(self, resolver, request):
+    def admit_capacity(self, resolver, request, *, kubernetes=None):
         from .capacity import plan_cluster, discover_capacity, assess_capacity
         resolved, plan = plan_cluster(resolver, request)
         path = Path(self.context["hostEvidence"])
         if not path.is_absolute() or path.is_symlink() or path.stat().st_mode & 0o022:
             raise InvalidRequestError("qualification host evidence path invalid")
         host = json.loads(path.read_text())
+        before = allocated_control_plane_compute(kubernetes, resolver, resolved, request, self.context["hostId"])
         snapshot = discover_capacity(resolver, resolved, self.context["clusterId"],
                                      self.context["hostId"], self.context["poolId"])
-        result = assess_capacity(snapshot, plan, host)
+        after = allocated_control_plane_compute(kubernetes, resolver, resolved, request, self.context["hostId"])
+        if before != after:
+            raise InvalidRequestError("Qualification allocation changed during capacity observation")
+        compute = {k: sum(v[k] for v in after.values()) for k in ("cpu", "cpu_mhz")}
+        result = assess_capacity(snapshot, plan, host, allocated_compute=compute)
         if result["decision"] != "PROVISION_ALLOWED":
             raise InvalidRequestError("fresh qualification capacity admission failed")
         return result

@@ -181,7 +181,7 @@ def discover_capacity(resolver, resolved, cluster_id, host_id, pool_id):
             "system_vm_count": len(systems), "project_vm_count": len(vms)}
 
 
-def assess_capacity(snapshot, plan, host_evidence, now=None):
+def assess_capacity(snapshot, plan, host_evidence, now=None, *, allocated_compute=None):
     """Admission requires fresh operator-collected host reality as well as IaaS data.
 
     host_evidence is a trusted host/console receipt, never tenant request data.
@@ -217,16 +217,28 @@ def assess_capacity(snapshot, plan, host_evidence, now=None):
         # Do not spend overcommit: intersect physical and CloudStack capacities.
         cpu_available = min(cpu["available"], cpu_total - max(cpu["used"], cpu["allocated"]))
         ram_available = min(ram["available"], ram_total - max(ram["used"], ram["allocated"]), ram_free)
-        cpu_head = cpu_available - integer(plan["cpu"], "planned cpu", 1)
+        # Only the bounded qualifier supplies this independently observed CAPC
+        # allocation. RAM/storage remain conservatively reserved in full.
+        credit = allocated_compute or {"cpu": 0, "cpu_mhz": 0}
+        if set(credit) != {"cpu", "cpu_mhz"}:
+            raise InvalidRequestError("Invalid allocated compute observation")
+        credited_cpu = integer(credit["cpu"], "allocated control-plane CPU")
+        credited_mhz = integer(credit["cpu_mhz"], "allocated control-plane MHz")
+        if (credited_cpu > min(cpu["allocated"], plan["cpu"] - 2)
+                or credited_mhz > min(mhz["allocated"], plan["cpu_mhz"])
+                or bool(credited_cpu) != bool(credited_mhz)):
+            raise InvalidRequestError("Control-plane allocation is not reflected in native capacity")
+        cpu_head = cpu_available - (integer(plan["cpu"], "planned cpu", 1) - credited_cpu)
         ram_head = ram_available - integer(plan["ram_bytes"], "planned memory", 1)
         disk_head = primary["available"] - integer(plan["storage_bytes"], "planned storage", 1)
         result.update(post_deployment_cpu_headroom=cpu_head,
                       post_deployment_ram_headroom_gib=ram_head / GIB,
                       post_deployment_storage_headroom_gib=disk_head / GIB,
                       available_cpu=cpu_available, available_ram_gib=ram_available / GIB,
-                      management_cpu_reserve=cpu_reserve, management_ram_reserve_gib=ram_reserve / GIB)
+                      management_cpu_reserve=cpu_reserve, management_ram_reserve_gib=ram_reserve / GIB,
+                      already_allocated_control_plane_compute=credit)
         if (snapshot["host_speed_mhz"] < plan["minimum_host_speed_mhz"]
-                or mhz["available"] - plan["cpu_mhz"] < cpu_reserve * snapshot["host_speed_mhz"]):
+                or mhz["available"] - (plan["cpu_mhz"] - credited_mhz) < cpu_reserve * snapshot["host_speed_mhz"]):
             raise InvalidRequestError("Insufficient CPU MHz or host speed after reserve")
         if cpu_head < cpu_reserve:
             raise InvalidRequestError("Insufficient CPU after management/system reserve")

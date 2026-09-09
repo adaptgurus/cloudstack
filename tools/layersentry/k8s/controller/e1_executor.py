@@ -136,7 +136,7 @@ class E1Executor:
                 raise InvalidRequestError("qualification permits only its first-cluster create")
             self.qualification.validate_request(parse_cluster_request(operation.request))
             if action in {"resolve-iaas-inputs", "reconcile-infrastructure", "reconcile-control-plane", "reconcile-worker-pools"}:
-                self.qualification.admit_capacity(self.resolver, operation.request)
+                self.qualification.admit_capacity(self.resolver, operation.request, kubernetes=self.kubernetes)
         if action == "scale-worker-pool":
             request = operation.request
             resource = {

@@ -91,6 +91,37 @@ class CloudStackCapacityTest(unittest.TestCase):
     def snapshot(self):
         return discover_capacity(self.resolver, self.resolved, "cluster-1", "host-1", "pool-1")
 
+    def test_live_36_cpu_retry_does_not_count_existing_cp_compute_twice(self):
+        snapshot=self.snapshot();host=evidence();plan=deepcopy(self.plan)
+        snapshot.update(host_cpu=36,host_speed_mhz=2600)
+        snapshot['cpu']={'total':36,'used':11,'allocated':11,'available':25}
+        snapshot['cpu_mhz']={'total':93600,'used':17500,'allocated':17500,'available':76100}
+        snapshot['memory']={'total':80*GIB,'used':8*GIB,'allocated':8*GIB,'available':72*GIB}
+        host.update(total_cpu=36,total_ram_bytes=80*GIB,available_ram_bytes=70*GIB)
+        plan.update(cpu=26,cpu_mhz=52000,ram_bytes=26*GIB,storage_bytes=160*GIB)
+        self.assertEqual(assess_capacity(snapshot,plan,host,NOW)['decision'],'PROVISION_BLOCKED_CAPACITY')
+        credit={'cpu':8,'cpu_mhz':16000}
+        result=assess_capacity(snapshot,plan,host,NOW,allocated_compute=credit)
+        self.assertEqual(result['decision'],'PROVISION_ALLOWED')
+        self.assertEqual(result['post_deployment_cpu_headroom'],7)
+        self.assertEqual(result['post_deployment_ram_headroom_gib'],44)
+        self.assertEqual(result['post_deployment_storage_headroom_gib'],290)
+        # Existing allocation never cancels CPU/RAM/storage safety reserves.
+        limited=deepcopy(snapshot);limited['cpu'].update(used=17,allocated=17,available=19)
+        self.assertEqual(assess_capacity(limited,plan,host,NOW,allocated_compute=credit)['decision'],'PROVISION_BLOCKED_CAPACITY')
+        for key,value in [('available_ram_bytes',30*GIB),('observed_at','2026-09-07T00:00:00Z'),('nested_virtualization','UNKNOWN')]:
+            with self.subTest(key=key):
+                bad={**host,key:value}
+                self.assertEqual(assess_capacity(snapshot,plan,bad,NOW,allocated_compute=credit)['decision'],'PROVISION_BLOCKED_CAPACITY')
+        limited=deepcopy(snapshot);limited['primary']['available']=200*GIB
+        self.assertEqual(assess_capacity(limited,plan,host,NOW,allocated_compute=credit)['decision'],'PROVISION_BLOCKED_CAPACITY')
+
+    def test_credit_not_in_native_allocation_or_consuming_worker_reserve_rejected(self):
+        for credit in ({'cpu':3,'cpu_mhz':6000}, {'cpu':2,'cpu_mhz':5000},
+                       {'cpu':-1,'cpu_mhz':1}, {'cpu':True,'cpu_mhz':2000}, {'cpu':0,'cpu_mhz':1}):
+            with self.subTest(credit=credit):
+                self.assertEqual(assess_capacity(self.snapshot(),self.plan,evidence(),NOW,allocated_compute=credit)['decision'],'PROVISION_BLOCKED_CAPACITY')
+
     def test_native_units_plan_and_healthy_admission(self):
         snapshot = self.snapshot()
         self.assertEqual(self.plan["cpu"], 8)
