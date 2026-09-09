@@ -1,0 +1,108 @@
+--- a/bootstrap/internal/cloudinit/controlplane_init.go
++++ b/bootstrap/internal/cloudinit/controlplane_init.go
+@@ -32,7 +32,8 @@
+ runcmd:
+ {{- template "commands" .PreRKE2Commands }}
+ {{- if .AirGappedChecksum }}
+-  - [[ $(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}') == {{ .AirGappedChecksum }} ]] || exit 1{{ end }}
++  - >-
++      test "$(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}')" = "{{ .AirGappedChecksum }}" || exit 1{{ end }}
+   - {{ if .AirGapped }}INSTALL_RKE2_ARTIFACT_PATH=/opt/rke2-artifacts sh /opt/install.sh{{ else }}'curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=%[1]s sh -s - server'{{ end }} 
+ {{- if .CISEnabled }}
+   - '/opt/rke2-cis-script.sh'{{ end }}
+--- a/bootstrap/internal/cloudinit/worker_join.go
++++ b/bootstrap/internal/cloudinit/worker_join.go
+@@ -29,7 +29,8 @@
+ runcmd:
+ {{- template "commands" .PreRKE2Commands }}
+ {{- if .AirGappedChecksum }}
+-  - [[ $(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}') == {{ .AirGappedChecksum }} ]] || exit 1{{ end }}
++  - >-
++      test "$(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}')" = "{{ .AirGappedChecksum }}" || exit 1{{ end }}
+   - '{{ if .AirGapped }}INSTALL_RKE2_ARTIFACT_PATH=/opt/rke2-artifacts INSTALL_RKE2_TYPE="agent" sh /opt/install.sh{{ else }}curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=%[1]s INSTALL_RKE2_TYPE="agent" sh -s -{{end}}'
+ {{- if .CISEnabled }}
+   - '/opt/rke2-cis-script.sh'{{ end }}
+--- a/bootstrap/internal/cloudinit/cloudinit_test.go
++++ b/bootstrap/internal/cloudinit/cloudinit_test.go
+@@ -80,7 +80,8 @@
+ 
+ 
+ runcmd:
+-  - [[ $(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}') == abcd ]] || exit 1
++  - >-
++      test "$(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}')" = "abcd" || exit 1
+   - 'INSTALL_RKE2_ARTIFACT_PATH=/opt/rke2-artifacts INSTALL_RKE2_TYPE="agent" sh /opt/install.sh'
+   - 'systemctl mask rke2-server.service || true'
+   - 'systemctl enable rke2-agent.service'
+--- /dev/null
++++ b/bootstrap/internal/cloudinit/layersentry_checksum_test.go
+@@ -0,0 +1,69 @@
++package cloudinit
++
++import (
++	"crypto/sha256"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"sigs.k8s.io/yaml"
++)
++
++func TestAirgapChecksumCloudConfig(t *testing.T) {
++	for _, role := range []string{"init", "join", "worker"} {
++		t.Run(role, func(t *testing.T) {
++			data := []byte("synthetic checksum manifest\n")
++			expected := fmt.Sprintf("%x", sha256.Sum256(data))
++			input := BaseUserData{AirGapped: true, AirGappedChecksum: expected}
++			var rendered []byte
++			var err error
++			switch role {
++			case "init":
++				rendered, err = NewInitControlPlane(&ControlPlaneInput{BaseUserData: input})
++			case "join":
++				rendered, err = NewJoinControlPlane(&ControlPlaneInput{BaseUserData: input})
++			case "worker":
++				rendered, err = NewJoinWorker(&input)
++			}
++			if err != nil {
++				t.Fatal(err)
++			}
++			var config struct {
++				RunCmd []string `json:"runcmd"`
++			}
++			if err = yaml.Unmarshal(rendered, &config); err != nil {
++				t.Fatalf("invalid cloud config: %v", err)
++			}
++			if len(config.RunCmd) == 0 {
++				t.Fatal("missing runcmd")
++			}
++			directory := t.TempDir()
++			path := filepath.Join(directory, "sha256sum-amd64.txt")
++			if err = os.WriteFile(path, data, 0600); err != nil {
++				t.Fatal(err)
++			}
++			check := strings.ReplaceAll(config.RunCmd[0], "/opt/rke2-artifacts", directory)
++			if !strings.Contains(check, expected) {
++				t.Fatal("checksum lost")
++			}
++			if err = exec.Command("sh", "-c", check).Run(); err != nil {
++				t.Fatal("valid checksum rejected", err)
++			}
++			if err = os.WriteFile(path, []byte("tampered"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			if exec.Command("sh", "-c", check).Run() == nil {
++				t.Fatal("tampered checksum accepted")
++			}
++			if err = os.Remove(path); err != nil {
++				t.Fatal(err)
++			}
++			if exec.Command("sh", "-c", check).Run() == nil {
++				t.Fatal("missing checksum file accepted")
++			}
++		})
++	}
++}

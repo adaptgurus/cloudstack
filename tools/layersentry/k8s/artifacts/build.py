@@ -27,7 +27,8 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parent
 K8S = ROOT.parent
-COMPONENTS = {'capc': ('capc', '.', 'manager'),
+COMPONENTS = {'caprke2-bootstrap': ('caprke2', './bootstrap', 'manager'),
+              'capc': ('capc', '.', 'manager'),
               'ccm': ('cloudstack-ccm', './cmd/cloudstack-ccm', 'cloudstack-ccm'),
               'csi': ('cloudstack-csi', './cmd/cloudstack-csi-driver', 'cloudstack-csi-driver')}
 
@@ -100,15 +101,19 @@ def build(component, output):
                              'RUN --network=none apk add --no-network /locked-apks/*.apk '
                              '&& rm -rf /locked-apks /var/cache/apk/* /var/log/apk.log\n')
         tests = "REPO_ROOT=/src go test -p 2 ./pkg/... -ginkgo.label-filter=\"!integ\"" if component == 'capc' else 'go test -p 2 ./...'
+        if component == 'caprke2-bootstrap':
+            tests = 'go test -p 2 ./bootstrap/internal/cloudinit'
         dockerfile = (f'FROM {images["builder"]} AS build\n'
                       'WORKDIR /src\nENV GOTOOLCHAIN=local CGO_ENABLED=0 GOFLAGS=-mod=readonly\n'
                       'COPY go.mod go.sum ./\nRUN go mod download && go mod verify\n'
                       f'COPY . .\nRUN {tests}\n'
                       f'RUN go build -p 2 -trimpath -buildvcs=false -o /artifact {target}\n'
                       f'FROM {runtime}\n' + package_layer +
-                      f'COPY --from=build /artifact /{binary}\n'
-                      'LABEL org.opencontainers.image.source="https://github.com/adaptgurus/layersentry-flux-catalog"\n' +
-                      ('USER 65532:65532\n' if component == 'capc' else '') +
+                      f'COPY --from=build /artifact /{binary}\n' +
+                      ('LABEL org.opencontainers.image.source="https://github.com/adaptgurus/cloudstack"\n'
+                       if component == 'caprke2-bootstrap' else
+                       'LABEL org.opencontainers.image.source="https://github.com/adaptgurus/layersentry-flux-catalog"\n') +
+                      ('USER 65532:65532\n' if component in {'capc', 'caprke2-bootstrap'} else '') +
                       f'ENTRYPOINT ["/{binary}"]\n')
         (source / 'Dockerfile.qualification').write_text(dockerfile)
         (source / '.dockerignore').write_text('.git\n')

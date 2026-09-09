@@ -1,0 +1,57 @@
+name: LayerSentry K8s CAPRKE2 artifact
+on:
+  push:
+    branches: [codex/k8s-native-api-completion]
+    paths:
+      - tools/layersentry/k8s/downstream/caprke2/**
+      - .github/workflows/layersentry-k8s-caprke2-artifact.yml
+permissions:
+  contents: read
+concurrency:
+  group: layersentry-caprke2-artifact
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build twice and test checksum rejection
+        run: python3 tools/layersentry/k8s/artifacts/build.py caprke2-bootstrap --output reports
+      - name: Publish immutable candidate without deployment
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG="$(mktemp -d)"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u adaptgurus --password-stdin
+          image=ghcr.io/adaptgurus/layersentry-caprke2-bootstrap
+          tag="qualification-${GITHUB_SHA}"
+          original_id="$(docker image inspect layersentry-caprke2-bootstrap:qualification --format '{{.Id}}')"
+          docker tag layersentry-caprke2-bootstrap:qualification "${image}:${tag}"
+          docker push "${image}:${tag}"
+          digest="$(docker image inspect "${image}:${tag}" --format '{{index .RepoDigests 0}}')"
+          docker pull "$digest"
+          test "$(docker image inspect "$digest" --format '{{.Id}}')" = "$original_id"
+          export VERIFIED_IMAGE="$digest"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path('reports/caprke2-bootstrap.json')
+          d=json.loads(p.read_text())
+          d.update(image=os.environ['VERIFIED_IMAGE'],pullByDigestVerified=True,
+                   anonymousPullVerified=False,liveQualified=False)
+          p.write_text(json.dumps(d,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: caprke2-bootstrap-evidence
+          path: reports/*.json
+          if-no-files-found: error

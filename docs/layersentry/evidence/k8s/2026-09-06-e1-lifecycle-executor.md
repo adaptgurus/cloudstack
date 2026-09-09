@@ -141,3 +141,28 @@ no data volume, and CAPI no NodeRef. Requested deletion only of CAPI Machine
 `ls-rke2-poc-control-plane-vsrmj`; provider finalizers own cleanup/recreation.
 Retry guard allowed the materially changed firewall environment. No manual
 RKE2 installation, cloud-init replay, native VM deletion, or finalizer removal.
+
+Fresh replacement `e9c1ef73-99a2-4b13-9402-83a8f15f9105` / `i-4-10-VM`
+obtained 172.17.30.32 on its first boot. VR HTTP access logs prove successful
+cloud-init metadata and userdata retrieval. Its log reports DataSourceCloudStack.
+A temporary diagnostic SSH public-key addition was rejected by the guest agent;
+no SSH key was installed and the restriction was not disabled.
+
+The next proven defect is CAPRKE2 0.25.2 cloud-init serialization: its air-gap
+checksum command starts with unquoted `[[`, which YAML interprets as a flow
+sequence. The actual guest log reports invalid YAML at line 258 and an empty
+merged cloud-config. Independently decompressing the delivered userdata and
+parsing it reproduces the error. Replacing only that command with a folded YAML
+scalar and POSIX `test` makes the exact delivered document parse (eight runcmd
+entries). The checksum remains mandatory and fail-closed.
+
+Prepared a pinned downstream bootstrap-only patch at the same upstream commit
+`38602b72a23faf719b94b250eba66ef804bf9706`; no provider version upgrade. Regression
+tests render and parse initial CP, joining CP and worker cloud-config, then
+execute checksum checks against valid, tampered and missing files. The patched
+upstream cloudinit Go package passed locally; 137 K8s tests and five downstream
+tests passed. Local image compilation was stopped after the tests so the scoped
+K8s publishing workflow can perform the two authoritative clean builds and
+publish with Actions package permission. The local GitHub credential lacks
+package scope. No patched provider rollout or immutable-readiness assertion is
+made before successful publication, digest retrieval and consumption binding.
