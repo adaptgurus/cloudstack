@@ -620,3 +620,12 @@ live etcd 3.6.14 help. JSON-array log-outputs is required by that conversion pat
 A protected CP2 RKE2 config drop-in is under live validation; no CAPI template
 rollout or VM creation has been dispatched for this change. Existing latency
 measurements remain a separate concern, not resolved by file logging.
+
+Logging source commit: `7b6d3976948b1174c2db2c55544c24a01b7d62fd`.
+Regenerated distribution from those exact bytes: tree
+`fb85a7d67ef4a1eec7618858233dd4801e0b6d69a3e2b9018d1852b03dd43110`, receipt
+`cc61b0d5aa98149ed94fa88bff9069f17e891c04f67b25e0cd4b711738bb0512`.
+Validation: 18 focused tests PASS; complete validate-source.py PASS with 151 K8s
+and 5 downstream tests. Distribution verification and diff checks PASS. The same
+seven live-readiness blockers remain false; this source evidence is not cluster
+or lifecycle qualification.
