@@ -449,3 +449,9 @@ Live corrected admission PASS: exact existing CP credit 8 CPU/16000 MHz;
 remaining headroom 7 CPU, 42.160240173339844 GiB RAM, 549.6988518685102 GiB primary.
 The same operation/journal resumed; no replayed Cluster create or VM duplication.
 CAPI Cluster unpaused and BFF restarted; reconciler timer remains inactive.
+
+CI 34321668345 failed only because hosted Python lacked PyYAML for the new RBAC
+YAML. Converted identical Role/RoleBinding objects to
+`tools/layersentry/k8s/qualification-capacity-read.json` (Kubernetes List).
+Normalized objects compare equal; no extra dependency or permission change.
+Installed controller source/release bytes remain those already CI-verified.
