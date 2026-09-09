@@ -662,3 +662,15 @@ console using the existing restricted public key; the temporary console password
 was relocked and deleted locally. Its observed join requests reach the supervisor
 and receive runtime-core-not-ready/503 while control planes recover. No worker
 VM replacement or bootstrap-token change was performed.
+
+Cold-unpack source commit: `4069864dd69a77d844d2da7900128a874f325e59`.
+Exact regenerated tree:
+`04e8a4ad54125c353481edd42ac5be0424f6167b3d86d2307f351e98b6d469ec`;
+receipt SHA: `ad1acbe21235934394118ba66376f790cf065d76ca5c735b4030e99d1f8a61ec`.
+Full validation PASS: 152 K8s tests + 5 downstream tests; distribution and diff
+checks PASS. Seven live-readiness gates remain pending.
+
+CP1 subsequently completed its logging-config static-pod replacement. Its RKE2
+service is active, protected file sink exists, local etcd linearizable health
+passed (sample latency 1.124793941s), and workload API responds again. This remains
+high-latency recovery evidence, not sustained performance or all-node readiness.
